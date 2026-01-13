@@ -1,0 +1,58 @@
+# 📈 Comprehensive Stock Analysis Dashboard Plan (Pandas & Plotly/Dash)
+
+This plan outlines a highly interactive, analyst-grade dashboard built using **Dash** (Plotly's application framework) and **Pandas** to provide meaningful, multi-dimensional insights from your **110+ stock parameters**.
+
+All visualizations will feature interactive elements and conditional formatting to help analysts quickly identify opportunities and risks.
+
+***
+
+## 1. Dashboard Controls & Interactivity ⚙️
+
+The top of every tab will feature global controls powered by Dash/Pandas filtering:
+
+| Control Type | Data Field Used | Options & Functionality |
+| :--- | :--- | :--- |
+| **Stock Selection** (Dropdown/Checkboxes) | $\text{Ticker}$, $\text{Company Name}$ | **Select All**, **Select Group of Stocks** (e.g., TATA Group stocks), or **Single Stock** deep-dive. |
+| **Sector Filter** (Dropdown/Multi-Select) | $\text{Sector}$, $\text{Industry}$ | Filter the entire dataset instantly (e.g., show only **Technology** and **Financial Services**). |
+| **Metric Filter** (Slider/Input) | $\text{P/E (TTM)}$, $\text{RSI14}$, $\text{Debt/Equity}$ | Apply quantitative filters (e.g., $\text{P/E} < 20$ AND $\text{RSI14} > 70$). |
+| **Color/Size By** (Dropdown) | Any quantitative column | Allows the user to select the third and fourth dimensions for scatter plots. |
+
+***
+
+## 2. Tab 1: Cross-Sectional & Relative Valuation 💰
+
+**Goal:** Compare stocks and identify relative value/quality opportunities across the selected universe.
+
+| Visualization | Key Metrics Used | Interactive/Conditional Formatting |
+| :--- | :--- | :--- |
+| **Valuation vs. Quality Scatter Plot** | **X-Axis:** $\text{P/E (TTM)}$ **Y-Axis:** $\text{ROE TTM \%}$ **Color/Size:** $\text{Market Cap (INR Cr)}$ | **Interactive:** Analyst can swap X/Y axes to compare $\text{P/B}$ vs. $\text{ROCE TTM \%}$. **Conditioning:** Color stock points **Green** if $\text{ROE TTM \%} > 15\%$ and **Red** if $\text{P/E} > 30$. |
+| **Sector Box Plots** | $\text{FCF Yield \%}$ grouped by $\text{Sector}$ | **Stock/Sector Wise:** Select 'Sector Wise' to see the distribution of $\text{FCF Yield \%}$ for each sector. **Conditioning:** Center line of the box plot is **Amber** if the $\text{Sector P/E (Median)}$ is high, indicating expensive sector. |
+| **Ranking Bar Chart** | $\text{Ticker}$ vs. User-Selected Metric (e.g., $\text{CAGR 3Y \%}$) | **Select Stock/Group:** Shows the ranking for the chosen group only. **Conditioning:** Bars are colored **Green** for the top $25\%$ of performers and **Red** for the bottom $25\%$. |
+
+***
+
+## 3. Tab 2: Technical & Momentum Analysis ⚡
+
+**Goal:** Evaluate trend health, short-term signals, and risk using technical indicators. This tab is critical for $\text{SMA20}$, $\text{RSI}$, and $\text{MACD}$ analysis.
+
+| Visualization | Key Metrics Used | Interactive/Conditional Formatting |
+| :--- | :--- | :--- |
+| **Momentum Status Indicators** | $\text{Return 1D \%}$, $\text{Return 1W \%}$, $\text{Return 6M \%}$ | **Stock Wise:** Displays three separate gauge charts for the selected stock. **Conditioning:** **Green** if $\text{Return}$ is $> 5\%$, **Red** if $\text{Return}$ is $< -5\%$, **Amber** otherwise. |
+| **Moving Average Proximity Chart** | $\text{Price (Last)}$, $\text{SMA20}$, $\text{SMA50}$, $\text{SMA200}$ | **Select All/Group:** A custom bar chart showing the percentage distance between $\text{Price (Last)}$ and the three $\text{SMAs}$ for all selected stocks. |
+| | | **Conditioning:** Bar is **Green** if $\text{Price}$ is above all three $\text{SMAs}$ (bullish), **Red** if below all three (bearish), **Amber** if mixed. |
+| **Technical Strength Scatter Plot** | **X-Axis:** $\text{RSI14}$ **Y-Axis:** $\text{MACD Hist}$ **Size:** $\text{Volatility 30D \%}$ | **Interactive:** Analyst clicks on a point, and a small panel displays the stock's $\text{ATR14}$, $\text{BB Upper}$, and $\text{BB Lower}$ values. **Conditioning:** Points are colored **Red** if $\text{RSI14} > 70$ (overbought), and **Green** if $\text{RSI14} < 30$ (oversold). |
+
+***
+
+## 4. Tab 3: Correlation & High-Dimensional Risk 🔗
+
+**Goal:** Understand the complex structural relationships between the $110+$ parameters and visualize risk-adjusted performance.
+
+| Visualization | Key Metrics Used | Interactive/Conditional Formatting |
+| :--- | :--- | :--- |
+| **Correlation Heatmap** | **All $\approx 100$ Quantitative Parameters** | **Interactive:** Hover over any square to see the exact correlation coefficient. **Conditioning:** Color scale: Deep **Green** for correlation near $+1.0$, Deep **Red** for correlation near $-1.0$. |
+| **Risk-Adjusted Return Plot** | **X-Axis:** $\text{Max Drawdown 1Y \%}$ **Y-Axis:** $\text{Sharpe 1Y}$ **Color:** $\text{Sortino 1Y}$ | **Select All/Group:** Allows quick comparison of risk efficiency. **Conditioning:** Points are sized by $\text{Volatility 90D \%}$. Stocks in the top-right quadrant (high $\text{Sharpe}$, low $\text{Max Drawdown}$) are prioritized with a bright **Green** border. |
+| **Sentiment vs. Performance** | $\text{News Sentiment Score}$, $\text{Social Media Sentiment}$, $\text{Return 1W \%}$ | **Sector Wise:** Box plots showing the distribution of $\text{News Sentiment Score}$ for each sector. **Conditioning:** The $\text{Return 1W \%}$ of the selected stock is colored **Green** if sentiment is positive, indicating confirmation. |
+
+***
+*This structure ensures that all $110+$ parameters are accessible and contribute to meaningful analysis, with filtering and conditional formatting providing clear signals.*
