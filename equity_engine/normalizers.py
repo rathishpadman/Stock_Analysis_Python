@@ -314,8 +314,8 @@ def compute_beta(ticker: str, index_symbol: str = '^NSEI', years: int = 2, windo
         used_method = 'daily'
         if joined.empty or len(joined) < min_daily_points:
             try:
-                s_month = hist['Close'].resample('M').last().pct_change().dropna()
-                m_month = idx_hist['Close'].resample('M').last().pct_change().dropna()
+                s_month = hist['Close'].resample('ME').last().pct_change().dropna()
+                m_month = idx_hist['Close'].resample('ME').last().pct_change().dropna()
                 joinedm = s_month.to_frame('s').join(m_month.to_frame('m'), how='inner').dropna()
                 if not joinedm.empty and len(joinedm) >= 12:
                     joined = joinedm

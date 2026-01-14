@@ -347,14 +347,7 @@ def run_pipeline(template_path: str, out_path: str) -> None:
     except Exception:
         logger.warning("Could not find 'NIFTY50' sheet in template. Output columns may not match.")
 
-    # --- vvv THIS IS THE MODIFIED BLOCK vvv ---
-    
-# ...existing code...
-# --- vvv THIS IS THE MODIFIED BLOCK vvv ---
-
-# prepare output filename
-# --- vvv THIS IS THE MODIFIED BLOCK vvv ---
-# prepare output filename
+    # Merge enriched technicals (stocks) with the universe metadata (uni)
     final_out_path = out_path
     if out_path == "Stocks_Analysis_Populated.xlsx":
         now = dt.datetime.now()

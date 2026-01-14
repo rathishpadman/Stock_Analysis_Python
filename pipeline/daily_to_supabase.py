@@ -9,10 +9,17 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
 
 def get_supabase_client() -> Client:
-    url = os.getenv("SUPABASE_URL")
-    key = os.getenv("SUPABASE_SERVICE_KEY")
+    url = os.getenv("SUPABASE_URL", "").strip()
+    key = os.getenv("SUPABASE_SERVICE_KEY", "").strip()
     if not url or not key:
         raise ValueError("SUPABASE_URL and SUPABASE_SERVICE_KEY must be set")
+    
+    # Debug logging for URL format (masked for security)
+    import logging
+    logger = logging.getLogger(__name__)
+    masked_url = f"{url[:12]}...{url[-5:]}" if len(url) > 20 else "Invalid Length"
+    logger.info(f"Initializing Supabase client with URL: {masked_url}")
+    
     return create_client(url, key)
 
 def prepare_daily_payload(df: pd.DataFrame, snapshot_date: date) -> list:
@@ -23,8 +30,12 @@ def prepare_daily_payload(df: pd.DataFrame, snapshot_date: date) -> list:
     df = df.replace([np.inf, -np.inf], np.nan)
     
     for _, row in df.iterrows():
+        ticker = str(row.get("symbol", row.get("Ticker", ""))).strip()
+        if not ticker:
+            continue
+            
         item = {
-            "ticker": str(row.get("symbol", "")),
+            "ticker": ticker,
             "company_name": str(row.get("Company Name", row.get("companyName", ""))),
             "date": snapshot_date.isoformat(),
             
@@ -83,7 +94,7 @@ def upload_to_supabase(payload: list):
     supabase = get_supabase_client()
     try:
         # Upsert by (ticker, date) unique constraint
-        supabase.table("daily_stocks").upsert(payload).execute()
+        supabase.table("daily_stocks").upsert(payload, on_conflict="ticker,date").execute()
         print(f"Successfully uploaded {len(payload)} rows to Supabase")
     except Exception as e:
         print(f"Error uploading to Supabase: {e}")
