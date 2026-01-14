@@ -11,7 +11,7 @@ export default function DashboardPage() {
   const { user, loading: authLoading, signInWithGoogle, signOut } = useAuth();
   const [stocks, setStocks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isLocalTest, setIsLocalTest] = useState(false);
+  const [timeframe, setTimeframe] = useState<'1d' | '1w' | '1m'>('1d');
   const [visibleColumns, setVisibleColumns] = useState(DEFAULT_COLUMNS);
   const [searchQuery, setSearchQuery] = useState('');
   const [showColumnPicker, setShowColumnPicker] = useState(false);
@@ -26,23 +26,6 @@ export default function DashboardPage() {
 
   const fetchStocks = async () => {
     setLoading(true);
-    if (isLocalTest) {
-      // Use mock data for testing
-      setStocks([
-        { ticker: 'RELIANCE', company_name: 'Reliance Industries', price_last: 1565.10, return_1d: 0.55, overall_score: 82.5, rsi14: 65.2, sector: 'Energy', pe_ttm: 25.4 },
-        { ticker: 'TCS', company_name: 'Tata Consultancy Services', price_last: 3850.40, return_1d: -1.2, overall_score: 78.1, rsi14: 45.8, sector: 'IT', pe_ttm: 30.1 },
-        { ticker: 'HDFCBANK', company_name: 'HDFC Bank', price_last: 1620.00, return_1d: 0.1, overall_score: 85.4, rsi14: 58.9, sector: 'Finance', pe_ttm: 18.2 },
-        { ticker: 'INFY', company_name: 'Infosys', price_last: 1450.75, return_1d: 0.8, overall_score: 75.2, rsi14: 52.1, sector: 'IT', pe_ttm: 22.5 },
-        { ticker: 'ICICIBANK', company_name: 'ICICI Bank', price_last: 980.50, return_1d: -0.3, overall_score: 72.8, rsi14: 48.3, sector: 'Finance', pe_ttm: 16.8 },
-        { ticker: 'HINDUNILVR', company_name: 'Hindustan Unilever', price_last: 2520.00, return_1d: 0.2, overall_score: 68.5, rsi14: 55.7, sector: 'FMCG', pe_ttm: 58.2 },
-        { ticker: 'BAJFINANCE', company_name: 'Bajaj Finance', price_last: 7250.00, return_1d: 1.5, overall_score: 79.3, rsi14: 62.4, sector: 'Finance', pe_ttm: 35.1 },
-        { ticker: 'BHARTIARTL', company_name: 'Bharti Airtel', price_last: 1125.30, return_1d: 0.9, overall_score: 81.2, rsi14: 68.9, sector: 'Telecom', pe_ttm: 45.3 },
-        { ticker: 'SBIN', company_name: 'State Bank of India', price_last: 625.40, return_1d: -0.5, overall_score: 55.1, rsi14: 38.2, sector: 'Finance', pe_ttm: 9.8 },
-        { ticker: 'MARUTI', company_name: 'Maruti Suzuki', price_last: 10850.00, return_1d: 0.7, overall_score: 71.6, rsi14: 54.8, sector: 'Auto', pe_ttm: 28.4 },
-      ]);
-      setLoading(false);
-      return;
-    }
     try {
       const res = await fetch('/api/stocks');
       const data = await res.json();
@@ -60,17 +43,25 @@ export default function DashboardPage() {
     );
   };
 
+  const updateTimeframe = (tf: '1d' | '1w' | '1m') => {
+    setTimeframe(tf);
+    setVisibleColumns(prev => {
+      const base = prev.filter(c => !['return_1d', 'return_1w', 'return_1m'].includes(c));
+      return [...base, `return_${tf}`];
+    });
+  };
+
   if (authLoading) return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center">
       <Loader2 className="h-8 w-8 text-blue-600 animate-spin" />
     </div>
   );
 
-  if (!user && !isLocalTest) return (
+  if (!user) return (
     <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4">
       <div className="max-w-md w-full text-center space-y-8 bg-slate-900 border border-slate-800 p-12 rounded-2xl shadow-2xl">
-        <h1 className="text-4xl font-extrabold text-white tracking-tight">Stock Pipeline</h1>
-        <p className="text-slate-400">Sign in with Google to access your dashboard and analyzed metrics.</p>
+        <h1 className="text-4xl font-extrabold text-white tracking-tight">Stock Analysis Dashboard</h1>
+        <p className="text-slate-400">Sign in with Google to access your daily enriched snapshots and metrics.</p>
         <div className="space-y-4">
           <button
             onClick={signInWithGoogle}
@@ -83,30 +74,6 @@ export default function DashboardPage() {
               <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 12-4.53z" fill="#EA4335" />
             </svg>
             Continue with Google
-          </button>
-
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-slate-800"></span></div>
-            <div className="relative flex justify-center text-xs uppercase"><span className="bg-slate-900 px-2 text-slate-500 font-bold">Or</span></div>
-          </div>
-
-          <button
-            onClick={() => {
-              setIsLocalTest(true);
-              setLoading(true);
-              // Trigger reload in local mode
-              setTimeout(() => {
-                setStocks([
-                  { ticker: 'RELIANCE', company_name: 'Reliance Industries', price_last: 1565.10, return_1d: 0.55, overall_score: 82.5, rsi14: 65.2, sector: 'Energy', pe_ttm: 25.4 },
-                  { ticker: 'TCS', company_name: 'Tata Consultancy Services', price_last: 3850.40, return_1d: -1.2, overall_score: 78.1, rsi14: 45.8, sector: 'IT', pe_ttm: 30.1 },
-                  { ticker: 'HDFCBANK', company_name: 'HDFC Bank', price_last: 1620.00, return_1d: 0.1, overall_score: 85.4, rsi14: 58.9, sector: 'Finance', pe_ttm: 18.2 },
-                ]);
-                setLoading(false);
-              }, 500);
-            }}
-            className="w-full bg-slate-800 text-slate-300 font-medium py-2.5 px-6 rounded-lg hover:bg-slate-700 transition-all border border-slate-700"
-          >
-            Enter Local Test Mode (No Auth)
           </button>
         </div>
       </div>
@@ -127,12 +94,24 @@ export default function DashboardPage() {
         </div>
 
         <div className="flex items-center gap-4">
+          <div className="flex bg-slate-900 border border-slate-800 rounded-lg p-1">
+            {(['1d', '1w', '1m'] as const).map((tf) => (
+              <button
+                key={tf}
+                onClick={() => updateTimeframe(tf)}
+                className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${timeframe === tf ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}
+              >
+                {tf.toUpperCase()}
+              </button>
+            ))}
+          </div>
+
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
             <input
               type="text"
-              placeholder="Search ticker or company..."
-              className="bg-slate-900 border border-slate-700 rounded-md pl-10 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 transition-all w-64 text-white"
+              placeholder="Search..."
+              className="bg-slate-900 border border-slate-700 rounded-md pl-10 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 transition-all w-48 text-white"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -140,26 +119,23 @@ export default function DashboardPage() {
 
           <button
             onClick={() => setShowCharts(!showCharts)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors text-sm border ${showCharts ? 'bg-blue-900/30 border-blue-800 text-blue-300' : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'}`}
+            className={`flex items-center gap-2 px-3 py-2 rounded-md transition-colors text-sm border ${showCharts ? 'bg-blue-900/30 border-blue-800 text-blue-300' : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'}`}
           >
             <BarChart3 className="h-4 w-4" />
-            {showCharts ? 'Hide Analytics' : 'Show Analytics'}
           </button>
 
           <button
             onClick={() => setShowColumnPicker(!showColumnPicker)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors text-sm border ${showColumnPicker ? 'bg-blue-900/30 border-blue-800 text-blue-300' : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'}`}
+            className={`flex items-center gap-2 px-3 py-2 rounded-md transition-colors text-sm border ${showColumnPicker ? 'bg-blue-900/30 border-blue-800 text-blue-300' : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'}`}
           >
             <Settings2 className="h-4 w-4" />
-            Customize View
           </button>
 
           <button
-            onClick={user ? signOut : () => setIsLocalTest(false)}
-            className="flex items-center gap-2 bg-rose-950/30 hover:bg-rose-900/50 border border-rose-900/50 px-4 py-2 rounded-md transition-colors text-sm text-rose-300"
+            onClick={signOut}
+            className="flex items-center gap-2 bg-rose-950/30 hover:bg-rose-900/50 border border-rose-900/50 px-3 py-2 rounded-md transition-colors text-sm text-rose-300"
           >
             <LogOut className="h-4 w-4" />
-            {user ? 'Sign Out' : 'Exit Test Mode'}
           </button>
         </div>
       </header>
