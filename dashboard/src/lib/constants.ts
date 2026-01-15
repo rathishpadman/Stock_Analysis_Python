@@ -1,30 +1,115 @@
 export const ALL_FIELDS = [
+    // Basic Metadata
     { id: 'ticker', label: 'Ticker', group: 'Basic' },
     { id: 'company_name', label: 'Company', group: 'Basic' },
+    { id: 'isin', label: 'ISIN', group: 'Basic' },
+    { id: 'exchange', label: 'Exchange', group: 'Basic' },
+    { id: 'sector', label: 'Sector', group: 'Basic' },
+    { id: 'industry', label: 'Industry', group: 'Basic' },
+    { id: 'currency', label: 'Currency', group: 'Basic' },
+
+    // Price & Returns
     { id: 'price_last', label: 'Price', group: 'Price' },
+    { id: 'high_52w', label: '52W High', group: 'Price' },
+    { id: 'low_52w', label: '52W Low', group: 'Price' },
     { id: 'return_1d', label: '1D Return %', group: 'Price' },
     { id: 'return_1w', label: '1W Return %', group: 'Price' },
     { id: 'return_1m', label: '1M Return %', group: 'Price' },
-    { id: 'high_52w', label: '52W High', group: 'Price' },
-    { id: 'low_52w', label: '52W Low', group: 'Price' },
+    { id: 'return_3m', label: '3M Return %', group: 'Price' },
+    { id: 'return_6m', label: '6M Return %', group: 'Price' },
+    { id: 'return_1y', label: '1Y Return %', group: 'Price' },
+    { id: 'cagr_3y_pct', label: '3Y CAGR %', group: 'Price' },
+    { id: 'cagr_5y_pct', label: '5Y CAGR %', group: 'Price' },
 
+    // Fundamental - Size & Value
+    { id: 'market_cap_cr', label: 'Market Cap (Cr)', group: 'Fundamental' },
+    { id: 'enterprise_value_cr', label: 'EV (Cr)', group: 'Fundamental' },
+    { id: 'shares_outstanding', label: 'Shares Out.', group: 'Fundamental' },
+    { id: 'free_float_pct', label: 'Free Float %', group: 'Fundamental' },
     { id: 'pe_ttm', label: 'P/E (TTM)', group: 'Fundamental' },
     { id: 'pb', label: 'P/B', group: 'Fundamental' },
-    { id: 'roe_ttm', label: 'ROE TTM %', group: 'Fundamental' },
-    { id: 'debt_equity', label: 'Debt/Equity', group: 'Fundamental' },
-    { id: 'market_cap_cr', label: 'Market Cap (Cr)', group: 'Fundamental' },
+    { id: 'ps_ratio', label: 'P/S Ratio', group: 'Fundamental' },
+    { id: 'ev_ebitda_ttm', label: 'EV/EBITDA', group: 'Fundamental' },
+    { id: 'peg_ratio', label: 'PEG Ratio', group: 'Fundamental' },
+    { id: 'dividend_yield_pct', label: 'Div. Yield %', group: 'Fundamental' },
 
-    { id: 'rsi14', label: 'RSI(14)', group: 'Technical' },
+    // Fundamental - Performance & Health
+    { id: 'revenue_ttm_cr', label: 'Revenue TTM (Cr)', group: 'Fundamental' },
+    { id: 'ebitda_ttm_cr', label: 'EBITDA TTM (Cr)', group: 'Fundamental' },
+    { id: 'net_income_ttm_cr', label: 'Net Income TTM (Cr)', group: 'Fundamental' },
+    { id: 'eps_ttm', label: 'EPS TTM', group: 'Fundamental' },
+    { id: 'roe_ttm', label: 'ROE TTM %', group: 'Fundamental' },
+    { id: 'roa_pct', label: 'ROA %', group: 'Fundamental' },
+    { id: 'debt_equity', label: 'Debt/Equity', group: 'Fundamental' },
+    { id: 'interest_coverage', label: 'Interest Cov.', group: 'Fundamental' },
+    { id: 'revenue_growth_yoy_pct', label: 'Rev. Growth YoY %', group: 'Fundamental' },
+    { id: 'eps_growth_yoy_pct', label: 'EPS Growth YoY %', group: 'Fundamental' },
+    { id: 'gross_profit_margin_pct', label: 'Gross Margin %', group: 'Fundamental' },
+    { id: 'operating_profit_margin_pct', label: 'Op. Margin %', group: 'Fundamental' },
+    { id: 'net_profit_margin_pct', label: 'Net Margin %', group: 'Fundamental' },
+
+    // Cash Flow
+    { id: 'ocf_ttm_cr', label: 'OCF TTM (Cr)', group: 'Fundamental' },
+    { id: 'capex_ttm_cr', label: 'CapEx TTM (Cr)', group: 'Fundamental' },
+    { id: 'fcf_ttm_cr', label: 'FCF TTM (Cr)', group: 'Fundamental' },
+    { id: 'fcf_yield_pct', label: 'FCF Yield %', group: 'Fundamental' },
+
+    // Technical Indicators
     { id: 'sma20', label: 'SMA 20', group: 'Technical' },
     { id: 'sma50', label: 'SMA 50', group: 'Technical' },
     { id: 'sma200', label: 'SMA 200', group: 'Technical' },
+    { id: 'rsi14', label: 'RSI(14)', group: 'Technical' },
+    { id: 'macd_line', label: 'MACD Line', group: 'Technical' },
+    { id: 'macd_signal', label: 'MACD Signal', group: 'Technical' },
+    { id: 'macd_hist', label: 'MACD Hist', group: 'Technical' },
+    { id: 'adx14', label: 'ADX(14)', group: 'Technical' },
+    { id: 'atr14', label: 'ATR(14)', group: 'Technical' },
+    { id: 'bb_upper', label: 'BB Upper', group: 'Technical' },
+    { id: 'bb_lower', label: 'BB Lower', group: 'Technical' },
+    { id: 'aroon_up', label: 'Aroon Up', group: 'Technical' },
+    { id: 'aroon_down', label: 'Aroon Down', group: 'Technical' },
+    { id: 'stoch_k', label: 'Stoch %K', group: 'Technical' },
+    { id: 'stoch_d', label: 'Stoch %D', group: 'Technical' },
+    { id: 'obv', label: 'OBV', group: 'Technical' },
 
-    { id: 'score_fundamental', label: 'Fund. Score', group: 'Scores' },
-    { id: 'score_technical', label: 'Tech. Score', group: 'Scores' },
+    // Volume & Liquidity
+    { id: 'avg_volume_1w', label: 'Avg Vol (1W)', group: 'Technical' },
+    { id: 'volume_vs_3m_avg_pct', label: 'Vol vs 3M Avg %', group: 'Technical' },
+    { id: 'avg_daily_turnover_3m_cr', label: 'Daily Turnover (Cr)', group: 'Technical' },
+
+    // Scores & Analysis
     { id: 'overall_score', label: 'Overall Score', group: 'Scores' },
+    { id: 'score_fundamental', label: 'Fundamental Score', group: 'Scores' },
+    { id: 'score_technical', label: 'Technical Score', group: 'Scores' },
+    { id: 'score_risk', label: 'Risk Score', group: 'Scores' },
+    { id: 'score_sentiment', label: 'Sentiment Score', group: 'Scores' },
+    { id: 'score_macro', label: 'Macro Score', group: 'Scores' },
+    { id: 'macro_composite', label: 'Macro Composite', group: 'Scores' },
 
-    { id: 'sector', label: 'Sector', group: 'Metadata' },
-    { id: 'industry', label: 'Industry', group: 'Metadata' },
+    // Analyst & Market Sentiment
+    { id: 'recommendation', label: 'Recommendation', group: 'Sentiment' },
+    { id: 'consensus_rating', label: 'Consensus (1-5)', group: 'Sentiment' },
+    { id: 'target_price', label: 'Target Price', group: 'Sentiment' },
+    { id: 'upside_pct', label: 'Upside %', group: 'Sentiment' },
+    { id: 'num_analysts', label: '# Analysts', group: 'Sentiment' },
+    { id: 'news_sentiment_score', label: 'News Sentiment', group: 'Sentiment' },
+    { id: 'social_sentiment', label: 'Social Sentiment', group: 'Sentiment' },
+
+    // Deep Analysis & Quality
+    { id: 'quality_score', label: 'Quality Score', group: 'Analysis' },
+    { id: 'momentum_score', label: 'Momentum Score', group: 'Analysis' },
+    { id: 'alpha_1y_pct', label: 'Alpha 1Y %', group: 'Analysis' },
+    { id: 'sortino_1y', label: 'Sortino 1Y', group: 'Analysis' },
+    { id: 'economic_moat_score', label: 'Economic Moat Score', group: 'Analysis' },
+    { id: 'altman_z', label: 'Altman Z-Score', group: 'Analysis' },
+    { id: 'piotroski_f', label: 'Piotroski F-Score', group: 'Analysis' },
+    { id: 'esg_score', label: 'ESG Score', group: 'Analysis' },
+
+    // Qualitative Notes
+    { id: 'moat_notes', label: 'Moat Notes', group: 'Deep Dive' },
+    { id: 'risk_notes', label: 'Risk Notes', group: 'Deep Dive' },
+    { id: 'catalysts', label: 'Catalysts', group: 'Deep Dive' },
+    { id: 'sector_notes', label: 'Sector Notes', group: 'Deep Dive' },
 ];
 
-export const DEFAULT_COLUMNS = ['ticker', 'company_name', 'price_last', 'return_1d', 'overall_score', 'rsi14', 'sector'];
+export const DEFAULT_COLUMNS = ['ticker', 'price_last', 'return_1d', 'overall_score', 'pe_ttm', 'market_cap_cr', 'rsi14', 'sector'];
