@@ -23,11 +23,14 @@ def compute_subscores(df: pd.DataFrame) -> pd.DataFrame:
     pos = {
         "ROE TTM %": True, "ROA %": True, "Net Profit Margin %": True, "Gross Profit Margin %": True,
         "Operating Profit Margin %": True, "EPS Growth YoY %": True, "Revenue Growth YoY %": True,
-        "Dividend Yield %": True, "FCF Yield %": True, "Interest Coverage": True
+        "Dividend Yield %": True, "FCF Yield %": True, "Interest Coverage": True,
+        "Altman Z-Score": True, "Piotroski F-Score": True, "Economic Moat Score": True,
+        "Quality Score": True, "Momentum Score": True
     }
     # lower is better
     neg = {
-        "P/E (TTM)": False, "P/B": False, "P/S Ratio": False, "Debt/Equity": False, "PEG Ratio": False
+        "P/E (TTM)": False, "P/B": False, "P/S Ratio": False, "Debt/Equity": False, "PEG Ratio": False,
+        "Enterprise Value (INR Cr)": False # Lower EV relative to peers can be value
     }
     # Build composite
     parts = []
@@ -82,11 +85,15 @@ def compute_subscores(df: pd.DataFrame) -> pd.DataFrame:
 
     # Risk: lower vol & drawdown & D/E is better; higher Sharpe better
     risk_parts = []
-    for col in ["Volatility 90D %","Volatility 30D %","Max Drawdown 1Y %","Debt/Equity"]:
+    # Lower is better
+    for col in ["Volatility 90D %","Volatility 30D %","Max Drawdown 1Y %","Debt/Equity","Beta 1Y"]:
         if col in df.columns:
             risk_parts.append(_rank_0_100(df[col], higher_is_better=False).rename(col))
+    # Higher is better
     if "Sharpe 1Y" in df.columns:
         risk_parts.append(_rank_0_100(df["Sharpe 1Y"], True).rename("Sharpe 1Y"))
+    if "Sortino 1Y" in df.columns:
+        risk_parts.append(_rank_0_100(df["Sortino 1Y"], True).rename("Sortino 1Y"))
     if "Interest Coverage" in df.columns:
         risk_parts.append(_rank_0_100(df["Interest Coverage"], True).rename("Interest Coverage"))
     if risk_parts:

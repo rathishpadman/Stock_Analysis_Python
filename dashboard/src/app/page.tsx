@@ -269,6 +269,7 @@ export default function DashboardPage() {
                   setSelectedStock(t);
                   setView('detail');
                 }}
+                timeframe={timeframe}
               />
             </div>
           ) : selectedStockData ? (

@@ -12,9 +12,10 @@ interface StockTableProps {
     stocks: Stock[];
     visibleColumns: string[];
     onSelectStock?: (ticker: string) => void;
+    timeframe?: '1d' | '1w' | '1m';
 }
 
-export default function StockTable({ stocks, visibleColumns, onSelectStock }: StockTableProps) {
+export default function StockTable({ stocks, visibleColumns, onSelectStock, timeframe = '1d' }: StockTableProps) {
     const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
     const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
 
@@ -76,7 +77,7 @@ export default function StockTable({ stocks, visibleColumns, onSelectStock }: St
                         >
                             {columns.map(col => (
                                 <td key={col.id} className="whitespace-nowrap px-6 py-4 text-sm font-medium">
-                                    {renderCell(stock, col.id)}
+                                    {renderCell(stock, col.id, timeframe)}
                                 </td>
                             ))}
                         </tr>
@@ -87,8 +88,14 @@ export default function StockTable({ stocks, visibleColumns, onSelectStock }: St
     );
 }
 
-function renderCell(stock: any, colId: string) {
-    const value = stock[colId];
+function renderCell(stock: any, colId: string, timeframe: '1d' | '1w' | '1m' = '1d') {
+    // Dynamic override for Return column
+    let lookupId = colId;
+    if (colId === 'return_1d') {
+        if (timeframe === '1w') lookupId = 'return_1w';
+        if (timeframe === '1m') lookupId = 'return_1m';
+    }
+    const value = stock[lookupId];
 
     if (colId === 'ticker') return <span className="font-bold text-white tracking-tight group-hover:text-blue-400 transition-colors">{value}</span>;
     if (colId === 'company_name') return <span className="text-slate-300 group-hover:text-white transition-colors">{value}</span>;
