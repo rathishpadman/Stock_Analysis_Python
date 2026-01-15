@@ -3,8 +3,9 @@ import { supabase } from '@/lib/supabase';
 
 export async function GET(
     request: Request,
-    { params }: { params: { ticker: string } }
+    props: { params: Promise<{ ticker: string }> }
 ) {
+    const params = await props.params;
     const { ticker } = params;
 
     // Fetch last 90 days of data for the specific ticker
