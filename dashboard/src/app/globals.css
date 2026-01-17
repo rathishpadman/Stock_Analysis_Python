@@ -24,3 +24,36 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Custom scrollbar styles for tables */
+.overflow-x-auto {
+  scrollbar-width: thin;
+  scrollbar-color: #475569 #1e293b;
+}
+
+.overflow-x-auto::-webkit-scrollbar {
+  height: 10px;
+  width: 10px;
+}
+
+.overflow-x-auto::-webkit-scrollbar-track {
+  background: #1e293b;
+  border-radius: 5px;
+}
+
+.overflow-x-auto::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 5px;
+  border: 2px solid #1e293b;
+}
+
+.overflow-x-auto::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+/* Ensure tables have minimum width for scrolling */
+.table-scroll-container {
+  min-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}

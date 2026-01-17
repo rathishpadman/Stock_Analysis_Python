@@ -91,6 +91,10 @@ export default function MonthlyReportTableV2({ data, onSelectStock }: MonthlyRep
     const [showFilters, setShowFilters] = useState(false);
     const [minYtd, setMinYtd] = useState<string>('');
     const [minConsistency, setMinConsistency] = useState<string>('');
+    
+    // Pagination state
+    const [currentPage, setCurrentPage] = useState(1);
+    const [rowsPerPage, setRowsPerPage] = useState(25);
 
     // Calculate performance ranks
     const rankedData = useMemo(() => calculatePerformanceRank(data), [data]);
@@ -167,6 +171,18 @@ export default function MonthlyReportTableV2({ data, onSelectStock }: MonthlyRep
 
         return result;
     }, [rankedData, sortField, sortDirection, trendFilter, minYtd, minConsistency]);
+
+    // Pagination calculations
+    const totalPages = Math.ceil(filteredAndSortedData.length / rowsPerPage);
+    const paginatedData = useMemo(() => {
+        const startIndex = (currentPage - 1) * rowsPerPage;
+        return filteredAndSortedData.slice(startIndex, startIndex + rowsPerPage);
+    }, [filteredAndSortedData, currentPage, rowsPerPage]);
+
+    // Reset to first page when filters change
+    useMemo(() => {
+        setCurrentPage(1);
+    }, [trendFilter, minYtd, minConsistency]);
 
     const handleSort = (field: SortField) => {
         if (sortField === field) {
@@ -269,8 +285,8 @@ export default function MonthlyReportTableV2({ data, onSelectStock }: MonthlyRep
             )}
 
             {/* Table */}
-            <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
+            <div className="overflow-x-auto pb-2">
+                <table className="w-full text-left border-collapse min-w-[1200px]">
                     <thead>
                         <tr className="border-b border-slate-700 text-slate-400 text-xs">
                             <th 
@@ -351,7 +367,7 @@ export default function MonthlyReportTableV2({ data, onSelectStock }: MonthlyRep
                         </tr>
                     </thead>
                     <tbody className="text-sm divide-y divide-slate-800">
-                        {filteredAndSortedData.map((row) => (
+                        {paginatedData.map((row) => (
                             <tr
                                 key={`${row.ticker}-${row.month}`}
                                 className="hover:bg-slate-800/50 cursor-pointer transition-colors"
@@ -418,7 +434,7 @@ export default function MonthlyReportTableV2({ data, onSelectStock }: MonthlyRep
                                 </td>
                             </tr>
                         ))}
-                        {filteredAndSortedData.length === 0 && (
+                        {paginatedData.length === 0 && (
                             <tr>
                                 <td colSpan={10} className="p-8 text-center text-slate-500">
                                     No stocks match the current filters.
@@ -427,6 +443,58 @@ export default function MonthlyReportTableV2({ data, onSelectStock }: MonthlyRep
                         )}
                     </tbody>
                 </table>
+            </div>
+
+            {/* Pagination Controls */}
+            <div className="flex items-center justify-between bg-slate-900/30 border border-slate-800 rounded-lg p-3">
+                <div className="flex items-center gap-4">
+                    <span className="text-xs text-slate-400">
+                        Showing {((currentPage - 1) * rowsPerPage) + 1} - {Math.min(currentPage * rowsPerPage, filteredAndSortedData.length)} of {filteredAndSortedData.length}
+                    </span>
+                    <select
+                        value={rowsPerPage}
+                        onChange={(e) => { setRowsPerPage(Number(e.target.value)); setCurrentPage(1); }}
+                        className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs text-white"
+                    >
+                        <option value={10}>10 per page</option>
+                        <option value={25}>25 per page</option>
+                        <option value={50}>50 per page</option>
+                        <option value={100}>100 per page</option>
+                    </select>
+                </div>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={() => setCurrentPage(1)}
+                        disabled={currentPage === 1}
+                        className="px-2 py-1 text-xs bg-slate-800 border border-slate-700 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-700 text-slate-300"
+                    >
+                        First
+                    </button>
+                    <button
+                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                        disabled={currentPage === 1}
+                        className="px-3 py-1 text-xs bg-slate-800 border border-slate-700 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-700 text-slate-300"
+                    >
+                        ←
+                    </button>
+                    <span className="text-xs text-slate-400 px-2">
+                        Page {currentPage} of {totalPages}
+                    </span>
+                    <button
+                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                        disabled={currentPage === totalPages}
+                        className="px-3 py-1 text-xs bg-slate-800 border border-slate-700 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-700 text-slate-300"
+                    >
+                        →
+                    </button>
+                    <button
+                        onClick={() => setCurrentPage(totalPages)}
+                        disabled={currentPage === totalPages}
+                        className="px-2 py-1 text-xs bg-slate-800 border border-slate-700 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-700 text-slate-300"
+                    >
+                        Last
+                    </button>
+                </div>
             </div>
 
             {/* Ranking Legend */}

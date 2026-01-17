@@ -48,6 +48,15 @@ const MONTH_FIELDS = ['jan_avg', 'feb_avg', 'mar_avg', 'apr_avg', 'may_avg', 'ju
 
 // Monthly Seasonality Bar Chart
 export function SeasonalityBarChart({ data, ticker }: SeasonalityChartProps) {
+    // Early return if no data - must be before useMemo
+    if (!data) {
+        return (
+            <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-6 h-[300px] flex items-center justify-center">
+                <p className="text-slate-500 text-sm">No seasonality data available for {ticker}</p>
+            </div>
+        );
+    }
+
     const chartData = useMemo(() => {
         return MONTHS.map((month, index) => ({
             month,
@@ -57,14 +66,6 @@ export function SeasonalityBarChart({ data, ticker }: SeasonalityChartProps) {
             isCurrentMonth: new Date().getMonth() === index,
         }));
     }, [data]);
-
-    if (!data) {
-        return (
-            <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-6 h-[300px] flex items-center justify-center">
-                <p className="text-slate-500 text-sm">No seasonality data available</p>
-            </div>
-        );
-    }
 
     return (
         <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-4">
@@ -127,6 +128,15 @@ export function SeasonalityBarChart({ data, ticker }: SeasonalityChartProps) {
 
 // Radar Chart for Seasonality
 export function SeasonalityRadarChart({ data, ticker }: SeasonalityChartProps) {
+    // Early return if no data - must be before useMemo
+    if (!data) {
+        return (
+            <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-6 h-[300px] flex items-center justify-center">
+                <p className="text-slate-500 text-sm">No seasonality data available for {ticker}</p>
+            </div>
+        );
+    }
+
     const chartData = useMemo(() => {
         return MONTHS.map((month, index) => ({
             month,
@@ -135,14 +145,6 @@ export function SeasonalityRadarChart({ data, ticker }: SeasonalityChartProps) {
             normalized: (Number(data[MONTH_FIELDS[index] as keyof SeasonalityData]) || 0) + 10,
         }));
     }, [data]);
-
-    if (!data) {
-        return (
-            <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-6 h-[300px] flex items-center justify-center">
-                <p className="text-slate-500 text-sm">No seasonality data available</p>
-            </div>
-        );
-    }
 
     return (
         <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-4">
@@ -190,6 +192,15 @@ export function SeasonalityRadarChart({ data, ticker }: SeasonalityChartProps) {
 
 // Quarterly Breakdown
 export function QuarterlyBreakdown({ data, ticker }: SeasonalityChartProps) {
+    // Early return if no data - must be before useMemo
+    if (!data) {
+        return (
+            <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-6 flex items-center justify-center">
+                <p className="text-slate-500 text-sm">No quarterly data available</p>
+            </div>
+        );
+    }
+
     const quarters = useMemo(() => {
         const q1 = ((Number(data.jan_avg) || 0) + (Number(data.feb_avg) || 0) + (Number(data.mar_avg) || 0)) / 3;
         const q2 = ((Number(data.apr_avg) || 0) + (Number(data.may_avg) || 0) + (Number(data.jun_avg) || 0)) / 3;
@@ -236,6 +247,15 @@ export function QuarterlyBreakdown({ data, ticker }: SeasonalityChartProps) {
 
 // Seasonality Stats Summary
 export function SeasonalityStats({ data, ticker }: SeasonalityChartProps) {
+    // Early return if no data - must be before useMemo
+    if (!data) {
+        return (
+            <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-6 flex items-center justify-center">
+                <p className="text-slate-500 text-sm">No seasonality statistics available</p>
+            </div>
+        );
+    }
+
     const stats = useMemo(() => {
         const monthlyReturns = MONTH_FIELDS.map(field => Number(data[field as keyof SeasonalityData]) || 0);
         const positiveMonths = monthlyReturns.filter(r => r > 0).length;

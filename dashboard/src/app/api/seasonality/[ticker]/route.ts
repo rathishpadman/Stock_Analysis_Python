@@ -7,21 +7,47 @@ export async function GET(
 ) {
     try {
         const { ticker } = await params;
-
-        const { data, error } = await supabase
+        const tickerUpper = ticker.toUpperCase();
+        
+        // Try exact match first
+        let { data, error } = await supabase
             .from('seasonality')
             .select('*')
-            .eq('ticker', ticker.toUpperCase())
+            .eq('ticker', tickerUpper)
             .single();
 
-        if (error) {
+        // If not found, try without .NS suffix
+        if (!data && tickerUpper.endsWith('.NS')) {
+            const tickerWithoutSuffix = tickerUpper.replace('.NS', '');
+            const result = await supabase
+                .from('seasonality')
+                .select('*')
+                .eq('ticker', tickerWithoutSuffix)
+                .single();
+            data = result.data;
+            error = result.error;
+        }
+
+        // If still not found, try with .NS suffix
+        if (!data && !tickerUpper.endsWith('.NS')) {
+            const tickerWithSuffix = tickerUpper + '.NS';
+            const result = await supabase
+                .from('seasonality')
+                .select('*')
+                .eq('ticker', tickerWithSuffix)
+                .single();
+            data = result.data;
+            error = result.error;
+        }
+
+        if (error && !data) {
             console.error('Supabase error:', error);
-            return NextResponse.json({ error: error.message }, { status: 500 });
+            return NextResponse.json(null);
         }
 
         return NextResponse.json(data || null);
     } catch (error) {
         console.error('API error:', error);
-        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+        return NextResponse.json(null);
     }
 }
