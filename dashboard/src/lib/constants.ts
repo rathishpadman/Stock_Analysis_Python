@@ -113,3 +113,71 @@ export const ALL_FIELDS = [
 ];
 
 export const DEFAULT_COLUMNS = ['ticker', 'price_last', 'return_1d', 'overall_score', 'pe_ttm', 'market_cap_cr', 'rsi14', 'sector'];
+
+// Weekly-specific fields for column picker
+export const WEEKLY_FIELDS = [
+    { id: 'ticker', label: 'Ticker', group: 'Basic' },
+    { id: 'company_name', label: 'Company', group: 'Basic' },
+    { id: 'week_ending', label: 'Week Ending', group: 'Basic' },
+    { id: 'weekly_open', label: 'Weekly Open', group: 'Price' },
+    { id: 'weekly_high', label: 'Weekly High', group: 'Price' },
+    { id: 'weekly_low', label: 'Weekly Low', group: 'Price' },
+    { id: 'weekly_close', label: 'Weekly Close', group: 'Price' },
+    { id: 'weekly_return_pct', label: 'Weekly Return %', group: 'Returns' },
+    { id: 'return_4w', label: '4W Return %', group: 'Returns' },
+    { id: 'return_13w', label: '13W Return %', group: 'Returns' },
+    { id: 'weekly_volume', label: 'Weekly Volume', group: 'Volume' },
+    { id: 'weekly_volume_ratio', label: 'Volume Ratio', group: 'Volume' },
+    { id: 'weekly_rsi14', label: 'RSI(14)', group: 'Technical' },
+    { id: 'weekly_sma10', label: 'SMA 10', group: 'Technical' },
+    { id: 'weekly_sma20', label: 'SMA 20', group: 'Technical' },
+    { id: 'weekly_trend', label: 'Trend', group: 'Technical' },
+];
+
+export const DEFAULT_WEEKLY_COLUMNS = ['ticker', 'company_name', 'weekly_close', 'weekly_return_pct', 'return_4w', 'weekly_rsi14', 'weekly_trend'];
+
+// Monthly-specific fields for column picker
+export const MONTHLY_FIELDS = [
+    { id: 'ticker', label: 'Ticker', group: 'Basic' },
+    { id: 'company_name', label: 'Company', group: 'Basic' },
+    { id: 'month', label: 'Month', group: 'Basic' },
+    { id: 'monthly_open', label: 'Monthly Open', group: 'Price' },
+    { id: 'monthly_high', label: 'Monthly High', group: 'Price' },
+    { id: 'monthly_low', label: 'Monthly Low', group: 'Price' },
+    { id: 'monthly_close', label: 'Monthly Close', group: 'Price' },
+    { id: 'monthly_return_pct', label: 'Monthly Return %', group: 'Returns' },
+    { id: 'return_3m', label: '3M Return %', group: 'Returns' },
+    { id: 'return_6m', label: '6M Return %', group: 'Returns' },
+    { id: 'return_12m', label: '12M Return %', group: 'Returns' },
+    { id: 'ytd_return_pct', label: 'YTD Return %', group: 'Returns' },
+    { id: 'monthly_volume', label: 'Monthly Volume', group: 'Volume' },
+    { id: 'monthly_sma3', label: 'SMA 3', group: 'Technical' },
+    { id: 'monthly_sma6', label: 'SMA 6', group: 'Technical' },
+    { id: 'monthly_sma12', label: 'SMA 12', group: 'Technical' },
+    { id: 'monthly_trend', label: 'Trend', group: 'Technical' },
+];
+
+export const DEFAULT_MONTHLY_COLUMNS = ['ticker', 'company_name', 'monthly_close', 'monthly_return_pct', 'return_3m', 'return_12m', 'monthly_trend'];
+
+// Seasonality-specific fields for column picker
+export const SEASONALITY_FIELDS = [
+    { id: 'ticker', label: 'Ticker', group: 'Basic' },
+    { id: 'company_name', label: 'Company', group: 'Basic' },
+    { id: 'jan_avg', label: 'January Avg %', group: 'Q1' },
+    { id: 'feb_avg', label: 'February Avg %', group: 'Q1' },
+    { id: 'mar_avg', label: 'March Avg %', group: 'Q1' },
+    { id: 'apr_avg', label: 'April Avg %', group: 'Q2' },
+    { id: 'may_avg', label: 'May Avg %', group: 'Q2' },
+    { id: 'jun_avg', label: 'June Avg %', group: 'Q2' },
+    { id: 'jul_avg', label: 'July Avg %', group: 'Q3' },
+    { id: 'aug_avg', label: 'August Avg %', group: 'Q3' },
+    { id: 'sep_avg', label: 'September Avg %', group: 'Q3' },
+    { id: 'oct_avg', label: 'October Avg %', group: 'Q4' },
+    { id: 'nov_avg', label: 'November Avg %', group: 'Q4' },
+    { id: 'dec_avg', label: 'December Avg %', group: 'Q4' },
+    { id: 'best_month', label: 'Best Month', group: 'Summary' },
+    { id: 'worst_month', label: 'Worst Month', group: 'Summary' },
+];
+
+export const DEFAULT_SEASONALITY_COLUMNS = ['ticker', 'company_name', 'jan_avg', 'apr_avg', 'jul_avg', 'oct_avg', 'best_month', 'worst_month'];
+

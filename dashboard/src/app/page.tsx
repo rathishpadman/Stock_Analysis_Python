@@ -7,15 +7,17 @@ import SeasonalityHeatmapV2 from '@/components/SeasonalityHeatmapV2';
 import TopMovers from '@/components/TopMovers';
 import TechnicalSignals from '@/components/TechnicalSignals';
 import { WeeklyPriceChart, WeeklyRSIChart, WeeklyReturnsChart, WeeklyVolumeChart, WeeklyStats } from '@/components/WeeklyCharts';
+import { MonthlyPriceChart, MonthlyReturnsChart, RollingReturnsChart, MonthlyVolumeChart, MonthlyStats } from '@/components/MonthlyCharts';
+import { SeasonalityBarChart, SeasonalityRadarChart, QuarterlyBreakdown, SeasonalityStats } from '@/components/SeasonalityCharts';
 import { ScoreBarChart, PriceChart, RSIChart, MACDChart } from '@/components/Charts';
-import { ALL_FIELDS, DEFAULT_COLUMNS } from '@/lib/constants';
+import { ALL_FIELDS, DEFAULT_COLUMNS, WEEKLY_FIELDS, DEFAULT_WEEKLY_COLUMNS, MONTHLY_FIELDS, DEFAULT_MONTHLY_COLUMNS, SEASONALITY_FIELDS, DEFAULT_SEASONALITY_COLUMNS } from '@/lib/constants';
 import { Settings2, Search, Filter, LogOut, Loader2, BarChart3, TrendingUp, ShieldCheck, Info, Calendar, Flame, AlertTriangle, Activity, ChevronLeft } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import StockTable from '@/components/StockTable';
 
 type ReportView = 'daily' | 'weekly' | 'monthly' | 'seasonality';
-type DetailSource = 'daily' | 'weekly';
+type DetailSource = 'daily' | 'weekly' | 'monthly' | 'seasonality';
 
 export default function DashboardPage() {
   const { user, loading: authLoading, signInWithGoogle, signOut } = useAuth();
@@ -27,12 +29,17 @@ export default function DashboardPage() {
   const [seasonalityData, setSeasonalityData] = useState<any[]>([]);
   const [historicalData, setHistoricalData] = useState<any[]>([]);
   const [weeklyHistoricalData, setWeeklyHistoricalData] = useState<any[]>([]);
+  const [monthlyHistoricalData, setMonthlyHistoricalData] = useState<any[]>([]);
+  const [seasonalityDetailData, setSeasonalityDetailData] = useState<any>(null);
   
   // UI states
   const [loading, setLoading] = useState(true);
   const [chartsLoading, setChartsLoading] = useState(false);
   const [timeframe, setTimeframe] = useState<'1d' | '1w' | '1m'>('1d');
   const [visibleColumns, setVisibleColumns] = useState(DEFAULT_COLUMNS);
+  const [weeklyVisibleColumns, setWeeklyVisibleColumns] = useState(DEFAULT_WEEKLY_COLUMNS);
+  const [monthlyVisibleColumns, setMonthlyVisibleColumns] = useState(DEFAULT_MONTHLY_COLUMNS);
+  const [seasonalityVisibleColumns, setSeasonalityVisibleColumns] = useState(DEFAULT_SEASONALITY_COLUMNS);
   const [searchQuery, setSearchQuery] = useState('');
   const [showColumnPicker, setShowColumnPicker] = useState(false);
   const [selectedStock, setSelectedStock] = useState<string | null>(null);
@@ -41,6 +48,49 @@ export default function DashboardPage() {
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [reportView, setReportView] = useState<ReportView>('daily');
   const [detailSource, setDetailSource] = useState<DetailSource>('daily');
+
+  // Get current fields and columns based on reportView
+  const currentFields = useMemo(() => {
+    switch (reportView) {
+      case 'weekly': return WEEKLY_FIELDS;
+      case 'monthly': return MONTHLY_FIELDS;
+      case 'seasonality': return SEASONALITY_FIELDS;
+      default: return ALL_FIELDS;
+    }
+  }, [reportView]);
+
+  const currentVisibleColumns = useMemo(() => {
+    switch (reportView) {
+      case 'weekly': return weeklyVisibleColumns;
+      case 'monthly': return monthlyVisibleColumns;
+      case 'seasonality': return seasonalityVisibleColumns;
+      default: return visibleColumns;
+    }
+  }, [reportView, visibleColumns, weeklyVisibleColumns, monthlyVisibleColumns, seasonalityVisibleColumns]);
+
+  const toggleCurrentColumn = (columnId: string) => {
+    switch (reportView) {
+      case 'weekly':
+        setWeeklyVisibleColumns(prev => 
+          prev.includes(columnId) ? prev.filter(c => c !== columnId) : [...prev, columnId]
+        );
+        break;
+      case 'monthly':
+        setMonthlyVisibleColumns(prev => 
+          prev.includes(columnId) ? prev.filter(c => c !== columnId) : [...prev, columnId]
+        );
+        break;
+      case 'seasonality':
+        setSeasonalityVisibleColumns(prev => 
+          prev.includes(columnId) ? prev.filter(c => c !== columnId) : [...prev, columnId]
+        );
+        break;
+      default:
+        setVisibleColumns(prev => 
+          prev.includes(columnId) ? prev.filter(c => c !== columnId) : [...prev, columnId]
+        );
+    }
+  };
 
   useEffect(() => {
     if (!authLoading && user) {
@@ -58,8 +108,12 @@ export default function DashboardPage() {
     if (selectedStock) {
       if (detailSource === 'daily') {
         fetchHistoricalData(selectedStock);
-      } else {
+      } else if (detailSource === 'weekly') {
         fetchWeeklyHistoricalData(selectedStock);
+      } else if (detailSource === 'monthly') {
+        fetchMonthlyHistoricalData(selectedStock);
+      } else if (detailSource === 'seasonality') {
+        fetchSeasonalityDetailData(selectedStock);
       }
     }
   }, [selectedStock, detailSource]);
@@ -175,6 +229,32 @@ export default function DashboardPage() {
     }
   };
 
+  const fetchMonthlyHistoricalData = async (ticker: string) => {
+    setChartsLoading(true);
+    try {
+      const res = await fetch(`/api/monthly/${ticker}?months=24`);
+      const data = await res.json();
+      setMonthlyHistoricalData(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Failed to fetch monthly historical data:', error);
+    } finally {
+      setChartsLoading(false);
+    }
+  };
+
+  const fetchSeasonalityDetailData = async (ticker: string) => {
+    setChartsLoading(true);
+    try {
+      const res = await fetch(`/api/seasonality/${ticker}`);
+      const data = await res.json();
+      setSeasonalityDetailData(data);
+    } catch (error) {
+      console.error('Failed to fetch seasonality data:', error);
+    } finally {
+      setChartsLoading(false);
+    }
+  };
+
   const toggleColumn = (id: string) => {
     setVisibleColumns(prev =>
       prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]
@@ -271,6 +351,8 @@ export default function DashboardPage() {
 
   const selectedStockData = stocks.find(s => s.ticker === selectedStock);
   const selectedWeeklyStockData = weeklyData.find(s => s.ticker === selectedStock);
+  const selectedMonthlyStockData = monthlyData.find(s => s.ticker === selectedStock);
+  const selectedSeasonalityStockData = seasonalityData.find(s => s.ticker === selectedStock);
 
   return (
     <div className="min-h-screen bg-[#05080f] text-slate-100 flex flex-col">
@@ -494,12 +576,12 @@ export default function DashboardPage() {
               ) : reportView === 'monthly' ? (
                 <MonthlyReportTableV2
                   data={getFilteredData}
-                  onSelectStock={(t) => handleStockSelect(t, 'daily')}
+                  onSelectStock={(t) => handleStockSelect(t, 'monthly')}
                 />
               ) : (
                 <SeasonalityHeatmapV2
                   data={getFilteredData}
-                  onSelectStock={(t) => handleStockSelect(t, 'daily')}
+                  onSelectStock={(t) => handleStockSelect(t, 'seasonality')}
                 />
               )}
             </div>
@@ -590,6 +672,163 @@ export default function DashboardPage() {
                         <div key={item.label} className="flex justify-between">
                           <span className="text-xs text-slate-500">{item.label}</span>
                           <span className="text-xs font-mono text-slate-300">{item.value || '-'}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              ) : detailSource === 'monthly' && selectedMonthlyStockData ? (
+                /* Monthly Detail View */
+                <>
+                  <div className="flex items-end justify-between border-b border-white/5 pb-6">
+                    <div>
+                      <div className="flex items-center gap-3 mb-2">
+                        <h2 className="text-5xl font-black text-white italic">{selectedMonthlyStockData.ticker}</h2>
+                        <span className={`px-4 py-1 rounded-full text-xs font-black uppercase ${
+                          selectedMonthlyStockData.monthly_trend === 'UP' 
+                            ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' 
+                            : selectedMonthlyStockData.monthly_trend === 'DOWN'
+                            ? 'bg-rose-500/10 text-rose-500 border border-rose-500/20'
+                            : 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
+                        }`}>
+                          {selectedMonthlyStockData.monthly_trend || 'N/A'}
+                        </span>
+                      </div>
+                      <p className="text-slate-400 text-lg uppercase font-light tracking-widest">
+                        {selectedMonthlyStockData.company_name}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-4xl font-mono text-white mb-1">₹{selectedMonthlyStockData.monthly_close?.toLocaleString()}</div>
+                      <div className={`flex items-center justify-end gap-2 font-mono ${(selectedMonthlyStockData.monthly_return_pct || 0) >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                        <Calendar className="h-4 w-4" />
+                        <span className="text-lg">
+                          {(selectedMonthlyStockData.monthly_return_pct || 0) >= 0 ? '+' : ''}
+                          {selectedMonthlyStockData.monthly_return_pct?.toFixed(2)}% this month
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Monthly Stats */}
+                  <MonthlyStats data={monthlyHistoricalData} ticker={selectedMonthlyStockData.ticker} />
+
+                  {/* Monthly Charts */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="relative">
+                      {chartsLoading && (
+                        <div className="absolute inset-0 bg-slate-950/50 backdrop-blur-[2px] z-10 flex items-center justify-center rounded-lg">
+                          <Loader2 className="h-8 w-8 text-blue-500 animate-spin" />
+                        </div>
+                      )}
+                      <MonthlyPriceChart data={monthlyHistoricalData} ticker={selectedMonthlyStockData.ticker} />
+                    </div>
+                    <div className="space-y-6">
+                      <MonthlyReturnsChart data={monthlyHistoricalData} ticker={selectedMonthlyStockData.ticker} />
+                      <RollingReturnsChart data={monthlyHistoricalData} ticker={selectedMonthlyStockData.ticker} />
+                    </div>
+                  </div>
+
+                  <MonthlyVolumeChart data={monthlyHistoricalData} ticker={selectedMonthlyStockData.ticker} />
+
+                  {/* Monthly Data Table */}
+                  <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-4">
+                    <h3 className="text-sm font-bold text-slate-300 mb-4">Monthly Data Fields</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      {[
+                        { label: 'Open', value: selectedMonthlyStockData.monthly_open },
+                        { label: 'High', value: selectedMonthlyStockData.monthly_high },
+                        { label: 'Low', value: selectedMonthlyStockData.monthly_low },
+                        { label: 'Close', value: selectedMonthlyStockData.monthly_close },
+                        { label: 'Volume', value: selectedMonthlyStockData.monthly_volume?.toLocaleString() },
+                        { label: 'Monthly Return', value: `${selectedMonthlyStockData.monthly_return_pct?.toFixed(2)}%` },
+                        { label: '3M Return', value: `${selectedMonthlyStockData.return_3m?.toFixed(2)}%` },
+                        { label: '6M Return', value: `${selectedMonthlyStockData.return_6m?.toFixed(2)}%` },
+                        { label: '12M Return', value: `${selectedMonthlyStockData.return_12m?.toFixed(2)}%` },
+                        { label: 'YTD Return', value: `${selectedMonthlyStockData.ytd_return_pct?.toFixed(2)}%` },
+                        { label: 'SMA 3', value: selectedMonthlyStockData.monthly_sma3?.toFixed(2) },
+                        { label: 'SMA 6', value: selectedMonthlyStockData.monthly_sma6?.toFixed(2) },
+                        { label: 'SMA 12', value: selectedMonthlyStockData.monthly_sma12?.toFixed(2) },
+                        { label: 'Month', value: selectedMonthlyStockData.month },
+                      ].map(item => (
+                        <div key={item.label} className="flex justify-between">
+                          <span className="text-xs text-slate-500">{item.label}</span>
+                          <span className="text-xs font-mono text-slate-300">{item.value || '-'}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              ) : detailSource === 'seasonality' && selectedSeasonalityStockData ? (
+                /* Seasonality Detail View */
+                <>
+                  <div className="flex items-end justify-between border-b border-white/5 pb-6">
+                    <div>
+                      <div className="flex items-center gap-3 mb-2">
+                        <h2 className="text-5xl font-black text-white italic">{selectedSeasonalityStockData.ticker}</h2>
+                        <span className="px-4 py-1 rounded-full text-xs font-black uppercase bg-purple-500/10 text-purple-500 border border-purple-500/20">
+                          SEASONALITY
+                        </span>
+                      </div>
+                      <p className="text-slate-400 text-lg uppercase font-light tracking-widest">
+                        {selectedSeasonalityStockData.company_name}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <div className="flex items-center gap-4">
+                        <div>
+                          <div className="text-xs text-slate-500 uppercase mb-1">Best Month</div>
+                          <div className="text-xl font-mono text-emerald-500">{selectedSeasonalityStockData.best_month || '-'}</div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-slate-500 uppercase mb-1">Worst Month</div>
+                          <div className="text-xl font-mono text-rose-500">{selectedSeasonalityStockData.worst_month || '-'}</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Seasonality Stats */}
+                  <SeasonalityStats data={seasonalityDetailData} ticker={selectedSeasonalityStockData.ticker} />
+
+                  {/* Seasonality Charts */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="relative">
+                      {chartsLoading && (
+                        <div className="absolute inset-0 bg-slate-950/50 backdrop-blur-[2px] z-10 flex items-center justify-center rounded-lg">
+                          <Loader2 className="h-8 w-8 text-blue-500 animate-spin" />
+                        </div>
+                      )}
+                      <SeasonalityBarChart data={seasonalityDetailData} ticker={selectedSeasonalityStockData.ticker} />
+                    </div>
+                    <SeasonalityRadarChart data={seasonalityDetailData} ticker={selectedSeasonalityStockData.ticker} />
+                  </div>
+
+                  <QuarterlyBreakdown data={seasonalityDetailData} ticker={selectedSeasonalityStockData.ticker} />
+
+                  {/* Seasonality Data Table */}
+                  <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-4">
+                    <h3 className="text-sm font-bold text-slate-300 mb-4">Monthly Average Returns</h3>
+                    <div className="grid grid-cols-3 md:grid-cols-6 gap-4">
+                      {[
+                        { label: 'January', value: selectedSeasonalityStockData.jan_avg },
+                        { label: 'February', value: selectedSeasonalityStockData.feb_avg },
+                        { label: 'March', value: selectedSeasonalityStockData.mar_avg },
+                        { label: 'April', value: selectedSeasonalityStockData.apr_avg },
+                        { label: 'May', value: selectedSeasonalityStockData.may_avg },
+                        { label: 'June', value: selectedSeasonalityStockData.jun_avg },
+                        { label: 'July', value: selectedSeasonalityStockData.jul_avg },
+                        { label: 'August', value: selectedSeasonalityStockData.aug_avg },
+                        { label: 'September', value: selectedSeasonalityStockData.sep_avg },
+                        { label: 'October', value: selectedSeasonalityStockData.oct_avg },
+                        { label: 'November', value: selectedSeasonalityStockData.nov_avg },
+                        { label: 'December', value: selectedSeasonalityStockData.dec_avg },
+                      ].map(item => (
+                        <div key={item.label} className="flex flex-col items-center p-2 rounded-lg bg-slate-800/50">
+                          <span className="text-[10px] text-slate-500 uppercase mb-1">{item.label.slice(0, 3)}</span>
+                          <span className={`text-sm font-mono ${(item.value || 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                            {item.value != null ? `${item.value >= 0 ? '+' : ''}${item.value.toFixed(2)}%` : '-'}
+                          </span>
                         </div>
                       ))}
                     </div>
@@ -698,20 +937,20 @@ export default function DashboardPage() {
       {showColumnPicker && (
         <div className="fixed right-20 top-20 z-[100] w-80 bg-[#0f172a] border border-white/10 rounded-lg shadow-2xl p-4 ring-1 ring-white/10 animate-in zoom-in-95 duration-200">
           <h3 className="text-xs font-black uppercase tracking-widest mb-3 border-b border-white/5 pb-2 flex justify-between items-center text-slate-400">
-            Telemetry Config
+            {reportView.charAt(0).toUpperCase() + reportView.slice(1)} Columns
             <button onClick={() => setShowColumnPicker(false)} className="text-rose-500 hover:text-white transition-colors">CLOSE</button>
           </h3>
           <div className="max-h-96 overflow-y-auto space-y-4 pr-1 scrollbar-thin scrollbar-thumb-slate-800">
-            {['Basic', 'Price', 'Fundamental', 'Technical', 'Scores', 'Sentiment', 'Analysis'].map(group => (
+            {Array.from(new Set(currentFields.map(f => f.group))).map(group => (
               <div key={group}>
                 <h4 className="text-[9px] font-black text-slate-600 uppercase tracking-[0.2em] mb-2">{group}</h4>
                 <div className="grid grid-cols-1 gap-1">
-                  {ALL_FIELDS.filter(f => f.group === group).map(field => (
+                  {currentFields.filter(f => f.group === group).map(field => (
                     <label key={field.id} className="flex items-center gap-3 hover:bg-white/5 p-1.5 rounded cursor-pointer transition-colors group">
                       <input
                         type="checkbox"
-                        checked={visibleColumns.includes(field.id)}
-                        onChange={() => toggleColumn(field.id)}
+                        checked={currentVisibleColumns.includes(field.id)}
+                        onChange={() => toggleCurrentColumn(field.id)}
                         className="rounded border-white/10 bg-slate-800 text-blue-600 focus:ring-0"
                       />
                       <span className="text-[10px] uppercase font-bold text-slate-400 group-hover:text-blue-400 transition-colors">{field.label}</span>
