@@ -1,38 +1,46 @@
 'use client';
 
-import React, { useState, useEffect } from 'react'; // Added explicit React import
-import WeeklyReportTable from '@/components/WeeklyReportTable';
-import MonthlyReportTable from '@/components/MonthlyReportTable';
-import SeasonalityHeatmap from '@/components/SeasonalityHeatmap';
+import React, { useState, useEffect, useMemo } from 'react';
+import WeeklyReportTableV2 from '@/components/WeeklyReportTableV2';
+import MonthlyReportTableV2 from '@/components/MonthlyReportTableV2';
+import SeasonalityHeatmapV2 from '@/components/SeasonalityHeatmapV2';
 import TopMovers from '@/components/TopMovers';
 import TechnicalSignals from '@/components/TechnicalSignals';
+import { WeeklyPriceChart, WeeklyRSIChart, WeeklyReturnsChart, WeeklyVolumeChart, WeeklyStats } from '@/components/WeeklyCharts';
 import { ScoreBarChart, PriceChart, RSIChart, MACDChart } from '@/components/Charts';
 import { ALL_FIELDS, DEFAULT_COLUMNS } from '@/lib/constants';
-import { Settings2, Search, Filter, LogOut, Loader2, BarChart3, TrendingUp, ShieldCheck, Info, Calendar, Flame, AlertTriangle, Activity } from 'lucide-react';
+import { Settings2, Search, Filter, LogOut, Loader2, BarChart3, TrendingUp, ShieldCheck, Info, Calendar, Flame, AlertTriangle, Activity, ChevronLeft } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
-import StockTable from '@/components/StockTable'; // Missing import
+import StockTable from '@/components/StockTable';
+
+type ReportView = 'daily' | 'weekly' | 'monthly' | 'seasonality';
+type DetailSource = 'daily' | 'weekly';
 
 export default function DashboardPage() {
   const { user, loading: authLoading, signInWithGoogle, signOut } = useAuth();
+  
+  // Data states
   const [stocks, setStocks] = useState<any[]>([]);
+  const [weeklyData, setWeeklyData] = useState<any[]>([]);
+  const [monthlyData, setMonthlyData] = useState<any[]>([]);
+  const [seasonalityData, setSeasonalityData] = useState<any[]>([]);
+  const [historicalData, setHistoricalData] = useState<any[]>([]);
+  const [weeklyHistoricalData, setWeeklyHistoricalData] = useState<any[]>([]);
+  
+  // UI states
   const [loading, setLoading] = useState(true);
+  const [chartsLoading, setChartsLoading] = useState(false);
   const [timeframe, setTimeframe] = useState<'1d' | '1w' | '1m'>('1d');
   const [visibleColumns, setVisibleColumns] = useState(DEFAULT_COLUMNS);
   const [searchQuery, setSearchQuery] = useState('');
   const [showColumnPicker, setShowColumnPicker] = useState(false);
   const [selectedStock, setSelectedStock] = useState<string | null>(null);
-  const [historicalData, setHistoricalData] = useState<any[]>([]);
-  const [chartsLoading, setChartsLoading] = useState(false);
   const [view, setView] = useState<'table' | 'detail'>('table');
   const [availableDates, setAvailableDates] = useState<string[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>('');
-
-  // Phase 5: Reports View State
-  const [reportView, setReportView] = useState<'screener' | 'weekly' | 'monthly' | 'seasonality'>('screener');
-  const [weeklyData, setWeeklyData] = useState<any[]>([]);
-  const [monthlyData, setMonthlyData] = useState<any[]>([]);
-  const [seasonalityData, setSeasonalityData] = useState<any[]>([]);
+  const [reportView, setReportView] = useState<ReportView>('daily');
+  const [detailSource, setDetailSource] = useState<DetailSource>('daily');
 
   useEffect(() => {
     if (!authLoading && user) {
@@ -48,9 +56,13 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (selectedStock) {
-      fetchHistoricalData(selectedStock);
+      if (detailSource === 'daily') {
+        fetchHistoricalData(selectedStock);
+      } else {
+        fetchWeeklyHistoricalData(selectedStock);
+      }
     }
-  }, [selectedStock]);
+  }, [selectedStock, detailSource]);
 
   // Fetch Weekly Data when view changes
   useEffect(() => {
@@ -68,7 +80,7 @@ export default function DashboardPage() {
   const fetchWeeklyData = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/weekly');
+      const res = await fetch('/api/weekly?limit=200');
       const data = await res.json();
       setWeeklyData(Array.isArray(data) ? data : []);
     } catch (error) {
@@ -81,7 +93,7 @@ export default function DashboardPage() {
   const fetchMonthlyData = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/monthly');
+      const res = await fetch('/api/monthly?limit=200');
       const data = await res.json();
       setMonthlyData(Array.isArray(data) ? data : []);
     } catch (error) {
@@ -150,10 +162,81 @@ export default function DashboardPage() {
     }
   };
 
+  const fetchWeeklyHistoricalData = async (ticker: string) => {
+    setChartsLoading(true);
+    try {
+      const res = await fetch(`/api/weekly/${ticker}?weeks=52`);
+      const data = await res.json();
+      setWeeklyHistoricalData(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Failed to fetch weekly historical data:', error);
+    } finally {
+      setChartsLoading(false);
+    }
+  };
+
   const toggleColumn = (id: string) => {
     setVisibleColumns(prev =>
       prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]
     );
+  };
+
+  // Context-aware search filter
+  const getFilteredData = useMemo(() => {
+    const query = searchQuery.toLowerCase();
+    
+    switch (reportView) {
+      case 'daily':
+        return stocks.filter(s =>
+          s.ticker?.toLowerCase().includes(query) ||
+          s.company_name?.toLowerCase().includes(query) ||
+          s.sector?.toLowerCase().includes(query)
+        );
+      case 'weekly':
+        return weeklyData.filter(s =>
+          s.ticker?.toLowerCase().includes(query) ||
+          s.company_name?.toLowerCase().includes(query)
+        );
+      case 'monthly':
+        return monthlyData.filter(s =>
+          s.ticker?.toLowerCase().includes(query) ||
+          s.company_name?.toLowerCase().includes(query)
+        );
+      case 'seasonality':
+        return seasonalityData.filter(s =>
+          s.ticker?.toLowerCase().includes(query) ||
+          s.company_name?.toLowerCase().includes(query)
+        );
+      default:
+        return [];
+    }
+  }, [reportView, searchQuery, stocks, weeklyData, monthlyData, seasonalityData]);
+
+  // Sidebar data based on current view
+  const sidebarData = useMemo(() => {
+    switch (reportView) {
+      case 'daily':
+        return stocks;
+      case 'weekly':
+        return weeklyData;
+      case 'monthly':
+        return monthlyData;
+      case 'seasonality':
+        return seasonalityData;
+      default:
+        return [];
+    }
+  }, [reportView, stocks, weeklyData, monthlyData, seasonalityData]);
+
+  const filteredSidebar = sidebarData.filter(s =>
+    s.ticker?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    s.company_name?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const handleStockSelect = (ticker: string, source: DetailSource = 'daily') => {
+    setSelectedStock(ticker);
+    setDetailSource(source);
+    setView('detail');
   };
 
   if (authLoading) return (
@@ -187,10 +270,7 @@ export default function DashboardPage() {
   );
 
   const selectedStockData = stocks.find(s => s.ticker === selectedStock);
-  const filteredStocks = stocks.filter(s =>
-    s.ticker?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    s.company_name?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const selectedWeeklyStockData = weeklyData.find(s => s.ticker === selectedStock);
 
   return (
     <div className="min-h-screen bg-[#05080f] text-slate-100 flex flex-col">
@@ -210,24 +290,28 @@ export default function DashboardPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 bg-[#0f172a] border border-white/5 rounded px-3 py-1.5">
-            <Calendar className="h-3 w-3 text-blue-500" />
-            <select
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="bg-transparent text-[10px] font-mono text-slate-300 focus:outline-none cursor-pointer uppercase"
-            >
-              {availableDates.map(date => (
-                <option key={date} value={date} className="bg-slate-900">{date}</option>
-              ))}
-            </select>
-          </div>
+          {/* Date selector - only for daily view */}
+          {reportView === 'daily' && (
+            <div className="flex items-center gap-2 bg-[#0f172a] border border-white/5 rounded px-3 py-1.5">
+              <Calendar className="h-3 w-3 text-blue-500" />
+              <select
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="bg-transparent text-[10px] font-mono text-slate-300 focus:outline-none cursor-pointer uppercase"
+              >
+                {availableDates.map(date => (
+                  <option key={date} value={date} className="bg-slate-900">{date}</option>
+                ))}
+              </select>
+            </div>
+          )}
 
+          {/* Context-aware search */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-600" />
             <input
               type="text"
-              placeholder="QUICK SEARCH..."
+              placeholder={`Search ${reportView.toUpperCase()}...`}
               className="bg-[#0f172a] border border-white/5 rounded pl-10 pr-4 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all w-64 text-slate-300 font-mono"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -256,7 +340,7 @@ export default function DashboardPage() {
           <div className="p-4 border-b border-white/5 flex items-center justify-between sticky top-0 bg-[#070b14] z-10">
             <h2 className="text-xs font-bold text-slate-500 flex items-center gap-2">
               <BarChart3 className="h-3 w-3" />
-              MARKET UNIVERSE ({filteredStocks.length})
+              {reportView.toUpperCase()} UNIVERSE ({filteredSidebar.length})
             </h2>
             <div className="flex gap-1">
               <button onClick={() => setView('table')} className={`p-1.5 rounded text-[10px] font-bold ${view === 'table' ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-800'}`}>GRID</button>
@@ -265,39 +349,60 @@ export default function DashboardPage() {
           </div>
 
           {loading ? (
-            <div className="p-12 text-center text-slate-600 italic text-xs">Accessing Supabase snapshots...</div>
+            <div className="p-12 text-center text-slate-600 italic text-xs">Loading data...</div>
           ) : (
             <div className="divide-y divide-white/[0.03]">
-              {filteredStocks.map(stock => (
-                <div
-                  key={stock.ticker}
-                  onClick={() => {
-                    setSelectedStock(stock.ticker);
-                    setView('detail');
-                  }}
-                  className={`p-4 cursor-pointer transition-all hover:bg-blue-600/5 group relative ${selectedStock === stock.ticker ? 'bg-blue-600/10 border-l-2 border-l-blue-500' : ''}`}
-                >
-                  <div className="flex justify-between items-start mb-1">
-                    <span className="font-bold text-sm tracking-tight group-hover:text-blue-400 transition-colors uppercase italic">{stock.ticker}</span>
-                    <span className={`text-[10px] font-mono ${(stock.return_1d || 0) >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                      {(stock.return_1d || 0) >= 0 ? '▲' : '▼'}{Math.abs(stock.return_1d || 0).toFixed(2)}%
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-[10px] text-slate-600 truncate max-w-[150px] uppercase">{stock.company_name}</span>
-                    <span className="text-[10px] font-bold text-slate-400">₹{stock.price_last?.toLocaleString()}</span>
-                  </div>
-                  <div className="mt-2 flex gap-2">
-                    <div className="h-1 flex-1 bg-slate-800 rounded-full overflow-hidden">
-                      <div
-                        className={`h-full ${(stock.overall_score || 0) > 70 ? 'bg-emerald-500' : (stock.overall_score || 0) > 40 ? 'bg-amber-500' : 'bg-rose-500'}`}
-                        style={{ width: `${stock.overall_score || 0}%` }}
-                      ></div>
+              {filteredSidebar.slice(0, 100).map(stock => {
+                const returnField = reportView === 'daily' ? stock.return_1d :
+                                   reportView === 'weekly' ? stock.weekly_return_pct :
+                                   reportView === 'monthly' ? stock.monthly_return_pct : null;
+                const priceField = reportView === 'daily' ? stock.price_last :
+                                  reportView === 'weekly' ? stock.weekly_close :
+                                  reportView === 'monthly' ? stock.monthly_close : null;
+                
+                return (
+                  <div
+                    key={stock.ticker}
+                    onClick={() => handleStockSelect(stock.ticker, reportView === 'weekly' ? 'weekly' : 'daily')}
+                    className={`p-4 cursor-pointer transition-all hover:bg-blue-600/5 group relative ${selectedStock === stock.ticker ? 'bg-blue-600/10 border-l-2 border-l-blue-500' : ''}`}
+                  >
+                    <div className="flex justify-between items-start mb-1">
+                      <span className="font-bold text-sm tracking-tight group-hover:text-blue-400 transition-colors uppercase italic">{stock.ticker}</span>
+                      {returnField !== null && (
+                        <span className={`text-[10px] font-mono ${(returnField || 0) >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                          {(returnField || 0) >= 0 ? '▲' : '▼'}{Math.abs(returnField || 0).toFixed(2)}%
+                        </span>
+                      )}
                     </div>
-                    <span className="text-[9px] font-bold text-slate-500">{stock.overall_score?.toFixed(0)}</span>
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] text-slate-600 truncate max-w-[150px] uppercase">{stock.company_name}</span>
+                      {priceField && <span className="text-[10px] font-bold text-slate-400">₹{priceField?.toLocaleString()}</span>}
+                    </div>
+                    {reportView === 'daily' && stock.overall_score && (
+                      <div className="mt-2 flex gap-2">
+                        <div className="h-1 flex-1 bg-slate-800 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full ${(stock.overall_score || 0) > 70 ? 'bg-emerald-500' : (stock.overall_score || 0) > 40 ? 'bg-amber-500' : 'bg-rose-500'}`}
+                            style={{ width: `${stock.overall_score || 0}%` }}
+                          ></div>
+                        </div>
+                        <span className="text-[9px] font-bold text-slate-500">{stock.overall_score?.toFixed(0)}</span>
+                      </div>
+                    )}
+                    {reportView === 'weekly' && stock.weekly_trend && (
+                      <div className="mt-2">
+                        <span className={`text-[9px] px-2 py-0.5 rounded ${
+                          stock.weekly_trend === 'UP' ? 'bg-green-500/20 text-green-400' :
+                          stock.weekly_trend === 'DOWN' ? 'bg-red-500/20 text-red-400' :
+                          'bg-slate-700 text-slate-400'
+                        }`}>
+                          {stock.weekly_trend}
+                        </span>
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </aside>
@@ -310,16 +415,16 @@ export default function DashboardPage() {
                 <div className="flex items-center gap-4">
                   <h2 className="text-xl font-bold flex items-center gap-2">
                     <div className="w-1 h-6 bg-blue-600 rounded-full"></div>
-                    {reportView === 'screener' ? 'MARKET SCREENER' : 
+                    {reportView === 'daily' ? 'DAILY SCREENER' : 
                      reportView === 'weekly' ? 'WEEKLY INTELLIGENCE' : 
                      reportView === 'monthly' ? 'MONTHLY ANALYSIS' : 'SEASONALITY PATTERNS'}
                   </h2>
                   <div className="flex bg-[#0f172a] border border-white/5 rounded p-0.5">
                     <button
-                      onClick={() => setReportView('screener')}
-                      className={`px-3 py-1 rounded text-[10px] font-bold transition-all ${reportView === 'screener' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                      onClick={() => setReportView('daily')}
+                      className={`px-3 py-1 rounded text-[10px] font-bold transition-all ${reportView === 'daily' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-300'}`}
                     >
-                      SCREENER
+                      DAILY
                     </button>
                     <button
                       onClick={() => setReportView('weekly')}
@@ -342,7 +447,7 @@ export default function DashboardPage() {
                   </div>
                 </div>
 
-                {reportView === 'screener' && (
+                {reportView === 'daily' && (
                   <div className="flex gap-4">
                     <div className="flex bg-[#0f172a] border border-white/5 rounded p-1">
                       {(['1d', '1w', '1m'] as const).map((tf) => (
@@ -359,155 +464,232 @@ export default function DashboardPage() {
                 )}
               </div>
 
-              {reportView === 'screener' ? (
+              {reportView === 'daily' ? (
                 <div className="space-y-6">
                   {/* Top Movers Summary */}
                   <TopMovers
-                    stocks={filteredStocks}
-                    onSelectStock={(t) => {
-                      setSelectedStock(t);
-                      setView('detail');
-                    }}
+                    stocks={getFilteredData}
+                    onSelectStock={(t) => handleStockSelect(t, 'daily')}
                   />
 
                   {/* Technical Signals Scanner */}
                   <TechnicalSignals
-                    stocks={filteredStocks}
-                    onSelectStock={(t) => {
-                      setSelectedStock(t);
-                      setView('detail');
-                    }}
+                    stocks={getFilteredData}
+                    onSelectStock={(t) => handleStockSelect(t, 'daily')}
                   />
 
                   {/* Main Stock Table */}
                   <StockTable
-                    stocks={filteredStocks}
+                    stocks={getFilteredData}
                     visibleColumns={visibleColumns}
-                    onSelectStock={(t) => {
-                      setSelectedStock(t);
-                      setView('detail');
-                    }}
+                    onSelectStock={(t) => handleStockSelect(t, 'daily')}
                     timeframe={timeframe}
                   />
                 </div>
               ) : reportView === 'weekly' ? (
-                <WeeklyReportTable
-                  data={weeklyData}
-                  onSelectStock={(t) => {
-                    setSelectedStock(t);
-                    setView('detail');
-                  }}
+                <WeeklyReportTableV2
+                  data={getFilteredData}
+                  onSelectStock={(t) => handleStockSelect(t, 'weekly')}
                 />
               ) : reportView === 'monthly' ? (
-                <MonthlyReportTable
-                  data={monthlyData}
-                  onSelectStock={(t) => {
-                    setSelectedStock(t);
-                    setView('detail');
-                  }}
+                <MonthlyReportTableV2
+                  data={getFilteredData}
+                  onSelectStock={(t) => handleStockSelect(t, 'daily')}
                 />
               ) : (
-                <SeasonalityHeatmap
-                  data={seasonalityData}
-                  onSelectStock={(t) => {
-                    setSelectedStock(t);
-                    setView('detail');
-                  }}
+                <SeasonalityHeatmapV2
+                  data={getFilteredData}
+                  onSelectStock={(t) => handleStockSelect(t, 'daily')}
                 />
               )}
             </div>
-          ) : selectedStockData ? (
-            <div className="space-y-8 animate-in fade-in slide-in-from-right-2 duration-500">
-              {/* Detail Hero */}
-              <div className="flex items-end justify-between border-b border-white/5 pb-6">
-                <div>
-                  <div className="flex items-center gap-3 mb-2">
-                    <h2 className="text-5xl font-black text-white italic">{selectedStockData.ticker}</h2>
-                    <span className={`px-4 py-1 rounded-full text-xs font-black uppercase ${selectedStockData.overall_score > 70 ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-500 border border-amber-500/20'}`}>
-                      SCORE: {selectedStockData.overall_score?.toFixed(1)}
-                    </span>
-                  </div>
-                  <p className="text-slate-400 text-lg uppercase font-light tracking-widest">{selectedStockData.company_name}</p>
-                </div>
-                <div className="text-right">
-                  <div className="text-4xl font-mono text-white mb-1">₹{selectedStockData.price_last?.toLocaleString()}</div>
-                  <div className={`flex items-center justify-end gap-2 font-mono ${(selectedStockData.return_1d || 0) >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                    <Calendar className="h-4 w-4" />
-                    <span className="text-lg">{(selectedStockData.return_1d || 0) >= 0 ? '+' : ''}{selectedStockData.return_1d?.toFixed(2)}%</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Charts Section */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="relative">
-                  {chartsLoading && (
-                    <div className="absolute inset-0 bg-slate-950/50 backdrop-blur-[2px] z-10 flex items-center justify-center rounded-lg">
-                      <Loader2 className="h-8 w-8 text-blue-500 animate-spin" />
-                    </div>
-                  )}
-                  <PriceChart ticker={selectedStockData.ticker} data={historicalData} />
-                </div>
-                <div className="space-y-6">
-                  <RSIChart ticker={selectedStockData.ticker} data={historicalData} />
-                  <MACDChart ticker={selectedStockData.ticker} data={historicalData} />
-                </div>
-              </div>
-
-              {/* Analysis Matrix - THE 110 FIELDS */}
-              <div className="space-y-6">
-                <h3 className="text-xs font-black text-slate-500 tracking-[0.2em] uppercase flex items-center gap-4">
-                  <div className="h-px flex-1 bg-white/5"></div>
-                  DEEP DIVE ANALYSIS MATRIX
-                  <div className="h-px flex-1 bg-white/5"></div>
-                </h3>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-                  {['Fundamental', 'Technical', 'Scores', 'Analysis'].map(group => (
-                    <div key={group} className="bg-[#0a101f] border border-white/5 rounded-xl p-5 shadow-inner">
-                      <h4 className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-4 flex items-center gap-2">
-                        {group === 'Fundamental' && < ShieldCheck className="h-3 w-3" />}
-                        {group === 'Technical' && <TrendingUp className="h-3 w-3" />}
-                        {group === 'Analysis' && <Info className="h-3 w-3" />}
-                        {group}
-                      </h4>
-                      <div className="space-y-3">
-                        {ALL_FIELDS.filter(f => f.group === group).map(field => {
-                          const value = selectedStockData[field.id];
-                          return (
-                            <div key={field.id} className="flex justify-between items-center group">
-                              <span className="text-[10px] text-slate-500 uppercase group-hover:text-slate-300 transition-colors">{field.label}</span>
-                              <span className="text-[10px] font-mono text-slate-300">
-                                {typeof value === 'number'
-                                  ? (field.id.includes('pct') || field.id.includes('return') ? `${value.toFixed(2)}%` : value.toLocaleString(undefined, { maximumFractionDigits: 2 }))
-                                  : (value || '-')}
-                              </span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Qualitative Notes Card */}
-                <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-                  {['Moat Notes', 'Risk Notes', 'Catalysts'].map(note => (
-                    <div key={note} className="bg-[#0a101f] border border-white/5 rounded-xl p-5">
-                      <h4 className="text-[10px] font-black text-amber-500 uppercase tracking-widest mb-3">{note}</h4>
-                      <div className="text-xs text-slate-400 leading-relaxed italic">
-                        {selectedStockData[note.toLowerCase().replace(' ', '_')] || `No qualitative ${note.toLowerCase()} recorded for this session.`}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
           ) : (
-            <div className="h-full flex flex-col items-center justify-center text-center opacity-40 grayscale">
-              <TrendingUp className="h-24 w-24 text-slate-800 mb-6" />
-              <h3 className="text-2xl font-black tracking-tighter uppercase italic">Select Assets For Detailed Telemetry</h3>
-              <p className="text-slate-600 max-w-sm mt-2 text-sm">Select a security from the left-hand market universe to stream technical indicators and full-cycle fundamental analysis.</p>
+            /* Detail View */
+            <div className="space-y-8 animate-in fade-in slide-in-from-right-2 duration-500">
+              {/* Back button */}
+              <button
+                onClick={() => setView('table')}
+                className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors text-sm"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                Back to {reportView.charAt(0).toUpperCase() + reportView.slice(1)}
+              </button>
+
+              {detailSource === 'weekly' && selectedWeeklyStockData ? (
+                /* Weekly Detail View */
+                <>
+                  <div className="flex items-end justify-between border-b border-white/5 pb-6">
+                    <div>
+                      <div className="flex items-center gap-3 mb-2">
+                        <h2 className="text-5xl font-black text-white italic">{selectedWeeklyStockData.ticker}</h2>
+                        <span className={`px-4 py-1 rounded-full text-xs font-black uppercase ${
+                          selectedWeeklyStockData.weekly_trend === 'UP' 
+                            ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' 
+                            : selectedWeeklyStockData.weekly_trend === 'DOWN'
+                            ? 'bg-rose-500/10 text-rose-500 border border-rose-500/20'
+                            : 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
+                        }`}>
+                          {selectedWeeklyStockData.weekly_trend || 'N/A'}
+                        </span>
+                      </div>
+                      <p className="text-slate-400 text-lg uppercase font-light tracking-widest">
+                        {selectedWeeklyStockData.company_name}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-4xl font-mono text-white mb-1">₹{selectedWeeklyStockData.weekly_close?.toLocaleString()}</div>
+                      <div className={`flex items-center justify-end gap-2 font-mono ${(selectedWeeklyStockData.weekly_return_pct || 0) >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                        <Calendar className="h-4 w-4" />
+                        <span className="text-lg">
+                          {(selectedWeeklyStockData.weekly_return_pct || 0) >= 0 ? '+' : ''}
+                          {selectedWeeklyStockData.weekly_return_pct?.toFixed(2)}% this week
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Weekly Stats */}
+                  <WeeklyStats data={weeklyHistoricalData} ticker={selectedWeeklyStockData.ticker} />
+
+                  {/* Weekly Charts */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="relative">
+                      {chartsLoading && (
+                        <div className="absolute inset-0 bg-slate-950/50 backdrop-blur-[2px] z-10 flex items-center justify-center rounded-lg">
+                          <Loader2 className="h-8 w-8 text-blue-500 animate-spin" />
+                        </div>
+                      )}
+                      <WeeklyPriceChart data={weeklyHistoricalData} ticker={selectedWeeklyStockData.ticker} />
+                    </div>
+                    <div className="space-y-6">
+                      <WeeklyRSIChart data={weeklyHistoricalData} ticker={selectedWeeklyStockData.ticker} />
+                      <WeeklyReturnsChart data={weeklyHistoricalData} ticker={selectedWeeklyStockData.ticker} />
+                    </div>
+                  </div>
+
+                  <WeeklyVolumeChart data={weeklyHistoricalData} ticker={selectedWeeklyStockData.ticker} />
+
+                  {/* Weekly Data Table */}
+                  <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-4">
+                    <h3 className="text-sm font-bold text-slate-300 mb-4">Weekly Data Fields</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      {[
+                        { label: 'Open', value: selectedWeeklyStockData.weekly_open },
+                        { label: 'High', value: selectedWeeklyStockData.weekly_high },
+                        { label: 'Low', value: selectedWeeklyStockData.weekly_low },
+                        { label: 'Close', value: selectedWeeklyStockData.weekly_close },
+                        { label: 'Volume', value: selectedWeeklyStockData.weekly_volume?.toLocaleString() },
+                        { label: 'Vol Ratio', value: selectedWeeklyStockData.weekly_volume_ratio?.toFixed(2) + 'x' },
+                        { label: 'RSI(14)', value: selectedWeeklyStockData.weekly_rsi14?.toFixed(1) },
+                        { label: 'SMA 10', value: selectedWeeklyStockData.weekly_sma10?.toFixed(2) },
+                        { label: 'SMA 20', value: selectedWeeklyStockData.weekly_sma20?.toFixed(2) },
+                        { label: '4W Return', value: `${selectedWeeklyStockData.return_4w?.toFixed(2)}%` },
+                        { label: '13W Return', value: `${selectedWeeklyStockData.return_13w?.toFixed(2)}%` },
+                        { label: 'Week Ending', value: selectedWeeklyStockData.week_ending },
+                      ].map(item => (
+                        <div key={item.label} className="flex justify-between">
+                          <span className="text-xs text-slate-500">{item.label}</span>
+                          <span className="text-xs font-mono text-slate-300">{item.value || '-'}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              ) : selectedStockData ? (
+                /* Daily Detail View */
+                <>
+                  {/* Detail Hero */}
+                  <div className="flex items-end justify-between border-b border-white/5 pb-6">
+                    <div>
+                      <div className="flex items-center gap-3 mb-2">
+                        <h2 className="text-5xl font-black text-white italic">{selectedStockData.ticker}</h2>
+                        <span className={`px-4 py-1 rounded-full text-xs font-black uppercase ${selectedStockData.overall_score > 70 ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-500 border border-amber-500/20'}`}>
+                          SCORE: {selectedStockData.overall_score?.toFixed(1)}
+                        </span>
+                      </div>
+                      <p className="text-slate-400 text-lg uppercase font-light tracking-widest">{selectedStockData.company_name}</p>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-4xl font-mono text-white mb-1">₹{selectedStockData.price_last?.toLocaleString()}</div>
+                      <div className={`flex items-center justify-end gap-2 font-mono ${(selectedStockData.return_1d || 0) >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                        <Calendar className="h-4 w-4" />
+                        <span className="text-lg">{(selectedStockData.return_1d || 0) >= 0 ? '+' : ''}{selectedStockData.return_1d?.toFixed(2)}%</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Charts Section */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="relative">
+                      {chartsLoading && (
+                        <div className="absolute inset-0 bg-slate-950/50 backdrop-blur-[2px] z-10 flex items-center justify-center rounded-lg">
+                          <Loader2 className="h-8 w-8 text-blue-500 animate-spin" />
+                        </div>
+                      )}
+                      <PriceChart ticker={selectedStockData.ticker} data={historicalData} />
+                    </div>
+                    <div className="space-y-6">
+                      <RSIChart ticker={selectedStockData.ticker} data={historicalData} />
+                      <MACDChart ticker={selectedStockData.ticker} data={historicalData} />
+                    </div>
+                  </div>
+
+                  {/* Analysis Matrix - THE 110 FIELDS */}
+                  <div className="space-y-6">
+                    <h3 className="text-xs font-black text-slate-500 tracking-[0.2em] uppercase flex items-center gap-4">
+                      <div className="h-px flex-1 bg-white/5"></div>
+                      DEEP DIVE ANALYSIS MATRIX
+                      <div className="h-px flex-1 bg-white/5"></div>
+                    </h3>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+                      {['Fundamental', 'Technical', 'Scores', 'Analysis'].map(group => (
+                        <div key={group} className="bg-[#0a101f] border border-white/5 rounded-xl p-5 shadow-inner">
+                          <h4 className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                            {group === 'Fundamental' && <ShieldCheck className="h-3 w-3" />}
+                            {group === 'Technical' && <TrendingUp className="h-3 w-3" />}
+                            {group === 'Analysis' && <Info className="h-3 w-3" />}
+                            {group}
+                          </h4>
+                          <div className="space-y-3">
+                            {ALL_FIELDS.filter(f => f.group === group).map(field => {
+                              const value = selectedStockData[field.id];
+                              return (
+                                <div key={field.id} className="flex justify-between items-center group">
+                                  <span className="text-[10px] text-slate-500 uppercase group-hover:text-slate-300 transition-colors">{field.label}</span>
+                                  <span className="text-[10px] font-mono text-slate-300">
+                                    {typeof value === 'number'
+                                      ? (field.id.includes('pct') || field.id.includes('return') ? `${value.toFixed(2)}%` : value.toLocaleString(undefined, { maximumFractionDigits: 2 }))
+                                      : (value || '-')}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Qualitative Notes Card */}
+                    <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                      {['Moat Notes', 'Risk Notes', 'Catalysts'].map(note => (
+                        <div key={note} className="bg-[#0a101f] border border-white/5 rounded-xl p-5">
+                          <h4 className="text-[10px] font-black text-amber-500 uppercase tracking-widest mb-3">{note}</h4>
+                          <div className="text-xs text-slate-400 leading-relaxed italic">
+                            {selectedStockData[note.toLowerCase().replace(' ', '_')] || `No qualitative ${note.toLowerCase()} recorded for this session.`}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="h-full flex flex-col items-center justify-center text-center opacity-40 grayscale">
+                  <TrendingUp className="h-24 w-24 text-slate-800 mb-6" />
+                  <h3 className="text-2xl font-black tracking-tighter uppercase italic">Select Assets For Detailed Telemetry</h3>
+                  <p className="text-slate-600 max-w-sm mt-2 text-sm">Select a security to view detailed analysis.</p>
+                </div>
+              )}
             </div>
           )}
         </main>
