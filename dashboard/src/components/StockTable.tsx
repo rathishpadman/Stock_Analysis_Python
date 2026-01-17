@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { ALL_FIELDS } from '@/lib/constants';
 import { ChevronUp, ChevronDown } from 'lucide-react';
 
@@ -18,10 +18,14 @@ interface StockTableProps {
 export default function StockTable({ stocks, visibleColumns, onSelectStock, timeframe = '1d' }: StockTableProps) {
     const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
     const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
+    
+    // Pagination state
+    const [currentPage, setCurrentPage] = useState(1);
+    const [rowsPerPage, setRowsPerPage] = useState(25);
 
     const columns = ALL_FIELDS.filter(f => visibleColumns.includes(f.id));
 
-    const sortedStocks = React.useMemo(() => {
+    const sortedStocks = useMemo(() => {
         if (!sortConfig) return stocks;
         return [...stocks].sort((a, b) => {
             const aVal = a[sortConfig.key];
@@ -32,6 +36,13 @@ export default function StockTable({ stocks, visibleColumns, onSelectStock, time
         });
     }, [stocks, sortConfig]);
 
+    // Pagination calculations
+    const totalPages = Math.ceil(sortedStocks.length / rowsPerPage);
+    const paginatedStocks = useMemo(() => {
+        const startIndex = (currentPage - 1) * rowsPerPage;
+        return sortedStocks.slice(startIndex, startIndex + rowsPerPage);
+    }, [sortedStocks, currentPage, rowsPerPage]);
+
     const requestSort = (key: string) => {
         let direction: 'asc' | 'desc' = 'asc';
         if (sortConfig?.key === key && sortConfig.direction === 'asc') {
@@ -41,49 +52,103 @@ export default function StockTable({ stocks, visibleColumns, onSelectStock, time
     };
 
     return (
-        <div className="overflow-x-auto rounded-lg border border-slate-700 bg-slate-900 shadow-xl">
-            <table className="min-w-full divide-y divide-slate-700">
-                <thead className="bg-slate-800/50 backdrop-blur-sm sticky top-0">
-                    <tr>
-                        {columns.map(col => (
-                            <th
-                                key={col.id}
-                                onClick={() => requestSort(col.id)}
-                                className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-400 whitespace-nowrap cursor-pointer hover:text-white transition-colors group"
-                            >
-                                <div className="flex items-center gap-2">
-                                    {col.label}
-                                    <span className="opacity-0 group-hover:opacity-100 transition-opacity">
-                                        {sortConfig?.key === col.id ? (
-                                            sortConfig.direction === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
-                                        ) : (
-                                            <ChevronUp className="h-3 w-3 text-slate-600" />
-                                        )}
-                                    </span>
-                                </div>
-                            </th>
-                        ))}
-                    </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800 bg-slate-900">
-                    {sortedStocks.map((stock) => (
-                        <tr
-                            key={stock.ticker}
-                            onClick={() => {
-                                setSelectedTicker(stock.ticker);
-                                onSelectStock?.(stock.ticker);
-                            }}
-                            className={`hover:bg-slate-800/60 transition-colors cursor-pointer group ${selectedTicker === stock.ticker ? 'bg-blue-900/20 border-l-2 border-l-blue-600' : ''}`}
-                        >
+        <div className="space-y-4">
+            <div className="overflow-x-auto rounded-lg border border-slate-700 bg-slate-900 shadow-xl pb-2">
+                <table className="min-w-full divide-y divide-slate-700">
+                    <thead className="bg-slate-800/50 backdrop-blur-sm sticky top-0">
+                        <tr>
                             {columns.map(col => (
-                                <td key={col.id} className="whitespace-nowrap px-6 py-4 text-sm font-medium">
-                                    {renderCell(stock, col.id, timeframe)}
-                                </td>
+                                <th
+                                    key={col.id}
+                                    onClick={() => requestSort(col.id)}
+                                    className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-400 whitespace-nowrap cursor-pointer hover:text-white transition-colors group"
+                                >
+                                    <div className="flex items-center gap-2">
+                                        {col.label}
+                                        <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                                            {sortConfig?.key === col.id ? (
+                                                sortConfig.direction === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
+                                            ) : (
+                                                <ChevronUp className="h-3 w-3 text-slate-600" />
+                                            )}
+                                        </span>
+                                    </div>
+                                </th>
                             ))}
                         </tr>
-                    ))}
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800 bg-slate-900">
+                        {paginatedStocks.map((stock) => (
+                            <tr
+                                key={stock.ticker}
+                                onClick={() => {
+                                    setSelectedTicker(stock.ticker);
+                                    onSelectStock?.(stock.ticker);
+                                }}
+                                className={`hover:bg-slate-800/60 transition-colors cursor-pointer group ${selectedTicker === stock.ticker ? 'bg-blue-900/20 border-l-2 border-l-blue-600' : ''}`}
+                            >
+                                {columns.map(col => (
+                                    <td key={col.id} className="whitespace-nowrap px-6 py-4 text-sm font-medium">
+                                        {renderCell(stock, col.id, timeframe)}
+                                    </td>
+                                ))}
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+
+            {/* Pagination Controls */}
+            <div className="flex items-center justify-between bg-slate-900/30 border border-slate-800 rounded-lg p-3">
+                <div className="flex items-center gap-4">
+                    <span className="text-xs text-slate-400">
+                        Showing {((currentPage - 1) * rowsPerPage) + 1} - {Math.min(currentPage * rowsPerPage, sortedStocks.length)} of {sortedStocks.length}
+                    </span>
+                    <select
+                        value={rowsPerPage}
+                        onChange={(e) => { setRowsPerPage(Number(e.target.value)); setCurrentPage(1); }}
+                        className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs text-white"
+                    >
+                        <option value={10}>10 per page</option>
+                        <option value={25}>25 per page</option>
+                        <option value={50}>50 per page</option>
+                        <option value={100}>100 per page</option>
+                    </select>
+                </div>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={() => setCurrentPage(1)}
+                        disabled={currentPage === 1}
+                        className="px-2 py-1 text-xs bg-slate-800 border border-slate-700 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-700 text-slate-300"
+                    >
+                        First
+                    </button>
+                    <button
+                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                        disabled={currentPage === 1}
+                        className="px-3 py-1 text-xs bg-slate-800 border border-slate-700 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-700 text-slate-300"
+                    >
+                        ←
+                    </button>
+                    <span className="text-xs text-slate-400 px-2">
+                        Page {currentPage} of {totalPages}
+                    </span>
+                    <button
+                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                        disabled={currentPage === totalPages}
+                        className="px-3 py-1 text-xs bg-slate-800 border border-slate-700 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-700 text-slate-300"
+                    >
+                        →
+                    </button>
+                    <button
+                        onClick={() => setCurrentPage(totalPages)}
+                        disabled={currentPage === totalPages}
+                        className="px-2 py-1 text-xs bg-slate-800 border border-slate-700 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-700 text-slate-300"
+                    >
+                        Last
+                    </button>
+                </div>
+            </div>
         </div>
     );
 }
