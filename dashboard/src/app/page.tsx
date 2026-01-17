@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import StockTable from '@/components/StockTable';
-import { ScoreBarChart, PriceChart, RSIChart } from '@/components/Charts';
+import React, { useState, useEffect } from 'react'; // Added explicit React import
+import WeeklyReportTable from '@/components/WeeklyReportTable';
+import { ScoreBarChart, PriceChart, RSIChart, MACDChart } from '@/components/Charts';
 import { ALL_FIELDS, DEFAULT_COLUMNS } from '@/lib/constants';
 import { Settings2, Search, Filter, LogOut, Loader2, BarChart3, TrendingUp, ShieldCheck, Info, Calendar } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
+import StockTable from '@/components/StockTable'; // Missing import
 
 export default function DashboardPage() {
   const { user, loading: authLoading, signInWithGoogle, signOut } = useAuth();
@@ -22,6 +23,10 @@ export default function DashboardPage() {
   const [view, setView] = useState<'table' | 'detail'>('table');
   const [availableDates, setAvailableDates] = useState<string[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>('');
+
+  // Phase 5: Reports View State
+  const [reportView, setReportView] = useState<'screener' | 'weekly'>('screener');
+  const [weeklyData, setWeeklyData] = useState<any[]>([]);
 
   useEffect(() => {
     if (!authLoading && user) {
@@ -40,6 +45,26 @@ export default function DashboardPage() {
       fetchHistoricalData(selectedStock);
     }
   }, [selectedStock]);
+
+  // Fetch Weekly Data when view changes
+  useEffect(() => {
+    if (reportView === 'weekly' && weeklyData.length === 0) {
+      fetchWeeklyData();
+    }
+  }, [reportView]);
+
+  const fetchWeeklyData = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/weekly');
+      const data = await res.json();
+      setWeeklyData(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Failed to fetch weekly reports:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const fetchAvailableDates = async () => {
     try {
@@ -141,7 +166,7 @@ export default function DashboardPage() {
             <div className="flex items-center gap-2 text-[10px] text-slate-500 font-mono">
               <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
               LIVE DATA STREAMING
-              <span className="ml-2 border-l border-slate-800 pl-2">V1.2.0-PHASE1_STABLE</span>
+              <span className="ml-2 border-l border-slate-800 pl-2">V1.3.0-PHASE5_REPORTING</span>
             </div>
           </div>
         </div>
@@ -244,33 +269,63 @@ export default function DashboardPage() {
           {view === 'table' ? (
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
               <div className="flex items-center justify-between">
-                <h2 className="text-xl font-bold flex items-center gap-2">
-                  <div className="w-1 h-6 bg-blue-600 rounded-full"></div>
-                  MARKET SCREENER
-                </h2>
-                <div className="flex gap-4">
-                  <div className="flex bg-[#0f172a] border border-white/5 rounded p-1">
-                    {(['1d', '1w', '1m'] as const).map((tf) => (
-                      <button
-                        key={tf}
-                        onClick={() => setTimeframe(tf)}
-                        className={`px-4 py-1.5 rounded text-[10px] font-black transition-all ${timeframe === tf ? 'bg-blue-600 text-white' : 'text-slate-600 hover:text-slate-400'}`}
-                      >
-                        {tf.toUpperCase()}
-                      </button>
-                    ))}
+                <div className="flex items-center gap-4">
+                  <h2 className="text-xl font-bold flex items-center gap-2">
+                    <div className="w-1 h-6 bg-blue-600 rounded-full"></div>
+                    {reportView === 'screener' ? 'MARKET SCREENER' : 'WEEKLY INTELLIGENCE'}
+                  </h2>
+                  <div className="flex bg-[#0f172a] border border-white/5 rounded p-0.5">
+                    <button
+                      onClick={() => setReportView('screener')}
+                      className={`px-3 py-1 rounded text-[10px] font-bold transition-all ${reportView === 'screener' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                    >
+                      SCREENER
+                    </button>
+                    <button
+                      onClick={() => setReportView('weekly')}
+                      className={`px-3 py-1 rounded text-[10px] font-bold transition-all ${reportView === 'weekly' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                    >
+                      WEEKLY REPORTS
+                    </button>
                   </div>
                 </div>
+
+                {reportView === 'screener' && (
+                  <div className="flex gap-4">
+                    <div className="flex bg-[#0f172a] border border-white/5 rounded p-1">
+                      {(['1d', '1w', '1m'] as const).map((tf) => (
+                        <button
+                          key={tf}
+                          onClick={() => setTimeframe(tf)}
+                          className={`px-4 py-1.5 rounded text-[10px] font-black transition-all ${timeframe === tf ? 'bg-blue-600 text-white' : 'text-slate-600 hover:text-slate-400'}`}
+                        >
+                          {tf.toUpperCase()}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-              <StockTable
-                stocks={filteredStocks}
-                visibleColumns={visibleColumns}
-                onSelectStock={(t) => {
-                  setSelectedStock(t);
-                  setView('detail');
-                }}
-                timeframe={timeframe}
-              />
+
+              {reportView === 'screener' ? (
+                <StockTable
+                  stocks={filteredStocks}
+                  visibleColumns={visibleColumns}
+                  onSelectStock={(t) => {
+                    setSelectedStock(t);
+                    setView('detail');
+                  }}
+                  timeframe={timeframe}
+                />
+              ) : (
+                <WeeklyReportTable
+                  data={weeklyData}
+                  onSelectStock={(t) => {
+                    setSelectedStock(t);
+                    setView('detail');
+                  }}
+                />
+              )}
             </div>
           ) : selectedStockData ? (
             <div className="space-y-8 animate-in fade-in slide-in-from-right-2 duration-500">
@@ -304,7 +359,10 @@ export default function DashboardPage() {
                   )}
                   <PriceChart ticker={selectedStockData.ticker} data={historicalData} />
                 </div>
-                <RSIChart ticker={selectedStockData.ticker} data={historicalData} />
+                <div className="space-y-6">
+                  <RSIChart ticker={selectedStockData.ticker} data={historicalData} />
+                  <MACDChart ticker={selectedStockData.ticker} data={historicalData} />
+                </div>
               </div>
 
               {/* Analysis Matrix - THE 110 FIELDS */}
