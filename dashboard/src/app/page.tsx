@@ -2,9 +2,13 @@
 
 import React, { useState, useEffect } from 'react'; // Added explicit React import
 import WeeklyReportTable from '@/components/WeeklyReportTable';
+import MonthlyReportTable from '@/components/MonthlyReportTable';
+import SeasonalityHeatmap from '@/components/SeasonalityHeatmap';
+import TopMovers from '@/components/TopMovers';
+import TechnicalSignals from '@/components/TechnicalSignals';
 import { ScoreBarChart, PriceChart, RSIChart, MACDChart } from '@/components/Charts';
 import { ALL_FIELDS, DEFAULT_COLUMNS } from '@/lib/constants';
-import { Settings2, Search, Filter, LogOut, Loader2, BarChart3, TrendingUp, ShieldCheck, Info, Calendar } from 'lucide-react';
+import { Settings2, Search, Filter, LogOut, Loader2, BarChart3, TrendingUp, ShieldCheck, Info, Calendar, Flame, AlertTriangle, Activity } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import StockTable from '@/components/StockTable'; // Missing import
@@ -25,8 +29,10 @@ export default function DashboardPage() {
   const [selectedDate, setSelectedDate] = useState<string>('');
 
   // Phase 5: Reports View State
-  const [reportView, setReportView] = useState<'screener' | 'weekly'>('screener');
+  const [reportView, setReportView] = useState<'screener' | 'weekly' | 'monthly' | 'seasonality'>('screener');
   const [weeklyData, setWeeklyData] = useState<any[]>([]);
+  const [monthlyData, setMonthlyData] = useState<any[]>([]);
+  const [seasonalityData, setSeasonalityData] = useState<any[]>([]);
 
   useEffect(() => {
     if (!authLoading && user) {
@@ -51,6 +57,12 @@ export default function DashboardPage() {
     if (reportView === 'weekly' && weeklyData.length === 0) {
       fetchWeeklyData();
     }
+    if (reportView === 'monthly' && monthlyData.length === 0) {
+      fetchMonthlyData();
+    }
+    if (reportView === 'seasonality' && seasonalityData.length === 0) {
+      fetchSeasonalityData();
+    }
   }, [reportView]);
 
   const fetchWeeklyData = async () => {
@@ -61,6 +73,32 @@ export default function DashboardPage() {
       setWeeklyData(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Failed to fetch weekly reports:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchMonthlyData = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/monthly');
+      const data = await res.json();
+      setMonthlyData(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Failed to fetch monthly reports:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchSeasonalityData = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/seasonality');
+      const data = await res.json();
+      setSeasonalityData(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Failed to fetch seasonality data:', error);
     } finally {
       setLoading(false);
     }
@@ -272,7 +310,9 @@ export default function DashboardPage() {
                 <div className="flex items-center gap-4">
                   <h2 className="text-xl font-bold flex items-center gap-2">
                     <div className="w-1 h-6 bg-blue-600 rounded-full"></div>
-                    {reportView === 'screener' ? 'MARKET SCREENER' : 'WEEKLY INTELLIGENCE'}
+                    {reportView === 'screener' ? 'MARKET SCREENER' : 
+                     reportView === 'weekly' ? 'WEEKLY INTELLIGENCE' : 
+                     reportView === 'monthly' ? 'MONTHLY ANALYSIS' : 'SEASONALITY PATTERNS'}
                   </h2>
                   <div className="flex bg-[#0f172a] border border-white/5 rounded p-0.5">
                     <button
@@ -285,7 +325,19 @@ export default function DashboardPage() {
                       onClick={() => setReportView('weekly')}
                       className={`px-3 py-1 rounded text-[10px] font-bold transition-all ${reportView === 'weekly' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-300'}`}
                     >
-                      WEEKLY REPORTS
+                      WEEKLY
+                    </button>
+                    <button
+                      onClick={() => setReportView('monthly')}
+                      className={`px-3 py-1 rounded text-[10px] font-bold transition-all ${reportView === 'monthly' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                    >
+                      MONTHLY
+                    </button>
+                    <button
+                      onClick={() => setReportView('seasonality')}
+                      className={`px-3 py-1 rounded text-[10px] font-bold transition-all ${reportView === 'seasonality' ? 'bg-amber-600 text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                    >
+                      SEASONALITY
                     </button>
                   </div>
                 </div>
@@ -308,18 +360,55 @@ export default function DashboardPage() {
               </div>
 
               {reportView === 'screener' ? (
-                <StockTable
-                  stocks={filteredStocks}
-                  visibleColumns={visibleColumns}
+                <div className="space-y-6">
+                  {/* Top Movers Summary */}
+                  <TopMovers
+                    stocks={filteredStocks}
+                    onSelectStock={(t) => {
+                      setSelectedStock(t);
+                      setView('detail');
+                    }}
+                  />
+
+                  {/* Technical Signals Scanner */}
+                  <TechnicalSignals
+                    stocks={filteredStocks}
+                    onSelectStock={(t) => {
+                      setSelectedStock(t);
+                      setView('detail');
+                    }}
+                  />
+
+                  {/* Main Stock Table */}
+                  <StockTable
+                    stocks={filteredStocks}
+                    visibleColumns={visibleColumns}
+                    onSelectStock={(t) => {
+                      setSelectedStock(t);
+                      setView('detail');
+                    }}
+                    timeframe={timeframe}
+                  />
+                </div>
+              ) : reportView === 'weekly' ? (
+                <WeeklyReportTable
+                  data={weeklyData}
                   onSelectStock={(t) => {
                     setSelectedStock(t);
                     setView('detail');
                   }}
-                  timeframe={timeframe}
+                />
+              ) : reportView === 'monthly' ? (
+                <MonthlyReportTable
+                  data={monthlyData}
+                  onSelectStock={(t) => {
+                    setSelectedStock(t);
+                    setView('detail');
+                  }}
                 />
               ) : (
-                <WeeklyReportTable
-                  data={weeklyData}
+                <SeasonalityHeatmap
+                  data={seasonalityData}
                   onSelectStock={(t) => {
                     setSelectedStock(t);
                     setView('detail');

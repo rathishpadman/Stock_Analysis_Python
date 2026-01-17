@@ -5,14 +5,23 @@ import React from 'react';
 
 interface WeeklyData {
     ticker: string;
+    company_name?: string;
     week_ending: string;
-    close_price: number;
-    weekly_return: number;
-    weekly_range_pct: number;
+    weekly_open?: number;
+    weekly_high?: number;
+    weekly_low?: number;
+    weekly_close: number;
+    weekly_return_pct: number;
+    weekly_volume?: number;
+    weekly_volume_ratio?: number;
+    weekly_rsi14?: number;
+    weekly_sma10?: number;
+    weekly_sma20?: number;
+    return_4w?: number;
+    return_13w?: number;
     distance_52w_high: number;
     distance_52w_low: number;
     weekly_trend: string;
-    volatility_weekly?: number;
 }
 
 interface WeeklyReportTableProps {
@@ -30,7 +39,9 @@ export default function WeeklyReportTable({ data, onSelectStock }: WeeklyReportT
                         <th className="p-3 font-medium">Trend</th>
                         <th className="p-3 font-medium text-right">Close</th>
                         <th className="p-3 font-medium text-right">Wk Return</th>
-                        <th className="p-3 font-medium text-right">Range %</th>
+                        <th className="p-3 font-medium text-right">4W Return</th>
+                        <th className="p-3 font-medium text-right">13W Return</th>
+                        <th className="p-3 font-medium text-right">RSI(14)</th>
                         <th className="p-3 font-medium text-right">Dist 52W High</th>
                         <th className="p-3 font-medium text-right">Dist 52W Low</th>
                     </tr>
@@ -38,7 +49,7 @@ export default function WeeklyReportTable({ data, onSelectStock }: WeeklyReportT
                 <tbody className="text-sm divide-y divide-slate-800">
                     {data.map((row) => (
                         <tr
-                            key={row.ticker}
+                            key={`${row.ticker}-${row.week_ending}`}
                             className="hover:bg-slate-800/50 cursor-pointer transition-colors"
                             onClick={() => onSelectStock(row.ticker)}
                         >
@@ -52,15 +63,21 @@ export default function WeeklyReportTable({ data, onSelectStock }: WeeklyReportT
                                 </span>
                             </td>
                             <td className="p-3 text-right text-slate-300">
-                                ₹{row.close_price?.toFixed(2)}
+                                ₹{row.weekly_close?.toFixed(2)}
                             </td>
-                            <td className={`p-3 text-right font-medium ${(row.weekly_return || 0) >= 0 ? 'text-green-400' : 'text-red-400'
+                            <td className={`p-3 text-right font-medium ${(row.weekly_return_pct || 0) >= 0 ? 'text-green-400' : 'text-red-400'
                                 }`}>
-                                {(row.weekly_return || 0) > 0 ? '+' : ''}
-                                {row.weekly_return?.toFixed(2)}%
+                                {(row.weekly_return_pct || 0) > 0 ? '+' : ''}
+                                {row.weekly_return_pct?.toFixed(2)}%
                             </td>
-                            <td className="p-3 text-right text-slate-300">
-                                {row.weekly_range_pct?.toFixed(2)}%
+                            <td className={`p-3 text-right ${(row.return_4w || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                {(row.return_4w || 0) > 0 ? '+' : ''}{row.return_4w?.toFixed(2)}%
+                            </td>
+                            <td className={`p-3 text-right ${(row.return_13w || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                {(row.return_13w || 0) > 0 ? '+' : ''}{row.return_13w?.toFixed(2)}%
+                            </td>
+                            <td className={`p-3 text-right ${(row.weekly_rsi14 || 0) > 70 ? 'text-red-400' : (row.weekly_rsi14 || 0) < 30 ? 'text-green-400' : 'text-slate-300'}`}>
+                                {row.weekly_rsi14?.toFixed(1)}
                             </td>
                             <td className="p-3 text-right text-red-300">
                                 {row.distance_52w_high?.toFixed(2)}%
@@ -72,7 +89,7 @@ export default function WeeklyReportTable({ data, onSelectStock }: WeeklyReportT
                     ))}
                     {data.length === 0 && (
                         <tr>
-                            <td colSpan={7} className="p-8 text-center text-slate-500">
+                            <td colSpan={9} className="p-8 text-center text-slate-500">
                                 No weekly data available.
                             </td>
                         </tr>
