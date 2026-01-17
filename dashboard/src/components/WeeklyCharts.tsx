@@ -83,11 +83,11 @@ export function WeeklyPriceChart({ data, ticker }: WeeklyChartProps) {
                             color: '#f1f5f9',
                         }}
                         labelFormatter={(label) => `Week: ${label}`}
-                        formatter={(value: number, name: string) => [
-                            `₹${value?.toFixed(2)}`,
+                        formatter={(value, name) => [
+                            `₹${(value as number)?.toFixed(2) ?? '-'}`,
                             name === 'weekly_close' ? 'Close' : 
                             name === 'weekly_sma10' ? 'SMA 10' : 
-                            name === 'weekly_sma20' ? 'SMA 20' : name
+                            name === 'weekly_sma20' ? 'SMA 20' : String(name)
                         ]}
                     />
                     <Area
@@ -177,7 +177,7 @@ export function WeeklyRSIChart({ data, ticker }: WeeklyChartProps) {
                             color: '#f1f5f9',
                         }}
                         labelFormatter={(label) => `Week: ${label}`}
-                        formatter={(value: number) => [value?.toFixed(1), 'RSI']}
+                        formatter={(value) => [(value as number)?.toFixed(1) ?? '-', 'RSI']}
                     />
                     <ReferenceLine y={70} stroke="#ef4444" strokeDasharray="3 3" />
                     <ReferenceLine y={30} stroke="#22c55e" strokeDasharray="3 3" />
@@ -235,7 +235,7 @@ export function WeeklyReturnsChart({ data, ticker }: WeeklyChartProps) {
                             color: '#f1f5f9',
                         }}
                         labelFormatter={(label) => `Week: ${label}`}
-                        formatter={(value: number) => [`${value?.toFixed(2)}%`, 'Return']}
+                        formatter={(value) => [`${(value as number)?.toFixed(2) ?? '-'}%`, 'Return']}
                     />
                     <ReferenceLine y={0} stroke="#64748b" />
                     <Bar dataKey="weekly_return_pct" radius={[2, 2, 0, 0]}>
@@ -296,7 +296,7 @@ export function WeeklyVolumeChart({ data, ticker }: WeeklyChartProps) {
                             color: '#f1f5f9',
                         }}
                         labelFormatter={(label) => `Week: ${label}`}
-                        formatter={(value: number) => [value?.toLocaleString(), 'Volume']}
+                        formatter={(value) => [(value as number)?.toLocaleString() ?? '-', 'Volume']}
                     />
                     <ReferenceLine y={avgVolume} stroke="#f59e0b" strokeDasharray="3 3" />
                     <Bar dataKey="weekly_volume" fill="#64748b" radius={[2, 2, 0, 0]}>
