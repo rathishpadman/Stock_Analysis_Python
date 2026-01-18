@@ -22,3 +22,10 @@ aiohttp>=3.9.0
 
 # SSE Support (for streaming)
 sse-starlette>=1.8.0
+
+# Stock data
+yfinance>=0.2.0
+
+# News/Web scraping
+requests>=2.31.0
+beautifulsoup4>=4.12.0
