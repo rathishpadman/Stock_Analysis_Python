@@ -1,0 +1,14 @@
+{
+  "total_analyses": 11,
+  "successful_analyses": 11,
+  "failed_analyses": 0,
+  "total_cost_usd": 0.0042825187499999995,
+  "total_input_tokens": 177465,
+  "total_output_tokens": 12734,
+  "avg_duration_seconds": 0.0,
+  "last_updated": "2026-01-18T20:00:20.236872",
+  "costs_by_agent": {},
+  "costs_by_date": {
+    "2026-01-18": 0.0042825187499999995
+  }
+}

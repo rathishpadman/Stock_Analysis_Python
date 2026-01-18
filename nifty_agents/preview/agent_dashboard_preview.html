@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Agent Analysis - Preview</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        slate: {
+                            850: '#1a2234',
+                            900: '#0f172a',
+                            950: '#080d19'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 5px rgba(59, 130, 246, 0.5); }
+            50% { box-shadow: 0 0 20px rgba(59, 130, 246, 0.8); }
+        }
+        @keyframes flow-down {
+            0% { transform: translateY(-10px); opacity: 0; }
+            50% { opacity: 1; }
+            100% { transform: translateY(10px); opacity: 0; }
+        }
+        @keyframes slide-in {
+            from { transform: translateX(-20px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes progress-bar {
+            from { width: 0%; }
+        }
+        .agent-active { animation: pulse-glow 1.5s ease-in-out infinite; }
+        .flow-particle { animation: flow-down 1s ease-in-out infinite; }
+        .message-slide { animation: slide-in 0.3s ease-out; }
+        .progress-animate { animation: progress-bar 2s ease-out; }
+        
+        /* Custom scrollbar */
+        .custom-scroll::-webkit-scrollbar { width: 6px; }
+        .custom-scroll::-webkit-scrollbar-track { background: #1e293b; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+        .custom-scroll::-webkit-scrollbar-thumb:hover { background: #64748b; }
+        
+        /* Gradient borders */
+        .gradient-border {
+            position: relative;
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+        }
+        .gradient-border::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            padding: 1px;
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 50%, #06b6d4 100%);
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            mask-composite: exclude;
+            border-radius: inherit;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-white min-h-screen">
+    <div class="container mx-auto p-6 max-w-7xl">
+        
+        <!-- Header -->
+        <div class="flex items-center justify-between mb-6">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold">AI Agent Analysis</h1>
+                    <p class="text-slate-500 text-sm">Multi-Agent Stock Intelligence</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-4">
+                <div class="text-right text-sm">
+                    <div class="text-slate-400">Model</div>
+                    <div class="text-cyan-400 font-mono">gemini-2.0-flash</div>
+                </div>
+                <div class="w-3 h-3 bg-green-500 rounded-full animate-pulse" title="API Connected"></div>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="flex gap-1 mb-6 bg-slate-900 p-1 rounded-lg w-fit">
+            <button class="tab-btn px-4 py-2 rounded text-sm font-medium bg-blue-600 text-white" data-tab="analyze">
+                🔍 Analyze
+            </button>
+            <button class="tab-btn px-4 py-2 rounded text-sm font-medium text-slate-400 hover:text-white" data-tab="logs">
+                📋 Logs
+            </button>
+            <button class="tab-btn px-4 py-2 rounded text-sm font-medium text-slate-400 hover:text-white" data-tab="traces">
+                🔬 LLM Traces
+            </button>
+            <button class="tab-btn px-4 py-2 rounded text-sm font-medium text-slate-400 hover:text-white" data-tab="finops">
+                💰 FinOps
+            </button>
+        </div>
+
+        <!-- Main Content -->
+        <div id="tab-content">
+            <!-- Analyze Tab -->
+            <div id="analyze-tab" class="tab-panel">
+                <!-- Input Section -->
+                <div class="gradient-border rounded-xl p-6 mb-6">
+                    <div class="flex gap-4 items-end">
+                        <div class="flex-1">
+                            <label class="block text-sm text-slate-400 mb-2">Stock Ticker (NSE)</label>
+                            <input type="text" id="ticker-input" value="RELIANCE" 
+                                class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-lg font-mono focus:outline-none focus:border-blue-500 uppercase"
+                                placeholder="Enter ticker...">
+                        </div>
+                        <button id="analyze-btn" onclick="startAnalysis()"
+                            class="px-8 py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 rounded-lg font-semibold transition-all flex items-center gap-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                            </svg>
+                            Analyze
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Agent Orchestration Visualization -->
+                <div class="gradient-border rounded-xl p-6 mb-6">
+                    <div class="flex items-center justify-between mb-6">
+                        <h2 class="text-lg font-semibold flex items-center gap-2">
+                            <span class="text-purple-400">🤖</span> Agent Orchestration
+                            <span id="status-badge" class="ml-3 px-2 py-0.5 text-xs rounded bg-slate-700 text-slate-400">Ready</span>
+                        </h2>
+                        <div id="cost-display" class="text-sm text-slate-400">
+                            <span class="text-green-400">$0.00000</span> | <span id="token-count">0</span> tokens | <span id="time-elapsed">0.0s</span>
+                        </div>
+                    </div>
+
+                    <!-- Orchestrator Node -->
+                    <div class="flex justify-center mb-4">
+                        <div id="orchestrator-node" class="bg-slate-800 border border-slate-600 rounded-xl px-6 py-3 text-center">
+                            <div class="text-2xl mb-1">🎯</div>
+                            <div class="font-semibold">ORCHESTRATOR</div>
+                            <div id="orchestrator-status" class="text-xs text-slate-500 mt-1">Idle</div>
+                        </div>
+                    </div>
+
+                    <!-- Connection Lines -->
+                    <div class="flex justify-center mb-4">
+                        <div class="flex items-center gap-2">
+                            <div class="h-8 w-px bg-slate-600"></div>
+                            <div id="flow-indicator" class="hidden">
+                                <div class="w-2 h-2 bg-blue-500 rounded-full flow-particle"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex justify-center mb-4">
+                        <div class="w-3/4 h-px bg-slate-600 relative">
+                            <div class="absolute left-0 top-0 h-full w-1/5 border-l border-slate-600"></div>
+                            <div class="absolute left-1/5 top-0 h-full w-1/5 border-l border-slate-600"></div>
+                            <div class="absolute left-2/5 top-0 h-full w-1/5 border-l border-slate-600"></div>
+                            <div class="absolute left-3/5 top-0 h-full w-1/5 border-l border-slate-600"></div>
+                            <div class="absolute right-0 top-0 h-full border-l border-slate-600"></div>
+                        </div>
+                    </div>
+
+                    <!-- Agent Nodes -->
+                    <div class="grid grid-cols-5 gap-4 mb-6">
+                        <div id="agent-fundamental" class="agent-node bg-slate-800/50 border border-slate-700 rounded-xl p-4 text-center transition-all">
+                            <div class="text-2xl mb-2">📈</div>
+                            <div class="font-semibold text-sm">FUNDAMENTAL</div>
+                            <div class="text-xs text-slate-500 mt-1 agent-status">Idle</div>
+                            <div class="mt-3 h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                                <div class="agent-progress h-full bg-blue-500 rounded-full transition-all duration-500" style="width: 0%"></div>
+                            </div>
+                            <div class="mt-2 text-xs">
+                                <span class="agent-score text-slate-500">--</span>
+                                <span class="agent-time text-slate-600 ml-2">--</span>
+                            </div>
+                        </div>
+                        <div id="agent-technical" class="agent-node bg-slate-800/50 border border-slate-700 rounded-xl p-4 text-center transition-all">
+                            <div class="text-2xl mb-2">📉</div>
+                            <div class="font-semibold text-sm">TECHNICAL</div>
+                            <div class="text-xs text-slate-500 mt-1 agent-status">Idle</div>
+                            <div class="mt-3 h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                                <div class="agent-progress h-full bg-cyan-500 rounded-full transition-all duration-500" style="width: 0%"></div>
+                            </div>
+                            <div class="mt-2 text-xs">
+                                <span class="agent-score text-slate-500">--</span>
+                                <span class="agent-time text-slate-600 ml-2">--</span>
+                            </div>
+                        </div>
+                        <div id="agent-sentiment" class="agent-node bg-slate-800/50 border border-slate-700 rounded-xl p-4 text-center transition-all">
+                            <div class="text-2xl mb-2">📰</div>
+                            <div class="font-semibold text-sm">SENTIMENT</div>
+                            <div class="text-xs text-slate-500 mt-1 agent-status">Idle</div>
+                            <div class="mt-3 h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                                <div class="agent-progress h-full bg-amber-500 rounded-full transition-all duration-500" style="width: 0%"></div>
+                            </div>
+                            <div class="mt-2 text-xs">
+                                <span class="agent-score text-slate-500">--</span>
+                                <span class="agent-time text-slate-600 ml-2">--</span>
+                            </div>
+                        </div>
+                        <div id="agent-macro" class="agent-node bg-slate-800/50 border border-slate-700 rounded-xl p-4 text-center transition-all">
+                            <div class="text-2xl mb-2">🌍</div>
+                            <div class="font-semibold text-sm">MACRO</div>
+                            <div class="text-xs text-slate-500 mt-1 agent-status">Idle</div>
+                            <div class="mt-3 h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                                <div class="agent-progress h-full bg-green-500 rounded-full transition-all duration-500" style="width: 0%"></div>
+                            </div>
+                            <div class="mt-2 text-xs">
+                                <span class="agent-score text-slate-500">--</span>
+                                <span class="agent-time text-slate-600 ml-2">--</span>
+                            </div>
+                        </div>
+                        <div id="agent-regulatory" class="agent-node bg-slate-800/50 border border-slate-700 rounded-xl p-4 text-center transition-all">
+                            <div class="text-2xl mb-2">⚖️</div>
+                            <div class="font-semibold text-sm">REGULATORY</div>
+                            <div class="text-xs text-slate-500 mt-1 agent-status">Idle</div>
+                            <div class="mt-3 h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                                <div class="agent-progress h-full bg-purple-500 rounded-full transition-all duration-500" style="width: 0%"></div>
+                            </div>
+                            <div class="mt-2 text-xs">
+                                <span class="agent-score text-slate-500">--</span>
+                                <span class="agent-time text-slate-600 ml-2">--</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Predictor Node -->
+                    <div class="flex justify-center mb-4">
+                        <div class="w-3/4 h-px bg-slate-600"></div>
+                    </div>
+                    <div class="flex justify-center mb-4">
+                        <div class="h-8 w-px bg-slate-600"></div>
+                    </div>
+                    <div class="flex justify-center">
+                        <div id="predictor-node" class="bg-slate-800 border border-slate-600 rounded-xl px-8 py-4 text-center">
+                            <div class="text-2xl mb-1">🎯</div>
+                            <div class="font-semibold">PREDICTOR</div>
+                            <div id="predictor-status" class="text-xs text-slate-500 mt-1">Waiting for agents...</div>
+                            <div class="mt-3 h-1.5 bg-slate-700 rounded-full overflow-hidden w-32">
+                                <div id="predictor-progress" class="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full transition-all duration-500" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Live Message Stream -->
+                <div class="gradient-border rounded-xl p-6 mb-6">
+                    <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                        <span class="text-cyan-400">💬</span> Live Message Stream
+                        <span class="ml-auto text-xs text-slate-500" id="message-count">0 messages</span>
+                    </h2>
+                    <div id="message-stream" class="h-48 overflow-y-auto custom-scroll bg-slate-900/50 rounded-lg p-4 font-mono text-sm space-y-2">
+                        <div class="text-slate-500 text-center py-8">
+                            Enter a ticker and click Analyze to see live messages...
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Result Card (Hidden Initially) -->
+                <div id="result-card" class="hidden gradient-border rounded-xl p-6">
+                    <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                        <span class="text-green-400">✅</span> Analysis Complete
+                    </h2>
+                    <div class="grid grid-cols-4 gap-4">
+                        <div class="bg-slate-800/50 rounded-lg p-4 text-center">
+                            <div class="text-slate-400 text-xs mb-1">RECOMMENDATION</div>
+                            <div id="result-recommendation" class="text-2xl font-bold text-green-400">--</div>
+                        </div>
+                        <div class="bg-slate-800/50 rounded-lg p-4 text-center">
+                            <div class="text-slate-400 text-xs mb-1">COMPOSITE SCORE</div>
+                            <div id="result-score" class="text-2xl font-bold text-blue-400">--</div>
+                        </div>
+                        <div class="bg-slate-800/50 rounded-lg p-4 text-center">
+                            <div class="text-slate-400 text-xs mb-1">TARGET PRICE</div>
+                            <div id="result-target" class="text-2xl font-bold text-cyan-400">--</div>
+                        </div>
+                        <div class="bg-slate-800/50 rounded-lg p-4 text-center">
+                            <div class="text-slate-400 text-xs mb-1">CONFIDENCE</div>
+                            <div id="result-confidence" class="text-2xl font-bold text-purple-400">--</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Logs Tab -->
+            <div id="logs-tab" class="tab-panel hidden">
+                <div class="gradient-border rounded-xl p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-lg font-semibold">Agent Execution Logs</h2>
+                        <button onclick="loadLogs()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm">
+                            🔄 Refresh
+                        </button>
+                    </div>
+                    <div id="logs-table" class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead class="bg-slate-800">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-slate-400">Time</th>
+                                    <th class="px-4 py-3 text-left text-slate-400">Ticker</th>
+                                    <th class="px-4 py-3 text-left text-slate-400">Agent</th>
+                                    <th class="px-4 py-3 text-left text-slate-400">Event</th>
+                                    <th class="px-4 py-3 text-left text-slate-400">Status</th>
+                                    <th class="px-4 py-3 text-right text-slate-400">Duration</th>
+                                    <th class="px-4 py-3 text-right text-slate-400">Tokens</th>
+                                </tr>
+                            </thead>
+                            <tbody id="logs-body" class="divide-y divide-slate-800">
+                                <tr><td colspan="7" class="px-4 py-8 text-center text-slate-500">Loading logs...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- LLM Traces Tab -->
+            <div id="traces-tab" class="tab-panel hidden">
+                <div class="gradient-border rounded-xl p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-lg font-semibold">LLM Request/Response Traces</h2>
+                        <button onclick="loadTraces()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm">
+                            🔄 Refresh
+                        </button>
+                    </div>
+                    <div id="traces-container" class="space-y-4">
+                        <div class="text-slate-500 text-center py-8">Loading traces...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- FinOps Tab -->
+            <div id="finops-tab" class="tab-panel hidden">
+                <div class="grid grid-cols-4 gap-4 mb-6">
+                    <div class="gradient-border rounded-xl p-4">
+                        <div class="text-slate-400 text-xs mb-1">TODAY'S COST</div>
+                        <div id="finops-today" class="text-2xl font-bold text-green-400">$0.0000</div>
+                    </div>
+                    <div class="gradient-border rounded-xl p-4">
+                        <div class="text-slate-400 text-xs mb-1">TOTAL ANALYSES</div>
+                        <div id="finops-analyses" class="text-2xl font-bold text-blue-400">0</div>
+                    </div>
+                    <div class="gradient-border rounded-xl p-4">
+                        <div class="text-slate-400 text-xs mb-1">TOTAL TOKENS</div>
+                        <div id="finops-tokens" class="text-2xl font-bold text-purple-400">0</div>
+                    </div>
+                    <div class="gradient-border rounded-xl p-4">
+                        <div class="text-slate-400 text-xs mb-1">AVG COST/ANALYSIS</div>
+                        <div id="finops-avg" class="text-2xl font-bold text-cyan-400">$0.0000</div>
+                    </div>
+                </div>
+                <div class="gradient-border rounded-xl p-6">
+                    <h2 class="text-lg font-semibold mb-4">Cost Breakdown by Agent</h2>
+                    <div id="finops-chart" class="h-48 flex items-end gap-2">
+                        <!-- Chart bars will be inserted here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const API_BASE = 'http://localhost:8000';
+        
+        // State
+        let isAnalyzing = false;
+        let startTime = null;
+        let timerInterval = null;
+        let messageCount = 0;
+        
+        // Check if running from file:// protocol (can't use SSE)
+        const isFileProtocol = window.location.protocol === 'file:';
+        if (isFileProtocol) {
+            console.warn('Running from file:// - SSE disabled, using polling fallback');
+        }
+
+        // Tab switching
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tabId = btn.dataset.tab;
+                
+                // Update button states
+                document.querySelectorAll('.tab-btn').forEach(b => {
+                    b.classList.remove('bg-blue-600', 'text-white');
+                    b.classList.add('text-slate-400');
+                });
+                btn.classList.add('bg-blue-600', 'text-white');
+                btn.classList.remove('text-slate-400');
+                
+                // Show/hide panels
+                document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
+                document.getElementById(`${tabId}-tab`).classList.remove('hidden');
+                
+                // Load data for specific tabs
+                if (tabId === 'logs') loadLogs();
+                if (tabId === 'traces') loadTraces();
+                if (tabId === 'finops') loadFinOps();
+            });
+        });
+
+        // Analysis function
+        async function startAnalysis() {
+            const ticker = document.getElementById('ticker-input').value.toUpperCase().trim();
+            if (!ticker) return alert('Please enter a ticker');
+            if (isAnalyzing) return;
+            
+            isAnalyzing = true;
+            startTime = Date.now();
+            messageCount = 0;
+            
+            // Reset UI
+            resetAgentStates();
+            document.getElementById('status-badge').textContent = 'Analyzing...';
+            document.getElementById('status-badge').className = 'ml-3 px-2 py-0.5 text-xs rounded bg-blue-600 text-white animate-pulse';
+            document.getElementById('analyze-btn').disabled = true;
+            document.getElementById('analyze-btn').innerHTML = '<svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Analyzing...';
+            document.getElementById('result-card').classList.add('hidden');
+            document.getElementById('message-stream').innerHTML = '';
+            document.getElementById('flow-indicator').classList.remove('hidden');
+            
+            // Start timer
+            timerInterval = setInterval(updateTimer, 100);
+            
+            // Update orchestrator
+            updateOrchestratorState('active', 'Coordinating agents...');
+            addMessage('ORCHESTRATOR', `Starting analysis for ${ticker}...`, 'info');
+            
+            try {
+                // Simulate or call real API
+                const useRealAPI = true; // Set to false for demo mode
+                
+                if (useRealAPI) {
+                    await runRealAnalysis(ticker);
+                } else {
+                    await runSimulatedAnalysis(ticker);
+                }
+            } catch (error) {
+                addMessage('ERROR', error.message, 'error');
+                document.getElementById('status-badge').textContent = 'Error';
+                document.getElementById('status-badge').className = 'ml-3 px-2 py-0.5 text-xs rounded bg-red-600 text-white';
+            } finally {
+                isAnalyzing = false;
+                clearInterval(timerInterval);
+                document.getElementById('analyze-btn').disabled = false;
+                document.getElementById('analyze-btn').innerHTML = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg> Analyze';
+                document.getElementById('flow-indicator').classList.add('hidden');
+            }
+        }
+
+        // Real API analysis - Use polling for file:// protocol, SSE otherwise
+        async function runRealAnalysis(ticker) {
+            // Always use fallback (non-SSE) for reliability
+            // SSE from file:// protocol doesn't work due to browser security
+            addMessage('ORCHESTRATOR', 'Starting analysis...', 'info');
+            return await runFallbackAnalysis(ticker);
+        }
+        
+        // Fallback non-streaming analysis with visual progress
+        async function runFallbackAnalysis(ticker) {
+            addMessage('ORCHESTRATOR', 'Fetching data from Supabase...', 'info');
+            
+            // Start all agents visually with staggered timing for effect
+            const agents = ['fundamental', 'technical', 'sentiment', 'macro', 'regulatory'];
+            
+            // Start agents with slight delays for visual effect
+            for (let i = 0; i < agents.length; i++) {
+                setTimeout(() => {
+                    updateAgentState(agents[i], 'running', 'Running...');
+                    addMessage(agents[i].toUpperCase(), `→ Sending to Gemini API...`, 'request');
+                    simulateProgress(agents[i], 25000 + Math.random() * 15000); // 25-40s
+                }, i * 300);
+            }
+            
+            await sleep(1500);
+            addMessage('ORCHESTRATOR', 'All 5 specialist agents running in parallel...', 'info');
+            
+            try {
+                // Call the real API
+                const response = await fetch(`${API_BASE}/api/agent/analyze/${ticker}`);
+                
+                if (!response.ok) {
+                    throw new Error(`API error: ${response.status} ${response.statusText}`);
+                }
+                
+                const result = await response.json();
+                
+                // Update agent states based on result
+                if (result.agent_analyses) {
+                    for (const [agentKey, analysis] of Object.entries(result.agent_analyses)) {
+                        // Convert key like "fundamental_agent" to "fundamental"
+                        const agentName = agentKey.toLowerCase().replace('_agent', '');
+                        if (agents.includes(agentName)) {
+                            if (analysis.error) {
+                                updateAgentState(agentName, 'error', 'Error');
+                                addMessage(agentName.toUpperCase(), `✗ Error: ${analysis.error}`, 'error');
+                            } else {
+                                const score = analysis.score || analysis.overall_score || '--';
+                                updateAgentState(agentName, 'complete', `Score: ${score}`, score);
+                                addMessage(agentName.toUpperCase(), `✓ Complete. Score: ${score}`, 'success');
+                            }
+                        }
+                    }
+                }
+                
+                // Update predictor
+                updatePredictorState('running', 'Synthesizing...');
+                addMessage('PREDICTOR', '→ Combining all agent analyses...', 'request');
+                
+                await sleep(500);
+                
+                updatePredictorState('complete', result.recommendation?.toUpperCase() || 'HOLD');
+                addMessage('PREDICTOR', `✓ Recommendation: ${result.recommendation?.toUpperCase() || 'N/A'}`, 'success');
+                
+                // Show results
+                showResults(result);
+                
+                // Update cost display
+                if (result.observability) {
+                    document.getElementById('cost-display').innerHTML = `
+                        <span class="text-green-400">$${result.observability.total_cost_usd?.toFixed(6) || '0.000000'}</span> | 
+                        <span id="token-count">${result.observability.total_tokens?.toLocaleString() || 0}</span> tokens | 
+                        <span id="time-elapsed">${result.analysis_duration_seconds?.toFixed(1) || 0}s</span>
+                    `;
+                }
+                
+                document.getElementById('status-badge').textContent = 'Complete';
+                document.getElementById('status-badge').className = 'ml-3 px-2 py-0.5 text-xs rounded bg-green-600 text-white';
+                
+                addMessage('ORCHESTRATOR', `✅ Analysis complete!`, 'success');
+                
+                return result;
+                
+            } catch (error) {
+                // Mark all running agents as error
+                agents.forEach(agent => {
+                    const node = document.getElementById(`agent-${agent}`);
+                    if (node && node.classList.contains('agent-active')) {
+                        updateAgentState(agent, 'error', 'Failed');
+                    }
+                });
+                throw error;
+            }
+        }
+
+        // Simulated analysis for demo
+        async function runSimulatedAnalysis(ticker) {
+            addMessage('ORCHESTRATOR', 'Fetching base data...', 'info');
+            await sleep(500);
+            addMessage('ORCHESTRATOR', `Price: ₹1,457.90 | P/E: 25.5 | Market Cap: 15L Cr`, 'data');
+            
+            const agents = [
+                { id: 'fundamental', emoji: '📈', delay: 3000, score: 68 },
+                { id: 'technical', emoji: '📉', delay: 2500, score: 72 },
+                { id: 'sentiment', emoji: '📰', delay: 2000, score: 55 },
+                { id: 'macro', emoji: '🌍', delay: 1800, score: 61 },
+                { id: 'regulatory', emoji: '⚖️', delay: 1500, score: 75 }
+            ];
+            
+            // Start all agents
+            agents.forEach(agent => {
+                updateAgentState(agent.id, 'running', 'Running...');
+                addMessage(agent.id.toUpperCase(), `→ Sending analysis request to Gemini...`, 'request');
+                simulateProgress(agent.id, agent.delay);
+            });
+            
+            // Complete agents with staggered timing
+            for (const agent of agents) {
+                await sleep(agent.delay);
+                updateAgentState(agent.id, 'complete', `Score: ${agent.score}`, agent.score);
+                addMessage(agent.id.toUpperCase(), `← Response received. Score: ${agent.score}/100`, 'response');
+            }
+            
+            // Predictor phase
+            updatePredictorState('running', 'Synthesizing...');
+            addMessage('PREDICTOR', '→ Combining all agent analyses...', 'request');
+            await sleep(2000);
+            
+            const finalScore = 65.2;
+            updatePredictorState('complete', `Score: ${finalScore}`);
+            addMessage('PREDICTOR', `← Final synthesis complete. Composite: ${finalScore}`, 'response');
+            addMessage('PREDICTOR', 'Recommendation: HOLD with Medium confidence', 'success');
+            
+            showResults({
+                recommendation: 'hold',
+                composite_score: finalScore,
+                target_price: 1485.50,
+                confidence: 'medium'
+            });
+            
+            document.getElementById('status-badge').textContent = 'Complete';
+            document.getElementById('status-badge').className = 'ml-3 px-2 py-0.5 text-xs rounded bg-green-600 text-white';
+        }
+
+        // Helper functions
+        function resetAgentStates() {
+            ['fundamental', 'technical', 'sentiment', 'macro', 'regulatory'].forEach(agent => {
+                updateAgentState(agent, 'idle', 'Idle');
+            });
+            updateOrchestratorState('idle', 'Idle');
+            updatePredictorState('idle', 'Waiting for agents...');
+        }
+
+        function updateAgentState(agentId, state, statusText, score = null) {
+            const node = document.getElementById(`agent-${agentId}`);
+            if (!node) return;
+            
+            const statusEl = node.querySelector('.agent-status');
+            const scoreEl = node.querySelector('.agent-score');
+            const progressEl = node.querySelector('.agent-progress');
+            
+            node.classList.remove('agent-active', 'border-blue-500', 'border-green-500', 'border-red-500', 'border-slate-700');
+            
+            switch(state) {
+                case 'running':
+                    node.classList.add('agent-active', 'border-blue-500');
+                    statusEl.textContent = statusText;
+                    statusEl.className = 'text-xs text-blue-400 mt-1 agent-status';
+                    break;
+                case 'complete':
+                    node.classList.add('border-green-500');
+                    statusEl.textContent = statusText;
+                    statusEl.className = 'text-xs text-green-400 mt-1 agent-status';
+                    progressEl.style.width = '100%';
+                    if (score) scoreEl.textContent = score;
+                    scoreEl.className = 'agent-score text-green-400';
+                    break;
+                case 'error':
+                    node.classList.add('border-red-500');
+                    statusEl.textContent = statusText;
+                    statusEl.className = 'text-xs text-red-400 mt-1 agent-status';
+                    break;
+                default:
+                    node.classList.add('border-slate-700');
+                    statusEl.textContent = 'Idle';
+                    statusEl.className = 'text-xs text-slate-500 mt-1 agent-status';
+                    progressEl.style.width = '0%';
+                    scoreEl.textContent = '--';
+                    scoreEl.className = 'agent-score text-slate-500';
+            }
+        }
+
+        function simulateProgress(agentId, duration = 3000) {
+            const node = document.getElementById(`agent-${agentId}`);
+            if (!node) return;
+            const progressEl = node.querySelector('.agent-progress');
+            
+            let progress = 0;
+            const interval = setInterval(() => {
+                progress += Math.random() * 15;
+                if (progress > 90) progress = 90;
+                progressEl.style.width = `${progress}%`;
+            }, duration / 10);
+            
+            setTimeout(() => clearInterval(interval), duration);
+        }
+
+        function updateOrchestratorState(state, text) {
+            const node = document.getElementById('orchestrator-node');
+            const status = document.getElementById('orchestrator-status');
+            
+            node.classList.remove('agent-active', 'border-blue-500', 'border-green-500', 'border-slate-600');
+            
+            if (state === 'active') {
+                node.classList.add('agent-active', 'border-blue-500');
+                status.className = 'text-xs text-blue-400 mt-1';
+            } else {
+                node.classList.add('border-slate-600');
+                status.className = 'text-xs text-slate-500 mt-1';
+            }
+            status.textContent = text;
+        }
+
+        function updatePredictorState(state, text) {
+            const node = document.getElementById('predictor-node');
+            const status = document.getElementById('predictor-status');
+            const progress = document.getElementById('predictor-progress');
+            
+            node.classList.remove('agent-active', 'border-blue-500', 'border-green-500', 'border-slate-600');
+            
+            switch(state) {
+                case 'running':
+                    node.classList.add('agent-active', 'border-blue-500');
+                    status.className = 'text-xs text-blue-400 mt-1';
+                    progress.style.width = '50%';
+                    break;
+                case 'complete':
+                    node.classList.add('border-green-500');
+                    status.className = 'text-xs text-green-400 mt-1';
+                    progress.style.width = '100%';
+                    break;
+                default:
+                    node.classList.add('border-slate-600');
+                    status.className = 'text-xs text-slate-500 mt-1';
+                    progress.style.width = '0%';
+            }
+            status.textContent = text;
+        }
+
+        function addMessage(source, text, type = 'info') {
+            messageCount++;
+            document.getElementById('message-count').textContent = `${messageCount} messages`;
+            
+            const stream = document.getElementById('message-stream');
+            const time = new Date().toLocaleTimeString('en-US', { hour12: false });
+            
+            const colors = {
+                info: 'text-slate-400',
+                success: 'text-green-400',
+                error: 'text-red-400',
+                request: 'text-blue-400',
+                response: 'text-cyan-400',
+                data: 'text-amber-400'
+            };
+            
+            const sourceColors = {
+                'ORCHESTRATOR': 'text-purple-400',
+                'FUNDAMENTAL': 'text-blue-400',
+                'TECHNICAL': 'text-cyan-400',
+                'SENTIMENT': 'text-amber-400',
+                'MACRO': 'text-green-400',
+                'REGULATORY': 'text-purple-400',
+                'PREDICTOR': 'text-pink-400',
+                'ERROR': 'text-red-400'
+            };
+            
+            const div = document.createElement('div');
+            div.className = `message-slide flex gap-3 ${colors[type]}`;
+            div.innerHTML = `
+                <span class="text-slate-600 flex-shrink-0">${time}</span>
+                <span class="${sourceColors[source] || 'text-slate-400'} font-semibold flex-shrink-0">[${source}]</span>
+                <span class="flex-1">${text}</span>
+            `;
+            
+            stream.appendChild(div);
+            stream.scrollTop = stream.scrollHeight;
+        }
+
+        function showResults(result) {
+            document.getElementById('result-card').classList.remove('hidden');
+            document.getElementById('result-recommendation').textContent = (result.recommendation || 'N/A').toUpperCase();
+            document.getElementById('result-score').textContent = result.composite_score?.toFixed(1) || '--';
+            document.getElementById('result-target').textContent = result.target_price ? `₹${result.target_price.toFixed(2)}` : '--';
+            document.getElementById('result-confidence').textContent = (result.confidence || 'N/A').toUpperCase();
+            
+            // Color code recommendation
+            const recEl = document.getElementById('result-recommendation');
+            if (result.recommendation === 'buy') recEl.className = 'text-2xl font-bold text-green-400';
+            else if (result.recommendation === 'sell') recEl.className = 'text-2xl font-bold text-red-400';
+            else recEl.className = 'text-2xl font-bold text-amber-400';
+        }
+
+        function updateTimer() {
+            if (!startTime) return;
+            const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+            document.getElementById('time-elapsed').textContent = `${elapsed}s`;
+        }
+
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        // Load logs
+        async function loadLogs() {
+            try {
+                const response = await fetch(`${API_BASE}/api/agent/observability/logs?n=50`);
+                const data = await response.json();
+                
+                const tbody = document.getElementById('logs-body');
+                if (!data.logs || data.logs.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="7" class="px-4 py-8 text-center text-slate-500">No logs found</td></tr>';
+                    return;
+                }
+                
+                tbody.innerHTML = data.logs.map(log => `
+                    <tr class="hover:bg-slate-800/50">
+                        <td class="px-4 py-2 font-mono text-xs text-slate-400">${log.timestamp?.slice(11, 19) || '--'}</td>
+                        <td class="px-4 py-2 text-white font-medium">${log.ticker || '--'}</td>
+                        <td class="px-4 py-2 text-purple-400">${log.agent_name || '--'}</td>
+                        <td class="px-4 py-2 text-slate-300">${log.event_type || '--'}</td>
+                        <td class="px-4 py-2">
+                            <span class="px-2 py-0.5 rounded text-xs ${log.status === 'success' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}">
+                                ${log.status || '--'}
+                            </span>
+                        </td>
+                        <td class="px-4 py-2 text-right text-slate-400">${log.duration_ms?.toFixed(0) || '--'}ms</td>
+                        <td class="px-4 py-2 text-right text-slate-400">${log.input_tokens && log.output_tokens ? `${log.input_tokens}/${log.output_tokens}` : '--'}</td>
+                    </tr>
+                `).join('');
+            } catch (error) {
+                document.getElementById('logs-body').innerHTML = `<tr><td colspan="7" class="px-4 py-8 text-center text-red-400">Error loading logs: ${error.message}</td></tr>`;
+            }
+        }
+
+        // Load traces
+        async function loadTraces() {
+            try {
+                const response = await fetch(`${API_BASE}/api/agent/observability/llm-traces?n=20`);
+                const data = await response.json();
+                
+                const container = document.getElementById('traces-container');
+                if (!data.traces || data.traces.length === 0) {
+                    container.innerHTML = '<div class="text-slate-500 text-center py-8">No traces found</div>';
+                    return;
+                }
+                
+                container.innerHTML = data.traces.map((trace, idx) => `
+                    <div class="bg-slate-800/50 border border-slate-700 rounded-lg overflow-hidden">
+                        <div class="px-4 py-3 flex items-center justify-between cursor-pointer hover:bg-slate-700/30" onclick="toggleTrace(${idx})">
+                            <div class="flex items-center gap-4">
+                                <span class="text-white font-medium">${trace.ticker || '--'}</span>
+                                <span class="text-purple-400">${trace.agent_name || '--'}</span>
+                                <span class="px-2 py-0.5 rounded text-xs ${trace.event_type === 'llm_request' ? 'bg-blue-500/20 text-blue-400' : 'bg-green-500/20 text-green-400'}">
+                                    ${trace.event_type || '--'}
+                                </span>
+                            </div>
+                            <span class="text-slate-500 text-sm font-mono">${trace.timestamp?.slice(11, 19) || '--'}</span>
+                        </div>
+                        <div id="trace-detail-${idx}" class="hidden border-t border-slate-700 p-4">
+                            ${trace.llm_request ? `
+                                <div class="mb-4">
+                                    <h4 class="text-sm font-semibold text-slate-300 mb-2">System Prompt</h4>
+                                    <pre class="bg-slate-900 p-3 rounded text-xs text-slate-300 overflow-x-auto max-h-32 overflow-y-auto">${escapeHtml(trace.llm_request.system_prompt || '')}</pre>
+                                </div>
+                                <div>
+                                    <h4 class="text-sm font-semibold text-slate-300 mb-2">User Prompt</h4>
+                                    <pre class="bg-slate-900 p-3 rounded text-xs text-slate-300 overflow-x-auto max-h-48 overflow-y-auto">${escapeHtml(trace.llm_request.user_prompt || '')}</pre>
+                                </div>
+                            ` : ''}
+                            ${trace.llm_response ? `
+                                <div class="mb-4">
+                                    <h4 class="text-sm font-semibold text-slate-300 mb-2">Raw Response</h4>
+                                    <pre class="bg-slate-900 p-3 rounded text-xs text-slate-300 overflow-x-auto max-h-48 overflow-y-auto">${escapeHtml(trace.llm_response.raw_response || '')}</pre>
+                                </div>
+                                <div class="flex gap-4 text-xs text-slate-500">
+                                    <span>Latency: ${trace.llm_response.latency_ms?.toFixed(0) || '--'}ms</span>
+                                    <span>Input: ${trace.llm_response.input_tokens || '--'} tokens</span>
+                                    <span>Output: ${trace.llm_response.output_tokens || '--'} tokens</span>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                document.getElementById('traces-container').innerHTML = `<div class="text-red-400 text-center py-8">Error loading traces: ${error.message}</div>`;
+            }
+        }
+
+        function toggleTrace(idx) {
+            const detail = document.getElementById(`trace-detail-${idx}`);
+            detail.classList.toggle('hidden');
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Load FinOps
+        async function loadFinOps() {
+            try {
+                const [metricsRes, finopsRes] = await Promise.all([
+                    fetch(`${API_BASE}/api/agent/observability/metrics`),
+                    fetch(`${API_BASE}/api/agent/observability/finops?n=50`)
+                ]);
+                
+                const metricsData = await metricsRes.json();
+                const finopsData = await finopsRes.json();
+                
+                const metrics = metricsData.metrics || {};
+                
+                document.getElementById('finops-today').textContent = `$${(metrics.costs_by_date?.[new Date().toISOString().slice(0,10)] || 0).toFixed(6)}`;
+                document.getElementById('finops-analyses').textContent = metrics.total_analyses || 0;
+                document.getElementById('finops-tokens').textContent = ((metrics.total_input_tokens || 0) + (metrics.total_output_tokens || 0)).toLocaleString();
+                document.getElementById('finops-avg').textContent = `$${(metrics.total_cost_usd / Math.max(metrics.total_analyses, 1)).toFixed(6)}`;
+                
+                // Create simple bar chart by agent
+                const costsByAgent = {};
+                (finopsData.entries || []).forEach(entry => {
+                    const agent = entry.agent_name || 'unknown';
+                    costsByAgent[agent] = (costsByAgent[agent] || 0) + (entry.total_cost_usd || 0);
+                });
+                
+                const maxCost = Math.max(...Object.values(costsByAgent), 0.0001);
+                const chartContainer = document.getElementById('finops-chart');
+                chartContainer.innerHTML = Object.entries(costsByAgent).map(([agent, cost]) => `
+                    <div class="flex-1 flex flex-col items-center">
+                        <div class="w-full bg-gradient-to-t from-blue-600 to-purple-500 rounded-t transition-all hover:opacity-80" 
+                             style="height: ${(cost / maxCost) * 100}%" title="$${cost.toFixed(6)}"></div>
+                        <div class="text-[10px] text-slate-500 mt-2 text-center truncate w-full">${agent.replace('_agent', '')}</div>
+                        <div class="text-[10px] text-green-400">$${cost.toFixed(5)}</div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading FinOps:', error);
+            }
+        }
+
+        // Initial load
+        loadFinOps();
+    </script>
+</body>
+</html>

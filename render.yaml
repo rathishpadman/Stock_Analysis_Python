@@ -1,0 +1,37 @@
+# Render.com Blueprint for NIFTY Agents API
+# Deploy: https://dashboard.render.com/blueprints
+# 
+# WHY RENDER.COM:
+# - No credit card required for free tier
+# - No timeout limits (unlike Vercel's 10s, Firebase's 60s)
+# - 750 free hours/month (enough for always-on)
+# - Only downside: 30s cold start after 15min idle
+#
+# COST: $0 forever on free tier (just slower cold starts)
+
+services:
+  - type: web
+    name: nifty-agents-api
+    runtime: python
+    region: singapore  # Closest to India
+    plan: free
+    
+    # Build settings
+    buildCommand: pip install -r requirements_agents.txt
+    startCommand: uvicorn nifty_agents.api:app --host 0.0.0.0 --port $PORT
+    
+    # Health check
+    healthCheckPath: /health
+    
+    # Environment variables (set these in Render dashboard for security)
+    envVars:
+      - key: GOOGLE_API_KEY
+        sync: false  # Must set manually in dashboard
+      - key: GEMINI_MODEL
+        value: gemini-2.0-flash-exp
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY  
+        sync: false
+      - key: PYTHONUNBUFFERED
+        value: "1"

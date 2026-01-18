@@ -1,0 +1,54 @@
+# .dockerignore - Exclude files from Docker build
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+.venv/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Git
+.git/
+.gitignore
+
+# Logs (will be created fresh in container)
+nifty_agents/logs/*.jsonl
+nifty_agents/logs/*.json
+
+# Dashboard (separate deployment)
+dashboard/
+node_modules/
+
+# Other folders not needed
+backups/
+OCT25/
+NOV25/
+DEC25/
+JAN26/
+agents-5days-kaggle-competition-main/
+data/
+supabase/
+
+# Test files
+*.test.py
+test_*.py
+
+# Documentation
+*.md
+!README.md
+
+# Misc
+.env
+.env.local
+*.csv
+*.xlsx
