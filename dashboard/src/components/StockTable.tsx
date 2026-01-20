@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { ALL_FIELDS } from '@/lib/constants';
-import { ChevronUp, ChevronDown } from 'lucide-react';
+import { ChevronUp, ChevronDown, Activity } from 'lucide-react';
 
 interface Stock {
     ticker: string;
@@ -12,13 +12,14 @@ interface StockTableProps {
     stocks: Stock[];
     visibleColumns: string[];
     onSelectStock?: (ticker: string) => void;
+    onRequestAnalysis?: (ticker: string) => void;  // New: AI Analysis callback
     timeframe?: '1d' | '1w' | '1m';
 }
 
-export default function StockTable({ stocks, visibleColumns, onSelectStock, timeframe = '1d' }: StockTableProps) {
+export default function StockTable({ stocks, visibleColumns, onSelectStock, onRequestAnalysis, timeframe = '1d' }: StockTableProps) {
     const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
     const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
-    
+
     // Pagination state
     const [currentPage, setCurrentPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(25);
@@ -75,6 +76,12 @@ export default function StockTable({ stocks, visibleColumns, onSelectStock, time
                                     </div>
                                 </th>
                             ))}
+                            {/* Actions column for AI Analysis */}
+                            {onRequestAnalysis && (
+                                <th className="px-4 py-4 text-center text-xs font-bold uppercase tracking-wider text-slate-400 whitespace-nowrap">
+                                    AI Analysis
+                                </th>
+                            )}
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800 bg-slate-900">
@@ -92,6 +99,22 @@ export default function StockTable({ stocks, visibleColumns, onSelectStock, time
                                         {renderCell(stock, col.id, timeframe)}
                                     </td>
                                 ))}
+                                {/* AI Analysis Button */}
+                                {onRequestAnalysis && (
+                                    <td className="whitespace-nowrap px-4 py-4 text-center">
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                onRequestAnalysis(stock.ticker);
+                                            }}
+                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 rounded-lg text-xs font-medium text-white transition-all shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40"
+                                            title={`Run AI Analysis for ${stock.ticker}`}
+                                        >
+                                            <Activity className="w-3.5 h-3.5" />
+                                            Analyze
+                                        </button>
+                                    </td>
+                                )}
                             </tr>
                         ))}
                     </tbody>

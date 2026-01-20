@@ -783,10 +783,14 @@ Respond ONLY with valid JSON.
         if self.enable_caching and ticker_clean in self.cache:
             cache_entry = self.cache[ticker_clean]
             cache_age = (datetime.now() - cache_entry.get("timestamp", datetime.min)).seconds
-            if cache_age < 3600:  # 1 hour cache
-                logger.info(f"Returning cached analysis for {ticker_clean}")
+            # 24 hour cache (86400 seconds) - user requested max duration
+            if cache_age < 86400:
+                logger.info(f"Returning cached analysis for {ticker_clean} (age: {cache_age}s)")
+                cached_report = cache_entry.get("report", {}).copy()
+                cached_report["cached"] = True
+                cached_report["cache_age_seconds"] = cache_age
                 self.observability.end_trace(trace_id)
-                return cache_entry.get("report")
+                return cached_report
         
         # Gather base data
         logger.info(f"Gathering base data for {ticker_clean}")

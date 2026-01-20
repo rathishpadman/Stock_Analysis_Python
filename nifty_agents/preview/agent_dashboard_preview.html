@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -22,37 +23,91 @@
     </script>
     <style>
         @keyframes pulse-glow {
-            0%, 100% { box-shadow: 0 0 5px rgba(59, 130, 246, 0.5); }
-            50% { box-shadow: 0 0 20px rgba(59, 130, 246, 0.8); }
+
+            0%,
+            100% {
+                box-shadow: 0 0 5px rgba(59, 130, 246, 0.5);
+            }
+
+            50% {
+                box-shadow: 0 0 20px rgba(59, 130, 246, 0.8);
+            }
         }
+
         @keyframes flow-down {
-            0% { transform: translateY(-10px); opacity: 0; }
-            50% { opacity: 1; }
-            100% { transform: translateY(10px); opacity: 0; }
+            0% {
+                transform: translateY(-10px);
+                opacity: 0;
+            }
+
+            50% {
+                opacity: 1;
+            }
+
+            100% {
+                transform: translateY(10px);
+                opacity: 0;
+            }
         }
+
         @keyframes slide-in {
-            from { transform: translateX(-20px); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
+            from {
+                transform: translateX(-20px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
         }
+
         @keyframes progress-bar {
-            from { width: 0%; }
+            from {
+                width: 0%;
+            }
         }
-        .agent-active { animation: pulse-glow 1.5s ease-in-out infinite; }
-        .flow-particle { animation: flow-down 1s ease-in-out infinite; }
-        .message-slide { animation: slide-in 0.3s ease-out; }
-        .progress-animate { animation: progress-bar 2s ease-out; }
-        
+
+        .agent-active {
+            animation: pulse-glow 1.5s ease-in-out infinite;
+        }
+
+        .flow-particle {
+            animation: flow-down 1s ease-in-out infinite;
+        }
+
+        .message-slide {
+            animation: slide-in 0.3s ease-out;
+        }
+
+        .progress-animate {
+            animation: progress-bar 2s ease-out;
+        }
+
         /* Custom scrollbar */
-        .custom-scroll::-webkit-scrollbar { width: 6px; }
-        .custom-scroll::-webkit-scrollbar-track { background: #1e293b; }
-        .custom-scroll::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
-        .custom-scroll::-webkit-scrollbar-thumb:hover { background: #64748b; }
-        
+        .custom-scroll::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .custom-scroll::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+
+        .custom-scroll::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 3px;
+        }
+
+        .custom-scroll::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+
         /* Gradient borders */
         .gradient-border {
             position: relative;
             background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
         }
+
         .gradient-border::before {
             content: '';
             position: absolute;
@@ -66,15 +121,19 @@
         }
     </style>
 </head>
+
 <body class="bg-slate-950 text-white min-h-screen">
     <div class="container mx-auto p-6 max-w-7xl">
-        
+
         <!-- Header -->
         <div class="flex items-center justify-between mb-6">
             <div class="flex items-center gap-3">
-                <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                <div
+                    class="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z">
+                        </path>
                     </svg>
                 </div>
                 <div>
@@ -96,13 +155,16 @@
             <button class="tab-btn px-4 py-2 rounded text-sm font-medium bg-blue-600 text-white" data-tab="analyze">
                 🔍 Analyze
             </button>
-            <button class="tab-btn px-4 py-2 rounded text-sm font-medium text-slate-400 hover:text-white" data-tab="logs">
+            <button class="tab-btn px-4 py-2 rounded text-sm font-medium text-slate-400 hover:text-white"
+                data-tab="logs">
                 📋 Logs
             </button>
-            <button class="tab-btn px-4 py-2 rounded text-sm font-medium text-slate-400 hover:text-white" data-tab="traces">
+            <button class="tab-btn px-4 py-2 rounded text-sm font-medium text-slate-400 hover:text-white"
+                data-tab="traces">
                 🔬 LLM Traces
             </button>
-            <button class="tab-btn px-4 py-2 rounded text-sm font-medium text-slate-400 hover:text-white" data-tab="finops">
+            <button class="tab-btn px-4 py-2 rounded text-sm font-medium text-slate-400 hover:text-white"
+                data-tab="finops">
                 💰 FinOps
             </button>
         </div>
@@ -116,14 +178,15 @@
                     <div class="flex gap-4 items-end">
                         <div class="flex-1">
                             <label class="block text-sm text-slate-400 mb-2">Stock Ticker (NSE)</label>
-                            <input type="text" id="ticker-input" value="RELIANCE" 
+                            <input type="text" id="ticker-input" value="RELIANCE"
                                 class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-lg font-mono focus:outline-none focus:border-blue-500 uppercase"
                                 placeholder="Enter ticker...">
                         </div>
                         <button id="analyze-btn" onclick="startAnalysis()"
                             class="px-8 py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 rounded-lg font-semibold transition-all flex items-center gap-2">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M13 10V3L4 14h7v7l9-11h-7z"></path>
                             </svg>
                             Analyze
                         </button>
@@ -135,16 +198,19 @@
                     <div class="flex items-center justify-between mb-6">
                         <h2 class="text-lg font-semibold flex items-center gap-2">
                             <span class="text-purple-400">🤖</span> Agent Orchestration
-                            <span id="status-badge" class="ml-3 px-2 py-0.5 text-xs rounded bg-slate-700 text-slate-400">Ready</span>
+                            <span id="status-badge"
+                                class="ml-3 px-2 py-0.5 text-xs rounded bg-slate-700 text-slate-400">Ready</span>
                         </h2>
                         <div id="cost-display" class="text-sm text-slate-400">
-                            <span class="text-green-400">$0.00000</span> | <span id="token-count">0</span> tokens | <span id="time-elapsed">0.0s</span>
+                            <span class="text-green-400">$0.00000</span> | <span id="token-count">0</span> tokens |
+                            <span id="time-elapsed">0.0s</span>
                         </div>
                     </div>
 
                     <!-- Orchestrator Node -->
                     <div class="flex justify-center mb-4">
-                        <div id="orchestrator-node" class="bg-slate-800 border border-slate-600 rounded-xl px-6 py-3 text-center">
+                        <div id="orchestrator-node"
+                            class="bg-slate-800 border border-slate-600 rounded-xl px-6 py-3 text-center">
                             <div class="text-2xl mb-1">🎯</div>
                             <div class="font-semibold">ORCHESTRATOR</div>
                             <div id="orchestrator-status" class="text-xs text-slate-500 mt-1">Idle</div>
@@ -172,60 +238,70 @@
 
                     <!-- Agent Nodes -->
                     <div class="grid grid-cols-5 gap-4 mb-6">
-                        <div id="agent-fundamental" class="agent-node bg-slate-800/50 border border-slate-700 rounded-xl p-4 text-center transition-all">
+                        <div id="agent-fundamental"
+                            class="agent-node bg-slate-800/50 border border-slate-700 rounded-xl p-4 text-center transition-all">
                             <div class="text-2xl mb-2">📈</div>
                             <div class="font-semibold text-sm">FUNDAMENTAL</div>
                             <div class="text-xs text-slate-500 mt-1 agent-status">Idle</div>
                             <div class="mt-3 h-1.5 bg-slate-700 rounded-full overflow-hidden">
-                                <div class="agent-progress h-full bg-blue-500 rounded-full transition-all duration-500" style="width: 0%"></div>
+                                <div class="agent-progress h-full bg-blue-500 rounded-full transition-all duration-500"
+                                    style="width: 0%"></div>
                             </div>
                             <div class="mt-2 text-xs">
                                 <span class="agent-score text-slate-500">--</span>
                                 <span class="agent-time text-slate-600 ml-2">--</span>
                             </div>
                         </div>
-                        <div id="agent-technical" class="agent-node bg-slate-800/50 border border-slate-700 rounded-xl p-4 text-center transition-all">
+                        <div id="agent-technical"
+                            class="agent-node bg-slate-800/50 border border-slate-700 rounded-xl p-4 text-center transition-all">
                             <div class="text-2xl mb-2">📉</div>
                             <div class="font-semibold text-sm">TECHNICAL</div>
                             <div class="text-xs text-slate-500 mt-1 agent-status">Idle</div>
                             <div class="mt-3 h-1.5 bg-slate-700 rounded-full overflow-hidden">
-                                <div class="agent-progress h-full bg-cyan-500 rounded-full transition-all duration-500" style="width: 0%"></div>
+                                <div class="agent-progress h-full bg-cyan-500 rounded-full transition-all duration-500"
+                                    style="width: 0%"></div>
                             </div>
                             <div class="mt-2 text-xs">
                                 <span class="agent-score text-slate-500">--</span>
                                 <span class="agent-time text-slate-600 ml-2">--</span>
                             </div>
                         </div>
-                        <div id="agent-sentiment" class="agent-node bg-slate-800/50 border border-slate-700 rounded-xl p-4 text-center transition-all">
+                        <div id="agent-sentiment"
+                            class="agent-node bg-slate-800/50 border border-slate-700 rounded-xl p-4 text-center transition-all">
                             <div class="text-2xl mb-2">📰</div>
                             <div class="font-semibold text-sm">SENTIMENT</div>
                             <div class="text-xs text-slate-500 mt-1 agent-status">Idle</div>
                             <div class="mt-3 h-1.5 bg-slate-700 rounded-full overflow-hidden">
-                                <div class="agent-progress h-full bg-amber-500 rounded-full transition-all duration-500" style="width: 0%"></div>
+                                <div class="agent-progress h-full bg-amber-500 rounded-full transition-all duration-500"
+                                    style="width: 0%"></div>
                             </div>
                             <div class="mt-2 text-xs">
                                 <span class="agent-score text-slate-500">--</span>
                                 <span class="agent-time text-slate-600 ml-2">--</span>
                             </div>
                         </div>
-                        <div id="agent-macro" class="agent-node bg-slate-800/50 border border-slate-700 rounded-xl p-4 text-center transition-all">
+                        <div id="agent-macro"
+                            class="agent-node bg-slate-800/50 border border-slate-700 rounded-xl p-4 text-center transition-all">
                             <div class="text-2xl mb-2">🌍</div>
                             <div class="font-semibold text-sm">MACRO</div>
                             <div class="text-xs text-slate-500 mt-1 agent-status">Idle</div>
                             <div class="mt-3 h-1.5 bg-slate-700 rounded-full overflow-hidden">
-                                <div class="agent-progress h-full bg-green-500 rounded-full transition-all duration-500" style="width: 0%"></div>
+                                <div class="agent-progress h-full bg-green-500 rounded-full transition-all duration-500"
+                                    style="width: 0%"></div>
                             </div>
                             <div class="mt-2 text-xs">
                                 <span class="agent-score text-slate-500">--</span>
                                 <span class="agent-time text-slate-600 ml-2">--</span>
                             </div>
                         </div>
-                        <div id="agent-regulatory" class="agent-node bg-slate-800/50 border border-slate-700 rounded-xl p-4 text-center transition-all">
+                        <div id="agent-regulatory"
+                            class="agent-node bg-slate-800/50 border border-slate-700 rounded-xl p-4 text-center transition-all">
                             <div class="text-2xl mb-2">⚖️</div>
                             <div class="font-semibold text-sm">REGULATORY</div>
                             <div class="text-xs text-slate-500 mt-1 agent-status">Idle</div>
                             <div class="mt-3 h-1.5 bg-slate-700 rounded-full overflow-hidden">
-                                <div class="agent-progress h-full bg-purple-500 rounded-full transition-all duration-500" style="width: 0%"></div>
+                                <div class="agent-progress h-full bg-purple-500 rounded-full transition-all duration-500"
+                                    style="width: 0%"></div>
                             </div>
                             <div class="mt-2 text-xs">
                                 <span class="agent-score text-slate-500">--</span>
@@ -242,12 +318,15 @@
                         <div class="h-8 w-px bg-slate-600"></div>
                     </div>
                     <div class="flex justify-center">
-                        <div id="predictor-node" class="bg-slate-800 border border-slate-600 rounded-xl px-8 py-4 text-center">
+                        <div id="predictor-node"
+                            class="bg-slate-800 border border-slate-600 rounded-xl px-8 py-4 text-center">
                             <div class="text-2xl mb-1">🎯</div>
                             <div class="font-semibold">PREDICTOR</div>
                             <div id="predictor-status" class="text-xs text-slate-500 mt-1">Waiting for agents...</div>
                             <div class="mt-3 h-1.5 bg-slate-700 rounded-full overflow-hidden w-32">
-                                <div id="predictor-progress" class="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full transition-all duration-500" style="width: 0%"></div>
+                                <div id="predictor-progress"
+                                    class="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full transition-all duration-500"
+                                    style="width: 0%"></div>
                             </div>
                         </div>
                     </div>
@@ -259,7 +338,8 @@
                         <span class="text-cyan-400">💬</span> Live Message Stream
                         <span class="ml-auto text-xs text-slate-500" id="message-count">0 messages</span>
                     </h2>
-                    <div id="message-stream" class="h-48 overflow-y-auto custom-scroll bg-slate-900/50 rounded-lg p-4 font-mono text-sm space-y-2">
+                    <div id="message-stream"
+                        class="h-48 overflow-y-auto custom-scroll bg-slate-900/50 rounded-lg p-4 font-mono text-sm space-y-2">
                         <div class="text-slate-500 text-center py-8">
                             Enter a ticker and click Analyze to see live messages...
                         </div>
@@ -297,7 +377,8 @@
                 <div class="gradient-border rounded-xl p-6">
                     <div class="flex items-center justify-between mb-4">
                         <h2 class="text-lg font-semibold">Agent Execution Logs</h2>
-                        <button onclick="loadLogs()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm">
+                        <button onclick="loadLogs()"
+                            class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm">
                             🔄 Refresh
                         </button>
                     </div>
@@ -315,7 +396,9 @@
                                 </tr>
                             </thead>
                             <tbody id="logs-body" class="divide-y divide-slate-800">
-                                <tr><td colspan="7" class="px-4 py-8 text-center text-slate-500">Loading logs...</td></tr>
+                                <tr>
+                                    <td colspan="7" class="px-4 py-8 text-center text-slate-500">Loading logs...</td>
+                                </tr>
                             </tbody>
                         </table>
                     </div>
@@ -327,7 +410,8 @@
                 <div class="gradient-border rounded-xl p-6">
                     <div class="flex items-center justify-between mb-4">
                         <h2 class="text-lg font-semibold">LLM Request/Response Traces</h2>
-                        <button onclick="loadTraces()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm">
+                        <button onclick="loadTraces()"
+                            class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm">
                             🔄 Refresh
                         </button>
                     </div>
@@ -359,7 +443,7 @@
                 </div>
                 <div class="gradient-border rounded-xl p-6">
                     <h2 class="text-lg font-semibold mb-4">Cost Breakdown by Agent</h2>
-                    <div id="finops-chart" class="h-48 flex items-end gap-2">
+                    <div id="finops-chart" class="h-64 flex items-end gap-3">
                         <!-- Chart bars will be inserted here -->
                     </div>
                 </div>
@@ -368,15 +452,15 @@
     </div>
 
     <script>
-        // Configuration
-        const API_BASE = 'http://localhost:8000';
-        
+        // Configuration - Use deployed Render API
+        const API_BASE = 'https://nifty-agents-api.onrender.com';
+
         // State
         let isAnalyzing = false;
         let startTime = null;
         let timerInterval = null;
         let messageCount = 0;
-        
+
         // Check if running from file:// protocol (can't use SSE)
         const isFileProtocol = window.location.protocol === 'file:';
         if (isFileProtocol) {
@@ -387,7 +471,7 @@
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const tabId = btn.dataset.tab;
-                
+
                 // Update button states
                 document.querySelectorAll('.tab-btn').forEach(b => {
                     b.classList.remove('bg-blue-600', 'text-white');
@@ -395,11 +479,11 @@
                 });
                 btn.classList.add('bg-blue-600', 'text-white');
                 btn.classList.remove('text-slate-400');
-                
+
                 // Show/hide panels
                 document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
                 document.getElementById(`${tabId}-tab`).classList.remove('hidden');
-                
+
                 // Load data for specific tabs
                 if (tabId === 'logs') loadLogs();
                 if (tabId === 'traces') loadTraces();
@@ -412,11 +496,11 @@
             const ticker = document.getElementById('ticker-input').value.toUpperCase().trim();
             if (!ticker) return alert('Please enter a ticker');
             if (isAnalyzing) return;
-            
+
             isAnalyzing = true;
             startTime = Date.now();
             messageCount = 0;
-            
+
             // Reset UI
             resetAgentStates();
             document.getElementById('status-badge').textContent = 'Analyzing...';
@@ -426,18 +510,18 @@
             document.getElementById('result-card').classList.add('hidden');
             document.getElementById('message-stream').innerHTML = '';
             document.getElementById('flow-indicator').classList.remove('hidden');
-            
+
             // Start timer
             timerInterval = setInterval(updateTimer, 100);
-            
+
             // Update orchestrator
             updateOrchestratorState('active', 'Coordinating agents...');
             addMessage('ORCHESTRATOR', `Starting analysis for ${ticker}...`, 'info');
-            
+
             try {
                 // Simulate or call real API
                 const useRealAPI = true; // Set to false for demo mode
-                
+
                 if (useRealAPI) {
                     await runRealAnalysis(ticker);
                 } else {
@@ -463,14 +547,14 @@
             addMessage('ORCHESTRATOR', 'Starting analysis...', 'info');
             return await runFallbackAnalysis(ticker);
         }
-        
+
         // Fallback non-streaming analysis with visual progress
         async function runFallbackAnalysis(ticker) {
             addMessage('ORCHESTRATOR', 'Fetching data from Supabase...', 'info');
-            
+
             // Start all agents visually with staggered timing for effect
             const agents = ['fundamental', 'technical', 'sentiment', 'macro', 'regulatory'];
-            
+
             // Start agents with slight delays for visual effect
             for (let i = 0; i < agents.length; i++) {
                 setTimeout(() => {
@@ -479,20 +563,20 @@
                     simulateProgress(agents[i], 25000 + Math.random() * 15000); // 25-40s
                 }, i * 300);
             }
-            
+
             await sleep(1500);
             addMessage('ORCHESTRATOR', 'All 5 specialist agents running in parallel...', 'info');
-            
+
             try {
                 // Call the real API
                 const response = await fetch(`${API_BASE}/api/agent/analyze/${ticker}`);
-                
+
                 if (!response.ok) {
                     throw new Error(`API error: ${response.status} ${response.statusText}`);
                 }
-                
+
                 const result = await response.json();
-                
+
                 // Update agent states based on result
                 if (result.agent_analyses) {
                     for (const [agentKey, analysis] of Object.entries(result.agent_analyses)) {
@@ -510,19 +594,19 @@
                         }
                     }
                 }
-                
+
                 // Update predictor
                 updatePredictorState('running', 'Synthesizing...');
                 addMessage('PREDICTOR', '→ Combining all agent analyses...', 'request');
-                
+
                 await sleep(500);
-                
+
                 updatePredictorState('complete', result.recommendation?.toUpperCase() || 'HOLD');
                 addMessage('PREDICTOR', `✓ Recommendation: ${result.recommendation?.toUpperCase() || 'N/A'}`, 'success');
-                
+
                 // Show results
                 showResults(result);
-                
+
                 // Update cost display
                 if (result.observability) {
                     document.getElementById('cost-display').innerHTML = `
@@ -531,14 +615,14 @@
                         <span id="time-elapsed">${result.analysis_duration_seconds?.toFixed(1) || 0}s</span>
                     `;
                 }
-                
+
                 document.getElementById('status-badge').textContent = 'Complete';
                 document.getElementById('status-badge').className = 'ml-3 px-2 py-0.5 text-xs rounded bg-green-600 text-white';
-                
+
                 addMessage('ORCHESTRATOR', `✅ Analysis complete!`, 'success');
-                
+
                 return result;
-                
+
             } catch (error) {
                 // Mark all running agents as error
                 agents.forEach(agent => {
@@ -556,7 +640,7 @@
             addMessage('ORCHESTRATOR', 'Fetching base data...', 'info');
             await sleep(500);
             addMessage('ORCHESTRATOR', `Price: ₹1,457.90 | P/E: 25.5 | Market Cap: 15L Cr`, 'data');
-            
+
             const agents = [
                 { id: 'fundamental', emoji: '📈', delay: 3000, score: 68 },
                 { id: 'technical', emoji: '📉', delay: 2500, score: 72 },
@@ -564,38 +648,38 @@
                 { id: 'macro', emoji: '🌍', delay: 1800, score: 61 },
                 { id: 'regulatory', emoji: '⚖️', delay: 1500, score: 75 }
             ];
-            
+
             // Start all agents
             agents.forEach(agent => {
                 updateAgentState(agent.id, 'running', 'Running...');
                 addMessage(agent.id.toUpperCase(), `→ Sending analysis request to Gemini...`, 'request');
                 simulateProgress(agent.id, agent.delay);
             });
-            
+
             // Complete agents with staggered timing
             for (const agent of agents) {
                 await sleep(agent.delay);
                 updateAgentState(agent.id, 'complete', `Score: ${agent.score}`, agent.score);
                 addMessage(agent.id.toUpperCase(), `← Response received. Score: ${agent.score}/100`, 'response');
             }
-            
+
             // Predictor phase
             updatePredictorState('running', 'Synthesizing...');
             addMessage('PREDICTOR', '→ Combining all agent analyses...', 'request');
             await sleep(2000);
-            
+
             const finalScore = 65.2;
             updatePredictorState('complete', `Score: ${finalScore}`);
             addMessage('PREDICTOR', `← Final synthesis complete. Composite: ${finalScore}`, 'response');
             addMessage('PREDICTOR', 'Recommendation: HOLD with Medium confidence', 'success');
-            
+
             showResults({
                 recommendation: 'hold',
                 composite_score: finalScore,
                 target_price: 1485.50,
                 confidence: 'medium'
             });
-            
+
             document.getElementById('status-badge').textContent = 'Complete';
             document.getElementById('status-badge').className = 'ml-3 px-2 py-0.5 text-xs rounded bg-green-600 text-white';
         }
@@ -612,14 +696,14 @@
         function updateAgentState(agentId, state, statusText, score = null) {
             const node = document.getElementById(`agent-${agentId}`);
             if (!node) return;
-            
+
             const statusEl = node.querySelector('.agent-status');
             const scoreEl = node.querySelector('.agent-score');
             const progressEl = node.querySelector('.agent-progress');
-            
+
             node.classList.remove('agent-active', 'border-blue-500', 'border-green-500', 'border-red-500', 'border-slate-700');
-            
-            switch(state) {
+
+            switch (state) {
                 case 'running':
                     node.classList.add('agent-active', 'border-blue-500');
                     statusEl.textContent = statusText;
@@ -652,23 +736,23 @@
             const node = document.getElementById(`agent-${agentId}`);
             if (!node) return;
             const progressEl = node.querySelector('.agent-progress');
-            
+
             let progress = 0;
             const interval = setInterval(() => {
                 progress += Math.random() * 15;
                 if (progress > 90) progress = 90;
                 progressEl.style.width = `${progress}%`;
             }, duration / 10);
-            
+
             setTimeout(() => clearInterval(interval), duration);
         }
 
         function updateOrchestratorState(state, text) {
             const node = document.getElementById('orchestrator-node');
             const status = document.getElementById('orchestrator-status');
-            
+
             node.classList.remove('agent-active', 'border-blue-500', 'border-green-500', 'border-slate-600');
-            
+
             if (state === 'active') {
                 node.classList.add('agent-active', 'border-blue-500');
                 status.className = 'text-xs text-blue-400 mt-1';
@@ -683,10 +767,10 @@
             const node = document.getElementById('predictor-node');
             const status = document.getElementById('predictor-status');
             const progress = document.getElementById('predictor-progress');
-            
+
             node.classList.remove('agent-active', 'border-blue-500', 'border-green-500', 'border-slate-600');
-            
-            switch(state) {
+
+            switch (state) {
                 case 'running':
                     node.classList.add('agent-active', 'border-blue-500');
                     status.className = 'text-xs text-blue-400 mt-1';
@@ -708,10 +792,10 @@
         function addMessage(source, text, type = 'info') {
             messageCount++;
             document.getElementById('message-count').textContent = `${messageCount} messages`;
-            
+
             const stream = document.getElementById('message-stream');
             const time = new Date().toLocaleTimeString('en-US', { hour12: false });
-            
+
             const colors = {
                 info: 'text-slate-400',
                 success: 'text-green-400',
@@ -720,7 +804,7 @@
                 response: 'text-cyan-400',
                 data: 'text-amber-400'
             };
-            
+
             const sourceColors = {
                 'ORCHESTRATOR': 'text-purple-400',
                 'FUNDAMENTAL': 'text-blue-400',
@@ -731,7 +815,7 @@
                 'PREDICTOR': 'text-pink-400',
                 'ERROR': 'text-red-400'
             };
-            
+
             const div = document.createElement('div');
             div.className = `message-slide flex gap-3 ${colors[type]}`;
             div.innerHTML = `
@@ -739,23 +823,46 @@
                 <span class="${sourceColors[source] || 'text-slate-400'} font-semibold flex-shrink-0">[${source}]</span>
                 <span class="flex-1">${text}</span>
             `;
-            
+
             stream.appendChild(div);
             stream.scrollTop = stream.scrollHeight;
         }
 
         function showResults(result) {
             document.getElementById('result-card').classList.remove('hidden');
-            document.getElementById('result-recommendation').textContent = (result.recommendation || 'N/A').toUpperCase();
-            document.getElementById('result-score').textContent = result.composite_score?.toFixed(1) || '--';
-            document.getElementById('result-target').textContent = result.target_price ? `₹${result.target_price.toFixed(2)}` : '--';
-            document.getElementById('result-confidence').textContent = (result.confidence || 'N/A').toUpperCase();
-            
+
+            // Handle recommendation
+            const rec = (result.recommendation || 'N/A').toString().toUpperCase();
+            document.getElementById('result-recommendation').textContent = rec;
+
+            // Handle composite score - could be string or number
+            const score = result.composite_score;
+            const scoreDisplay = score !== null && score !== undefined
+                ? (typeof score === 'number' ? score.toFixed(1) : score.toString())
+                : '--';
+            document.getElementById('result-score').textContent = scoreDisplay;
+
+            // Handle target price
+            const target = result.target_price;
+            const targetDisplay = target !== null && target !== undefined
+                ? (typeof target === 'number' ? `₹${target.toFixed(2)}` : `₹${target}`)
+                : '--';
+            document.getElementById('result-target').textContent = targetDisplay;
+
+            // Handle confidence
+            const confidence = (result.confidence || 'N/A').toString().toUpperCase();
+            document.getElementById('result-confidence').textContent = confidence;
+
             // Color code recommendation
             const recEl = document.getElementById('result-recommendation');
-            if (result.recommendation === 'buy') recEl.className = 'text-2xl font-bold text-green-400';
-            else if (result.recommendation === 'sell') recEl.className = 'text-2xl font-bold text-red-400';
-            else recEl.className = 'text-2xl font-bold text-amber-400';
+            const recLower = rec.toLowerCase();
+            if (recLower === 'buy' || recLower === 'strong buy') {
+                recEl.className = 'text-2xl font-bold text-green-400';
+            } else if (recLower === 'sell' || recLower === 'strong sell') {
+                recEl.className = 'text-2xl font-bold text-red-400';
+            } else {
+                recEl.className = 'text-2xl font-bold text-amber-400';
+            }
         }
 
         function updateTimer() {
@@ -773,13 +880,13 @@
             try {
                 const response = await fetch(`${API_BASE}/api/agent/observability/logs?n=50`);
                 const data = await response.json();
-                
+
                 const tbody = document.getElementById('logs-body');
                 if (!data.logs || data.logs.length === 0) {
                     tbody.innerHTML = '<tr><td colspan="7" class="px-4 py-8 text-center text-slate-500">No logs found</td></tr>';
                     return;
                 }
-                
+
                 tbody.innerHTML = data.logs.map(log => `
                     <tr class="hover:bg-slate-800/50">
                         <td class="px-4 py-2 font-mono text-xs text-slate-400">${log.timestamp?.slice(11, 19) || '--'}</td>
@@ -805,13 +912,13 @@
             try {
                 const response = await fetch(`${API_BASE}/api/agent/observability/llm-traces?n=20`);
                 const data = await response.json();
-                
+
                 const container = document.getElementById('traces-container');
                 if (!data.traces || data.traces.length === 0) {
                     container.innerHTML = '<div class="text-slate-500 text-center py-8">No traces found</div>';
                     return;
                 }
-                
+
                 container.innerHTML = data.traces.map((trace, idx) => `
                     <div class="bg-slate-800/50 border border-slate-700 rounded-lg overflow-hidden">
                         <div class="px-4 py-3 flex items-center justify-between cursor-pointer hover:bg-slate-700/30" onclick="toggleTrace(${idx})">
@@ -872,32 +979,32 @@
                     fetch(`${API_BASE}/api/agent/observability/metrics`),
                     fetch(`${API_BASE}/api/agent/observability/finops?n=50`)
                 ]);
-                
+
                 const metricsData = await metricsRes.json();
                 const finopsData = await finopsRes.json();
-                
+
                 const metrics = metricsData.metrics || {};
-                
-                document.getElementById('finops-today').textContent = `$${(metrics.costs_by_date?.[new Date().toISOString().slice(0,10)] || 0).toFixed(6)}`;
+
+                document.getElementById('finops-today').textContent = `$${(metrics.costs_by_date?.[new Date().toISOString().slice(0, 10)] || 0).toFixed(6)}`;
                 document.getElementById('finops-analyses').textContent = metrics.total_analyses || 0;
                 document.getElementById('finops-tokens').textContent = ((metrics.total_input_tokens || 0) + (metrics.total_output_tokens || 0)).toLocaleString();
                 document.getElementById('finops-avg').textContent = `$${(metrics.total_cost_usd / Math.max(metrics.total_analyses, 1)).toFixed(6)}`;
-                
+
                 // Create simple bar chart by agent
                 const costsByAgent = {};
                 (finopsData.entries || []).forEach(entry => {
                     const agent = entry.agent_name || 'unknown';
                     costsByAgent[agent] = (costsByAgent[agent] || 0) + (entry.total_cost_usd || 0);
                 });
-                
+
                 const maxCost = Math.max(...Object.values(costsByAgent), 0.0001);
                 const chartContainer = document.getElementById('finops-chart');
                 chartContainer.innerHTML = Object.entries(costsByAgent).map(([agent, cost]) => `
-                    <div class="flex-1 flex flex-col items-center">
-                        <div class="w-full bg-gradient-to-t from-blue-600 to-purple-500 rounded-t transition-all hover:opacity-80" 
-                             style="height: ${(cost / maxCost) * 100}%" title="$${cost.toFixed(6)}"></div>
-                        <div class="text-[10px] text-slate-500 mt-2 text-center truncate w-full">${agent.replace('_agent', '')}</div>
-                        <div class="text-[10px] text-green-400">$${cost.toFixed(5)}</div>
+                    <div class="flex-1 flex flex-col items-center min-w-[60px]">
+                        <div class="w-full bg-gradient-to-t from-blue-600 to-purple-500 rounded-t transition-all hover:opacity-80 cursor-pointer" 
+                             style="height: ${Math.max((cost / maxCost) * 100, 5)}%" title="$${cost.toFixed(6)}"></div>
+                        <div class="text-sm text-slate-300 mt-2 text-center font-medium capitalize">${agent.replace('_agent', '')}</div>
+                        <div class="text-sm text-green-400 font-semibold">$${cost.toFixed(5)}</div>
                     </div>
                 `).join('');
             } catch (error) {
@@ -909,4 +1016,5 @@
         loadFinOps();
     </script>
 </body>
+
 </html>

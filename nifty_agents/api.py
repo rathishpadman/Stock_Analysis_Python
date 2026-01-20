@@ -167,6 +167,81 @@ async def health():
     return {"status": "healthy"}
 
 
+# ============================================================================
+# Cache Management Endpoints
+# ============================================================================
+
+@app.get("/api/agent/cache/stats", tags=["Cache"], summary="Get Cache Statistics")
+async def cache_stats():
+    """
+    Get cache statistics including cached tickers and TTL.
+    
+    Returns:
+        Cache size, cached tickers, and TTL configuration
+    """
+    cache_entries = []
+    for ticker, entry in orchestrator.cache.items():
+        cache_age = (datetime.now() - entry.get("timestamp", datetime.min)).seconds
+        cache_entries.append({
+            "ticker": ticker,
+            "cache_age_seconds": cache_age,
+            "expires_in_seconds": max(0, 86400 - cache_age),
+            "cached_at": entry.get("timestamp", datetime.min).isoformat()
+        })
+    
+    return {
+        "cache_enabled": orchestrator.enable_caching,
+        "cache_ttl_seconds": 86400,  # 24 hours
+        "cache_ttl_hours": 24,
+        "entries_count": len(orchestrator.cache),
+        "entries": cache_entries
+    }
+
+
+@app.delete("/api/agent/cache/{ticker}", tags=["Cache"], summary="Clear Cache for Ticker")
+async def clear_cache(ticker: str):
+    """
+    Clear cached analysis for a specific ticker.
+    
+    Args:
+        ticker: Stock ticker to clear from cache
+        
+    Returns:
+        Confirmation of cache clearance
+    """
+    ticker_clean = ticker.upper().strip()
+    if ticker_clean in orchestrator.cache:
+        del orchestrator.cache[ticker_clean]
+        return {
+            "cleared": True,
+            "ticker": ticker_clean,
+            "message": f"Cache cleared for {ticker_clean}"
+        }
+    return {
+        "cleared": False,
+        "ticker": ticker_clean,
+        "message": f"{ticker_clean} was not in cache"
+    }
+
+
+@app.delete("/api/agent/cache", tags=["Cache"], summary="Clear All Cache")
+async def clear_all_cache():
+    """
+    Clear all cached analyses.
+    
+    Returns:
+        Number of entries cleared
+    """
+    count = len(orchestrator.cache)
+    orchestrator.cache.clear()
+    return {
+        "cleared": True,
+        "entries_cleared": count,
+        "message": f"Cleared {count} cached entries"
+    }
+
+
+
 @app.get(
     "/api/agent/analyze/{ticker}",
     response_model=Dict[str, Any],
