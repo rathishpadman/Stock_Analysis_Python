@@ -245,13 +245,21 @@ class NiftyAgentOrchestrator:
             price_data_list = price_history.get("data", [])
             recent_50_days = price_data_list[:50] if isinstance(price_data_list, list) else []
             
+            # Extract VIX value safely
+            india_vix_data = macro.get("india_vix", {})
+            vix_value = india_vix_data.get("value") if isinstance(india_vix_data, dict) else None
+            
             return {
                 **common,
+                # Volume data for volume analysis
+                "volume": quote.get("volume"),
+                "avg_volume": fundamentals.get("avg_volume"),
+                "avg_volume_10d": fundamentals.get("avg_volume_10d"),
                 # Recent 50 days for pattern recognition (not 250)
                 "price_history": {
                     "data": recent_50_days,
-                    "52w_high": price_history.get("52w_high"),
-                    "52w_low": price_history.get("52w_low"),
+                    "52w_high": price_history.get("52w_high") or quote.get("52w_high"),
+                    "52w_low": price_history.get("52w_low") or quote.get("52w_low"),
                     "days_included": len(recent_50_days)
                 },
                 # Pre-computed indicators from pipeline (avoid LLM recomputing)
@@ -259,66 +267,94 @@ class NiftyAgentOrchestrator:
                     "rsi14": supabase_data.get("scores", {}).get("rsi14"),
                     "macd_signal": supabase_data.get("scores", {}).get("macd_signal"),
                     "sma20": supabase_data.get("daily", {}).get("sma20"),
-                    "sma50": supabase_data.get("daily", {}).get("sma50"),
-                    "sma200": supabase_data.get("daily", {}).get("sma200"),
+                    "sma50": supabase_data.get("daily", {}).get("sma50") or fundamentals.get("50d_avg"),
+                    "sma200": supabase_data.get("daily", {}).get("sma200") or fundamentals.get("200d_avg"),
                     "technical_score": supabase_data.get("scores", {}).get("score_technical")
                 },
                 # Market context for "consider Nifty direction"
                 "market_regime": macro.get("market_regime"),
-                "india_vix": macro.get("india_vix", {}).get("value")
+                "india_vix": vix_value
             }
         
         elif agent_name == "sentiment_agent":
             # Needs: News headlines, sentiment scores, VIX for fear/greed
             # Prompt mentions: News from ET/Moneycontrol, India VIX, FII/DII, events
             headlines = sentiment.get("headlines", [])
+            
+            # Extract VIX data safely
+            india_vix_data = macro.get("india_vix", {})
+            
+            # Get sector from fundamentals (required for news filtering)
+            sector = fundamentals.get("sector", "Unknown")
+            
             return {
                 **common,
+                "sector": sector,
+                "industry": fundamentals.get("industry", "Unknown"),
                 "sentiment": {
                     "overall_sentiment": sentiment.get("overall_sentiment"),
-                    "sentiment_score": sentiment.get("sentiment_score"),
+                    "sentiment_score": sentiment.get("sentiment_score") or sentiment.get("confidence", 0),
                     "confidence": sentiment.get("confidence"),
-                    "positive_count": sentiment.get("positive_count"),
-                    "negative_count": sentiment.get("negative_count"),
+                    "positive_count": sentiment.get("positive_count", 0),
+                    "negative_count": sentiment.get("negative_count", 0),
+                    "news_count": sentiment.get("news_count", 0),
+                    "reason": sentiment.get("reason", ""),
                     "headlines": headlines[:10] if isinstance(headlines, list) else [],
                     "top_positive": sentiment.get("top_positive", [])[:3],
                     "top_negative": sentiment.get("top_negative", [])[:3]
                 },
-                # VIX for fear/greed cycles
-                "india_vix": macro.get("india_vix"),
-                "market_regime": macro.get("market_regime"),
-                # Sector context for news interpretation
-                "sector": fundamentals.get("sector")
+                # VIX for fear/greed cycles (full object for context)
+                "india_vix": india_vix_data if isinstance(india_vix_data, dict) else {"value": None},
+                "market_regime": macro.get("market_regime", "unknown")
             }
         
         elif agent_name == "macro_agent":
             # Needs: Full macro data, sector for connecting to stock
             # Prompt mentions: RBI, VIX, INR, FII, sector impacts
+            # NOTE: Does NOT need price_history - macro doesn't analyze charts!
+            
+            # Get sector/industry (required for sector-specific impacts)
+            sector = fundamentals.get("sector", "Unknown")
+            industry = fundamentals.get("industry", "Unknown")
+            
             return {
                 **common,
-                "macro": macro,  # Full macro data needed
-                # Sector context for "connect macro to sector impacts"
-                "sector": fundamentals.get("sector"),
-                "industry": fundamentals.get("industry"),
+                # Sector context for "connect macro to sector impacts" (REQUIRED)
+                "sector": sector,
+                "industry": industry,
+                # Full macro data needed for RBI, VIX, etc.
+                "macro": macro,
                 # Basic valuation for macro overlay
                 "pe_ratio": fundamentals.get("pe_ratio"),
-                "market_cap": fundamentals.get("market_cap")
+                "market_cap": fundamentals.get("market_cap"),
+                # Beta for market sensitivity
+                "beta": fundamentals.get("beta")
             }
         
         elif agent_name == "regulatory_agent":
             # Needs: Corporate announcements, sector (for regulation type)
             # Prompt mentions: SEBI, RBI circulars, litigations, compliance
+            # NOTE: Does NOT need price_history or detailed macro data!
+            
+            # Get sector/industry (REQUIRED for determining applicable regulations)
+            sector = fundamentals.get("sector", "Unknown")
+            industry = fundamentals.get("industry", "Unknown")
+            
             return {
                 **common,
-                "sector": fundamentals.get("sector"),
-                "industry": fundamentals.get("industry"),
+                # Sector/Industry (REQUIRED for regulation type)
+                "sector": sector,
+                "industry": industry,
+                # Company size for regulatory tier (large caps have different requirements)
+                "market_cap": fundamentals.get("market_cap"),
                 # Corporate announcements for regulatory filings
                 "announcements": sentiment.get("announcements", []),
                 "corporate_actions": sentiment.get("corporate_actions", []),
                 # Scores hint at historical compliance
                 "scores": {
                     "composite_score": supabase_data.get("scores", {}).get("composite_score"),
-                    "quality_score": supabase_data.get("scores", {}).get("quality_score")
+                    "quality_score": supabase_data.get("scores", {}).get("quality_score"),
+                    "fundamental_score": supabase_data.get("scores", {}).get("score_fundamental")
                 }
             }
         
