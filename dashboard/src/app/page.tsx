@@ -15,13 +15,14 @@ import { Settings2, Search, Filter, LogOut, Loader2, BarChart3, TrendingUp, Shie
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import StockTable from '@/components/StockTable';
+import AIAnalysisModal from '@/components/AIAnalysisModal';
 
 type ReportView = 'daily' | 'weekly' | 'monthly' | 'seasonality';
 type DetailSource = 'daily' | 'weekly' | 'monthly' | 'seasonality';
 
 export default function DashboardPage() {
   const { user, loading: authLoading, signInWithGoogle, signOut } = useAuth();
-  
+
   // Data states
   const [stocks, setStocks] = useState<any[]>([]);
   const [weeklyData, setWeeklyData] = useState<any[]>([]);
@@ -31,7 +32,7 @@ export default function DashboardPage() {
   const [weeklyHistoricalData, setWeeklyHistoricalData] = useState<any[]>([]);
   const [monthlyHistoricalData, setMonthlyHistoricalData] = useState<any[]>([]);
   const [seasonalityDetailData, setSeasonalityDetailData] = useState<any>(null);
-  
+
   // UI states
   const [loading, setLoading] = useState(true);
   const [chartsLoading, setChartsLoading] = useState(false);
@@ -48,6 +49,10 @@ export default function DashboardPage() {
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [reportView, setReportView] = useState<ReportView>('daily');
   const [detailSource, setDetailSource] = useState<DetailSource>('daily');
+
+  // AI Analysis Modal state
+  const [aiAnalysisTicker, setAiAnalysisTicker] = useState<string | null>(null);
+  const [showAiModal, setShowAiModal] = useState(false);
 
   // Get current fields and columns based on reportView
   const currentFields = useMemo(() => {
@@ -71,22 +76,22 @@ export default function DashboardPage() {
   const toggleCurrentColumn = (columnId: string) => {
     switch (reportView) {
       case 'weekly':
-        setWeeklyVisibleColumns(prev => 
+        setWeeklyVisibleColumns(prev =>
           prev.includes(columnId) ? prev.filter(c => c !== columnId) : [...prev, columnId]
         );
         break;
       case 'monthly':
-        setMonthlyVisibleColumns(prev => 
+        setMonthlyVisibleColumns(prev =>
           prev.includes(columnId) ? prev.filter(c => c !== columnId) : [...prev, columnId]
         );
         break;
       case 'seasonality':
-        setSeasonalityVisibleColumns(prev => 
+        setSeasonalityVisibleColumns(prev =>
           prev.includes(columnId) ? prev.filter(c => c !== columnId) : [...prev, columnId]
         );
         break;
       default:
-        setVisibleColumns(prev => 
+        setVisibleColumns(prev =>
           prev.includes(columnId) ? prev.filter(c => c !== columnId) : [...prev, columnId]
         );
     }
@@ -264,7 +269,7 @@ export default function DashboardPage() {
   // Context-aware search filter
   const getFilteredData = useMemo(() => {
     const query = searchQuery.toLowerCase();
-    
+
     switch (reportView) {
       case 'daily':
         return stocks.filter(s =>
@@ -436,12 +441,12 @@ export default function DashboardPage() {
             <div className="divide-y divide-white/[0.03]">
               {filteredSidebar.slice(0, 100).map(stock => {
                 const returnField = reportView === 'daily' ? stock.return_1d :
-                                   reportView === 'weekly' ? stock.weekly_return_pct :
-                                   reportView === 'monthly' ? stock.monthly_return_pct : null;
+                  reportView === 'weekly' ? stock.weekly_return_pct :
+                    reportView === 'monthly' ? stock.monthly_return_pct : null;
                 const priceField = reportView === 'daily' ? stock.price_last :
-                                  reportView === 'weekly' ? stock.weekly_close :
-                                  reportView === 'monthly' ? stock.monthly_close : null;
-                
+                  reportView === 'weekly' ? stock.weekly_close :
+                    reportView === 'monthly' ? stock.monthly_close : null;
+
                 return (
                   <div
                     key={stock.ticker}
@@ -473,11 +478,10 @@ export default function DashboardPage() {
                     )}
                     {reportView === 'weekly' && stock.weekly_trend && (
                       <div className="mt-2">
-                        <span className={`text-[9px] px-2 py-0.5 rounded ${
-                          stock.weekly_trend === 'UP' ? 'bg-green-500/20 text-green-400' :
+                        <span className={`text-[9px] px-2 py-0.5 rounded ${stock.weekly_trend === 'UP' ? 'bg-green-500/20 text-green-400' :
                           stock.weekly_trend === 'DOWN' ? 'bg-red-500/20 text-red-400' :
-                          'bg-slate-700 text-slate-400'
-                        }`}>
+                            'bg-slate-700 text-slate-400'
+                          }`}>
                           {stock.weekly_trend}
                         </span>
                       </div>
@@ -497,9 +501,9 @@ export default function DashboardPage() {
                 <div className="flex items-center gap-4">
                   <h2 className="text-xl font-bold flex items-center gap-2">
                     <div className="w-1 h-6 bg-blue-600 rounded-full"></div>
-                    {reportView === 'daily' ? 'DAILY SCREENER' : 
-                     reportView === 'weekly' ? 'WEEKLY INTELLIGENCE' : 
-                     reportView === 'monthly' ? 'MONTHLY ANALYSIS' : 'SEASONALITY PATTERNS'}
+                    {reportView === 'daily' ? 'DAILY SCREENER' :
+                      reportView === 'weekly' ? 'WEEKLY INTELLIGENCE' :
+                        reportView === 'monthly' ? 'MONTHLY ANALYSIS' : 'SEASONALITY PATTERNS'}
                   </h2>
                   <div className="flex bg-[#0f172a] border border-white/5 rounded p-0.5">
                     <button
@@ -565,6 +569,10 @@ export default function DashboardPage() {
                     stocks={getFilteredData}
                     visibleColumns={visibleColumns}
                     onSelectStock={(t) => handleStockSelect(t, 'daily')}
+                    onRequestAnalysis={(ticker) => {
+                      setAiAnalysisTicker(ticker);
+                      setShowAiModal(true);
+                    }}
                     timeframe={timeframe}
                   />
                 </div>
@@ -604,13 +612,12 @@ export default function DashboardPage() {
                     <div>
                       <div className="flex items-center gap-3 mb-2">
                         <h2 className="text-5xl font-black text-white italic">{selectedWeeklyStockData.ticker}</h2>
-                        <span className={`px-4 py-1 rounded-full text-xs font-black uppercase ${
-                          selectedWeeklyStockData.weekly_trend === 'UP' 
-                            ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' 
-                            : selectedWeeklyStockData.weekly_trend === 'DOWN'
+                        <span className={`px-4 py-1 rounded-full text-xs font-black uppercase ${selectedWeeklyStockData.weekly_trend === 'UP'
+                          ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
+                          : selectedWeeklyStockData.weekly_trend === 'DOWN'
                             ? 'bg-rose-500/10 text-rose-500 border border-rose-500/20'
                             : 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
-                        }`}>
+                          }`}>
                           {selectedWeeklyStockData.weekly_trend || 'N/A'}
                         </span>
                       </div>
@@ -684,13 +691,12 @@ export default function DashboardPage() {
                     <div>
                       <div className="flex items-center gap-3 mb-2">
                         <h2 className="text-5xl font-black text-white italic">{selectedMonthlyStockData.ticker}</h2>
-                        <span className={`px-4 py-1 rounded-full text-xs font-black uppercase ${
-                          selectedMonthlyStockData.monthly_trend === 'UP' 
-                            ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' 
-                            : selectedMonthlyStockData.monthly_trend === 'DOWN'
+                        <span className={`px-4 py-1 rounded-full text-xs font-black uppercase ${selectedMonthlyStockData.monthly_trend === 'UP'
+                          ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
+                          : selectedMonthlyStockData.monthly_trend === 'DOWN'
                             ? 'bg-rose-500/10 text-rose-500 border border-rose-500/20'
                             : 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
-                        }`}>
+                          }`}>
                           {selectedMonthlyStockData.monthly_trend || 'N/A'}
                         </span>
                       </div>
@@ -962,6 +968,16 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
+
+      {/* AI Analysis Modal */}
+      <AIAnalysisModal
+        ticker={aiAnalysisTicker}
+        isOpen={showAiModal}
+        onClose={() => {
+          setShowAiModal(false);
+          setAiAnalysisTicker(null);
+        }}
+      />
     </div>
   );
 }
