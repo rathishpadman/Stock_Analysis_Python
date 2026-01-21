@@ -39,11 +39,11 @@ interface AIAnalysisModalProps {
 }
 
 const AGENTS = [
-    { key: 'fundamental_agent', name: 'Fundamental', emoji: '📈', color: 'blue' },
-    { key: 'technical_agent', name: 'Technical', emoji: '📉', color: 'cyan' },
-    { key: 'sentiment_agent', name: 'Sentiment', emoji: '📰', color: 'amber' },
-    { key: 'macro_agent', name: 'Macro', emoji: '🌍', color: 'purple' },
-    { key: 'regulatory_agent', name: 'Regulatory', emoji: '⚖️', color: 'emerald' },
+    { key: 'fundamental', name: 'Fundamental', emoji: '📈', color: 'blue', scoreKey: 'fundamental_score' },
+    { key: 'technical', name: 'Technical', emoji: '📉', color: 'cyan', scoreKey: 'technical_score' },
+    { key: 'sentiment', name: 'Sentiment', emoji: '📰', color: 'amber', scoreKey: 'sentiment_score' },
+    { key: 'macro', name: 'Macro', emoji: '🌍', color: 'purple', scoreKey: 'macro_score' },
+    { key: 'regulatory', name: 'Regulatory', emoji: '⚖️', color: 'emerald', scoreKey: 'compliance_score' },
 ];
 
 // Helper function to safely convert values to numbers (handles string responses from API)
@@ -60,6 +60,7 @@ export default function AIAnalysisModal({ ticker, isOpen, onClose }: AIAnalysisM
     const [error, setError] = useState<string | null>(null);
     const [result, setResult] = useState<AnalysisResult | null>(null);
     const [agentProgress, setAgentProgress] = useState<Record<string, 'idle' | 'running' | 'complete' | 'error'>>({});
+    const [expandedAgents, setExpandedAgents] = useState<Set<string>>(new Set());
     const modalRef = useRef<HTMLDivElement>(null);
 
     // Fetch analysis when modal opens with a ticker
@@ -75,8 +76,46 @@ export default function AIAnalysisModal({ ticker, isOpen, onClose }: AIAnalysisM
             setResult(null);
             setError(null);
             setAgentProgress({});
+            setExpandedAgents(new Set());
         }
     }, [isOpen]);
+
+    const toggleAgentExpanded = (agentKey: string) => {
+        setExpandedAgents(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(agentKey)) {
+                newSet.delete(agentKey);
+            } else {
+                newSet.add(agentKey);
+            }
+            return newSet;
+        });
+    };
+
+    // Helper to extract reasoning/summary from agent output
+    const getAgentSummary = (analysis: any): string | null => {
+        if (!analysis) return null;
+        // Try different fields that might contain reasoning
+        return analysis.reasoning ||
+            analysis.reasoning_summary ||
+            analysis.summary ||
+            analysis.analysis_summary ||
+            analysis.key_insights?.join(' • ') ||
+            null;
+    };
+
+    // Helper to get signal from agent output
+    const getAgentSignal = (analysis: any, agentKey: string): string | null => {
+        if (!analysis) return null;
+        // Different agents use different signal field names
+        return analysis.signal ||
+            analysis.recommendation ||
+            analysis.trend?.primary_trend ||
+            analysis.news_sentiment?.label ||
+            analysis.outlook ||
+            analysis.risk_level ||
+            null;
+    };
 
     const fetchAnalysis = async (tickerSymbol: string) => {
         setLoading(true);
@@ -209,40 +248,121 @@ export default function AIAnalysisModal({ ticker, isOpen, onClose }: AIAnalysisM
 
                     {/* Agent Progress */}
                     {(loading || result) && (
-                        <div className="grid grid-cols-5 gap-3">
+                        <div className="space-y-2">
+                            {/* Compact Agent Summary Row */}
+                            <div className="grid grid-cols-5 gap-2">
+                                {AGENTS.map(agent => {
+                                    const status = agentProgress[agent.key] || 'idle';
+                                    const analysis = result?.agent_analyses?.[agent.key];
+                                    const score = safeNumber(analysis?.[agent.scoreKey]) ?? safeNumber(analysis?.score);
+                                    const signal = getAgentSignal(analysis, agent.key);
+                                    const isExpanded = expandedAgents.has(agent.key);
+
+                                    return (
+                                        <button
+                                            key={agent.key}
+                                            onClick={() => status === 'complete' && toggleAgentExpanded(agent.key)}
+                                            disabled={status !== 'complete'}
+                                            className={`
+                                                rounded-lg p-2 text-center border transition-all text-left
+                                                ${status === 'running' ? 'bg-blue-500/10 border-blue-500/30 animate-pulse' : ''}
+                                                ${status === 'complete' ? 'bg-slate-800/50 border-slate-600 hover:bg-slate-700/50 hover:border-slate-500 cursor-pointer' : ''}
+                                                ${status === 'error' ? 'bg-red-500/10 border-red-500/30' : ''}
+                                                ${status === 'idle' ? 'bg-slate-800/30 border-slate-700' : ''}
+                                                ${isExpanded ? 'ring-2 ring-blue-500/50' : ''}
+                                            `}
+                                        >
+                                            <div className="flex items-center gap-1 mb-1">
+                                                <span className="text-lg">{agent.emoji}</span>
+                                                <span className="text-[10px] font-medium text-slate-400 truncate">{agent.name}</span>
+                                            </div>
+                                            {status === 'running' && (
+                                                <span className="text-[10px] text-blue-400">Running...</span>
+                                            )}
+                                            {status === 'complete' && (
+                                                <div className="flex items-center justify-between">
+                                                    <span className={`text-sm font-bold ${(score ?? 0) >= 70 ? 'text-emerald-400' :
+                                                            (score ?? 0) >= 50 ? 'text-amber-400' : 'text-rose-400'
+                                                        }`}>
+                                                        {score !== null ? score.toFixed(0) : '--'}
+                                                    </span>
+                                                    {signal && (
+                                                        <span className="text-[9px] text-slate-500 uppercase truncate max-w-12">
+                                                            {signal}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            )}
+                                            {status === 'error' && (
+                                                <span className="text-[10px] text-red-400">Error</span>
+                                            )}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Expanded Agent Details */}
                             {AGENTS.map(agent => {
-                                const status = agentProgress[agent.key] || 'idle';
                                 const analysis = result?.agent_analyses?.[agent.key];
-                                const score = safeNumber(analysis?.score) ?? safeNumber(analysis?.overall_score);
+                                const summary = getAgentSummary(analysis);
+                                const isExpanded = expandedAgents.has(agent.key);
+
+                                if (!isExpanded || !analysis) return null;
 
                                 return (
                                     <div
-                                        key={agent.key}
-                                        className={`
-                      rounded-lg p-3 text-center border transition-all
-                      ${status === 'running' ? 'bg-blue-500/10 border-blue-500/30 animate-pulse' : ''}
-                      ${status === 'complete' ? 'bg-slate-800/50 border-slate-600' : ''}
-                      ${status === 'error' ? 'bg-red-500/10 border-red-500/30' : ''}
-                      ${status === 'idle' ? 'bg-slate-800/30 border-slate-700' : ''}
-                    `}
+                                        key={`${agent.key}-detail`}
+                                        className="bg-slate-800/50 border border-slate-700 rounded-lg p-4 animate-in slide-in-from-top-2 duration-200"
                                     >
-                                        <div className="text-2xl mb-1">{agent.emoji}</div>
-                                        <div className="text-xs font-medium text-slate-300">{agent.name}</div>
-                                        <div className="mt-2">
-                                            {status === 'running' && (
-                                                <span className="text-xs text-blue-400">Running...</span>
-                                            )}
-                                            {status === 'complete' && score !== null && (
-                                                <span className={`text-lg font-bold ${score >= 70 ? 'text-emerald-400' :
-                                                    score >= 50 ? 'text-amber-400' : 'text-rose-400'
-                                                    }`}>
-                                                    {score.toFixed(0)}
-                                                </span>
-                                            )}
-                                            {status === 'error' && (
-                                                <span className="text-xs text-red-400">Error</span>
-                                            )}
+                                        <div className="flex items-center justify-between mb-3">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-xl">{agent.emoji}</span>
+                                                <span className="font-semibold text-white">{agent.name} Analysis</span>
+                                            </div>
+                                            <button
+                                                onClick={() => toggleAgentExpanded(agent.key)}
+                                                className="p-1 hover:bg-slate-700 rounded text-slate-400 hover:text-white transition-colors"
+                                            >
+                                                <X className="w-4 h-4" />
+                                            </button>
                                         </div>
+
+                                        {/* Key Metrics */}
+                                        {analysis && (
+                                            <div className="grid grid-cols-3 gap-3 mb-3">
+                                                {Object.entries(analysis).slice(0, 6).map(([key, value]) => {
+                                                    // Skip complex objects and known fields
+                                                    if (typeof value === 'object' || key.includes('_')) return null;
+                                                    return (
+                                                        <div key={key} className="text-sm">
+                                                            <span className="text-slate-500 text-xs uppercase">{key.replace(/_/g, ' ')}: </span>
+                                                            <span className="text-slate-300">{String(value)}</span>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+
+                                        {/* Reasoning/Summary */}
+                                        {summary && (
+                                            <div className="mt-2 pt-2 border-t border-slate-700">
+                                                <p className="text-sm text-slate-400 leading-relaxed">{summary}</p>
+                                            </div>
+                                        )}
+
+                                        {/* Key Risks/Catalysts if available */}
+                                        {analysis.key_risks && Array.isArray(analysis.key_risks) && (
+                                            <div className="mt-2 pt-2 border-t border-slate-700">
+                                                <span className="text-xs text-rose-400 font-medium">Risks: </span>
+                                                <span className="text-sm text-slate-400">{analysis.key_risks.join(' • ')}</span>
+                                            </div>
+                                        )}
+                                        {analysis.key_catalysts && Array.isArray(analysis.key_catalysts) && (
+                                            <div className="mt-1">
+                                                <span className="text-xs text-emerald-400 font-medium">Catalysts: </span>
+                                                <span className="text-sm text-slate-400">{analysis.key_catalysts.join(' • ')}</span>
+                                            </div>
+                                        )}
                                     </div>
                                 );
                             })}
