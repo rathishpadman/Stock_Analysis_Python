@@ -54,6 +54,10 @@ export default function DashboardPage() {
   const [aiAnalysisTicker, setAiAnalysisTicker] = useState<string | null>(null);
   const [showAiModal, setShowAiModal] = useState(false);
 
+  // Collapsible sections state (default collapsed for table-first focus)
+  const [showMarketMovers, setShowMarketMovers] = useState(false);
+  const [showTechnicalSignals, setShowTechnicalSignals] = useState(false);
+
   // Get current fields and columns based on reportView
   const currentFields = useMemo(() => {
     switch (reportView) {
@@ -96,6 +100,24 @@ export default function DashboardPage() {
         );
     }
   };
+
+  // Load collapsible section preferences from localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedMovers = localStorage.getItem('showMarketMovers');
+      const savedSignals = localStorage.getItem('showTechnicalSignals');
+      if (savedMovers !== null) setShowMarketMovers(savedMovers === 'true');
+      if (savedSignals !== null) setShowTechnicalSignals(savedSignals === 'true');
+    }
+  }, []);
+
+  // Save collapsible section preferences to localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('showMarketMovers', String(showMarketMovers));
+      localStorage.setItem('showTechnicalSignals', String(showTechnicalSignals));
+    }
+  }, [showMarketMovers, showTechnicalSignals]);
 
   useEffect(() => {
     if (!authLoading && user) {
@@ -560,19 +582,7 @@ export default function DashboardPage() {
 
               {reportView === 'daily' ? (
                 <div className="space-y-6">
-                  {/* Top Movers Summary */}
-                  <TopMovers
-                    stocks={getFilteredData}
-                    onSelectStock={(t) => handleStockSelect(t, 'daily')}
-                  />
-
-                  {/* Technical Signals Scanner */}
-                  <TechnicalSignals
-                    stocks={getFilteredData}
-                    onSelectStock={(t) => handleStockSelect(t, 'daily')}
-                  />
-
-                  {/* Main Stock Table */}
+                  {/* Main Stock Table - Landing Focus */}
                   <StockTable
                     stocks={getFilteredData}
                     visibleColumns={visibleColumns}
@@ -583,6 +593,52 @@ export default function DashboardPage() {
                     }}
                     timeframe={timeframe}
                   />
+
+                  {/* Collapsible: Market Movers */}
+                  <div className="border border-white/10 rounded-lg overflow-hidden bg-slate-900/30">
+                    <button
+                      onClick={() => setShowMarketMovers(!showMarketMovers)}
+                      className="w-full flex items-center justify-between p-4 hover:bg-slate-800/50 transition-colors"
+                    >
+                      <span className="flex items-center gap-2 text-sm font-bold text-slate-300">
+                        <TrendingUp className="h-4 w-4 text-emerald-500" />
+                        📊 MARKET MOVERS
+                        <span className="text-xs font-normal text-slate-500">Top Gainers, Losers & Volume</span>
+                      </span>
+                      <span className={`text-slate-500 transition-transform ${showMarketMovers ? 'rotate-180' : ''}`}>▼</span>
+                    </button>
+                    {showMarketMovers && (
+                      <div className="p-4 pt-0 animate-in fade-in slide-in-from-top-2 duration-300">
+                        <TopMovers
+                          stocks={getFilteredData}
+                          onSelectStock={(t) => handleStockSelect(t, 'daily')}
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Collapsible: Technical Signals Scanner */}
+                  <div className="border border-white/10 rounded-lg overflow-hidden bg-slate-900/30">
+                    <button
+                      onClick={() => setShowTechnicalSignals(!showTechnicalSignals)}
+                      className="w-full flex items-center justify-between p-4 hover:bg-slate-800/50 transition-colors"
+                    >
+                      <span className="flex items-center gap-2 text-sm font-bold text-slate-300">
+                        <Activity className="h-4 w-4 text-cyan-500" />
+                        📉 TECHNICAL SIGNALS SCANNER
+                        <span className="text-xs font-normal text-slate-500">RSI, MACD, Cross & Breakout alerts</span>
+                      </span>
+                      <span className={`text-slate-500 transition-transform ${showTechnicalSignals ? 'rotate-180' : ''}`}>▼</span>
+                    </button>
+                    {showTechnicalSignals && (
+                      <div className="p-4 pt-0 animate-in fade-in slide-in-from-top-2 duration-300">
+                        <TechnicalSignals
+                          stocks={getFilteredData}
+                          onSelectStock={(t) => handleStockSelect(t, 'daily')}
+                        />
+                      </div>
+                    )}
+                  </div>
                 </div>
               ) : reportView === 'weekly' ? (
                 <WeeklyReportTableV2
