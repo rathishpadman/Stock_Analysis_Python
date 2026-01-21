@@ -264,12 +264,12 @@ class NiftyAgentOrchestrator:
                 },
                 # Pre-computed indicators from pipeline (avoid LLM recomputing)
                 "indicators": {
-                    "rsi14": supabase_data.get("scores", {}).get("rsi14"),
-                    "macd_signal": supabase_data.get("scores", {}).get("macd_signal"),
+                    "rsi14": supabase_data.get("scores", {}).get("rsi") or supabase_data.get("daily", {}).get("rsi14"),
+                    "macd_signal": supabase_data.get("scores", {}).get("macd_signal") or supabase_data.get("daily", {}).get("macd_signal"),
                     "sma20": supabase_data.get("daily", {}).get("sma20"),
                     "sma50": supabase_data.get("daily", {}).get("sma50") or fundamentals.get("50d_avg"),
                     "sma200": supabase_data.get("daily", {}).get("sma200") or fundamentals.get("200d_avg"),
-                    "technical_score": supabase_data.get("scores", {}).get("score_technical")
+                    "technical_score": supabase_data.get("scores", {}).get("technical_score") or supabase_data.get("scores", {}).get("score_technical")
                 },
                 # Market context for "consider Nifty direction"
                 "market_regime": macro.get("market_regime"),

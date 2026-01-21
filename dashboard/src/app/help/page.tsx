@@ -2,250 +2,349 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { ChevronLeft, ChevronDown, ChevronRight, BarChart3, TrendingUp, Calendar, Activity, Brain, FileJson, Download, HelpCircle, Info, Table, Layers } from 'lucide-react';
+import { ChevronLeft, ChevronDown, ChevronRight, BarChart3, TrendingUp, Calendar, Activity, Brain, FileJson, Download, HelpCircle, Info, Table, Layers, LineChart } from 'lucide-react';
 
 export default function HelpPage() {
     return (
-        <div className="min-h-screen bg-[#05080f] text-slate-100 p-8">
-            <div className="max-w-4xl mx-auto">
+        <div className="min-h-screen bg-[#05080f] text-slate-100 p-6">
+            <div className="max-w-5xl mx-auto">
                 {/* Header */}
-                <div className="flex items-center gap-4 mb-8">
+                <div className="flex items-center gap-4 mb-6">
                     <Link href="/" className="p-2 hover:bg-slate-800 rounded-lg transition-colors">
                         <ChevronLeft className="w-5 h-5 text-slate-400" />
                     </Link>
                     <div>
-                        <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-                            <HelpCircle className="w-8 h-8 text-blue-500" />
+                        <h1 className="text-2xl font-bold text-white flex items-center gap-3">
+                            <HelpCircle className="w-7 h-7 text-blue-500" />
                             Help & Documentation
                         </h1>
-                        <p className="text-slate-400 mt-1">Complete guide to the Antigravity Terminal</p>
+                        <p className="text-slate-400 text-sm">Complete field reference for Antigravity Terminal</p>
                     </div>
                 </div>
 
-                <div className="space-y-4">
-                    {/* Overview Section */}
+                <div className="space-y-3">
+                    {/* Overview */}
                     <CollapsibleSection title="Overview" icon={<Info className="w-5 h-5" />} defaultOpen>
-                        <p className="text-slate-300 leading-relaxed mb-4">
-                            The <strong>Antigravity Terminal</strong> is a professional-grade stock analysis dashboard
-                            that provides comprehensive insights into NIFTY 200 stocks. It combines traditional
-                            quantitative metrics with AI-powered multi-agent analysis.
+                        <p className="text-slate-300 text-sm mb-3">
+                            The <strong>Antigravity Terminal</strong> provides comprehensive stock analysis for NIFTY 200 stocks
+                            with AI-powered insights. Use the tabs to switch between Daily, Weekly, Monthly, and Seasonality views.
                         </p>
-                        <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-                            <h4 className="font-medium text-white mb-2">Quick Navigation</h4>
-                            <ul className="text-sm text-slate-400 space-y-1">
-                                <li>• <strong>Daily Screener</strong>: Real-time scores and signals</li>
-                                <li>• <strong>Weekly/Monthly</strong>: Trend analysis and performance</li>
-                                <li>• <strong>Seasonality</strong>: Historical monthly patterns</li>
-                                <li>• <strong>AI Analysis</strong>: Click "Analyze" button on any stock</li>
-                            </ul>
-                        </div>
-                    </CollapsibleSection>
-
-                    {/* Daily Screener */}
-                    <CollapsibleSection title="Daily Screener Fields" icon={<Table className="w-5 h-5" />}>
-                        <div className="space-y-4">
-                            <FieldGroup title="Score Columns">
-                                <Field name="Overall Score" description="Composite score (0-100) combining fundamental, technical, momentum, and quality factors. Higher = better investment opportunity." />
-                                <Field name="Fundamental Score" description="Based on PE, PB, ROE, debt levels, and profitability metrics. High score = undervalued with strong fundamentals." />
-                                <Field name="Technical Score" description="Derived from RSI, MACD, SMA positions, and trend strength. High score = bullish technical setup." />
-                                <Field name="Momentum Score" description="Measures recent price momentum across 1D, 1W, 1M returns. High score = strong upward momentum." />
-                                <Field name="Quality Score" description="Evaluates earnings quality, governance, and consistency. High score = reliable quality stock." />
-                            </FieldGroup>
-
-                            <FieldGroup title="Price & Return Columns">
-                                <Field name="Close" description="Latest closing price from BSE/NSE." />
-                                <Field name="Change %" description="Percentage change from previous close." />
-                                <Field name="1D/1W/1M Return" description="Returns over 1 day, 1 week, or 1 month. Toggle at top-right of table." />
-                                <Field name="52W High/Low" description="Highest and lowest prices in the past 52 weeks." />
-                                <Field name="Distance from 52W High" description="How far current price is from 52-week high (negative = below)." />
-                            </FieldGroup>
-
-                            <FieldGroup title="Technical Indicators">
-                                <Field name="RSI(14)" description="Relative Strength Index (14-day). &gt;70 = overbought, &lt;30 = oversold, 40-60 = neutral." />
-                                <Field name="MACD Signal" description="Moving Average Convergence Divergence direction. Bullish = uptrend, Bearish = downtrend." />
-                                <Field name="SMA 20/50/200" description="Simple Moving Averages. Price above SMA = bullish, below = bearish. Golden cross (50 &gt; 200) = strong buy." />
-                                <Field name="Trend" description="Primary price trend: BULLISH, BEARISH, or SIDEWAYS based on moving average positions." />
-                            </FieldGroup>
-
-                            <FieldGroup title="Fundamental Metrics">
-                                <Field name="PE Ratio" description="Price to Earnings. Lower = potentially undervalued. Compare to sector average." />
-                                <Field name="PB Ratio" description="Price to Book. Lower = potentially undervalued. &lt;1 may indicate deep value." />
-                                <Field name="ROE %" description="Return on Equity. Higher = better capital efficiency. &gt;15% is generally good." />
-                                <Field name="Debt/Equity" description="Leverage ratio. Lower = less risky. &gt;1 means more debt than equity." />
-                                <Field name="Dividend Yield %" description="Annual dividend as % of price. Higher = better income, but check sustainability." />
-                                <Field name="Market Cap" description="Company size. Large cap (&gt;₹20K Cr) = stable, Mid cap = growth potential, Small cap = higher risk/reward." />
-                            </FieldGroup>
-                        </div>
-                    </CollapsibleSection>
-
-                    {/* Weekly Report */}
-                    <CollapsibleSection title="Weekly Report Fields" icon={<Calendar className="w-5 h-5" />}>
-                        <div className="space-y-4">
-                            <FieldGroup title="Weekly Metrics">
-                                <Field name="Week High/Low" description="Highest and lowest prices during the current week." />
-                                <Field name="Weekly Return %" description="Percentage change from last week's close to this week's close." />
-                                <Field name="Weekly Trend" description="UP = higher highs/lows, DOWN = lower highs/lows, NEUTRAL = consolidating." />
-                                <Field name="Volume Ratio" description="Current week's volume vs 4-week average. &gt;1.5 = high activity, &lt;0.5 = low interest." />
-                                <Field name="SMA 10/20" description="Short-term weekly moving averages. Price above both = strong uptrend." />
-                                <Field name="Week RSI" description="Weekly RSI for longer-term momentum. Smooths out daily noise." />
-                            </FieldGroup>
-                        </div>
-                    </CollapsibleSection>
-
-                    {/* Monthly Report */}
-                    <CollapsibleSection title="Monthly Report Fields" icon={<BarChart3 className="w-5 h-5" />}>
-                        <div className="space-y-4">
-                            <FieldGroup title="Monthly Metrics">
-                                <Field name="Month High/Low" description="Highest and lowest prices during the current month." />
-                                <Field name="Monthly Return %" description="Percentage change from last month's close to this month's close." />
-                                <Field name="YTD Return %" description="Year-to-date return from January 1st." />
-                                <Field name="3M/6M/12M Return" description="Rolling returns over 3, 6, and 12 months. Shows medium-term performance." />
-                                <Field name="SMA 3/6/12" description="Monthly moving averages (in months). Price above all three = strong uptrend." />
-                                <Field name="Monthly Trend" description="Based on monthly candle patterns and SMA positions." />
-                            </FieldGroup>
-                        </div>
-                    </CollapsibleSection>
-
-                    {/* Seasonality */}
-                    <CollapsibleSection title="Seasonality Analysis" icon={<Layers className="w-5 h-5" />}>
-                        <div className="space-y-4">
-                            <FieldGroup title="Seasonality Metrics">
-                                <Field name="Best Month" description="Historically best-performing calendar month based on 5+ years of data." />
-                                <Field name="Worst Month" description="Historically worst-performing calendar month." />
-                                <Field name="Win Rate %" description="Percentage of years with positive returns for each month. &gt;60% = reliable pattern." />
-                                <Field name="Avg Return %" description="Mean monthly return across all years in the dataset." />
-                                <Field name="Max Gain/Loss %" description="Best and worst single-month performance in history." />
-                                <Field name="Volatility" description="Standard deviation of monthly returns. Higher = more unpredictable." />
-                            </FieldGroup>
-                            <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 text-sm text-blue-300">
-                                💡 <strong>Tip</strong>: Use seasonality for timing entries. If a stock historically performs well in March and poorly in October,
-                                consider buying in February and reducing exposure in September.
+                        <div className="grid grid-cols-4 gap-2 text-xs">
+                            <div className="bg-slate-800/50 p-2 rounded border border-slate-700">
+                                <div className="text-blue-400 font-medium">113 Fields</div>
+                                <div className="text-slate-500">Daily Screener</div>
+                            </div>
+                            <div className="bg-slate-800/50 p-2 rounded border border-slate-700">
+                                <div className="text-cyan-400 font-medium">17 Fields</div>
+                                <div className="text-slate-500">Weekly Report</div>
+                            </div>
+                            <div className="bg-slate-800/50 p-2 rounded border border-slate-700">
+                                <div className="text-purple-400 font-medium">18 Fields</div>
+                                <div className="text-slate-500">Monthly Report</div>
+                            </div>
+                            <div className="bg-slate-800/50 p-2 rounded border border-slate-700">
+                                <div className="text-amber-400 font-medium">16 Fields</div>
+                                <div className="text-slate-500">Seasonality</div>
                             </div>
                         </div>
                     </CollapsibleSection>
 
-                    {/* AI Agent Analysis */}
-                    <CollapsibleSection title="AI Agent Analysis" icon={<Brain className="w-5 h-5" />} defaultOpen>
-                        <p className="text-slate-300 mb-4">
-                            Click the <span className="px-2 py-1 bg-gradient-to-r from-blue-600 to-purple-600 rounded text-xs font-medium">Analyze</span> button
-                            on any stock to run a comprehensive AI analysis powered by <strong>Google Gemini 2.0 Flash</strong>.
-                        </p>
+                    {/* DAILY SCREENER - ALL FIELDS */}
+                    <CollapsibleSection title="Daily Screener Fields (113)" icon={<Table className="w-5 h-5" />}>
+                        <div className="space-y-4 text-sm">
+                            {/* Basic */}
+                            <FieldGroup title="Basic Metadata (7)">
+                                <Field name="ticker" desc="Stock symbol (e.g., RELIANCE, TCS)" />
+                                <Field name="company_name" desc="Full company name" />
+                                <Field name="isin" desc="International Securities ID Number" />
+                                <Field name="exchange" desc="Exchange (NSE/BSE)" />
+                                <Field name="sector" desc="Industry sector classification" />
+                                <Field name="industry" desc="Specific industry within sector" />
+                                <Field name="currency" desc="Trading currency (INR)" />
+                            </FieldGroup>
 
-                        <h4 className="font-medium text-white mb-3">The 5 Specialist Agents</h4>
-                        <div className="grid grid-cols-1 gap-3 mb-4">
-                            <AgentCard
-                                emoji="📈"
-                                name="Fundamental Agent"
-                                score="fundamental_score"
-                                description="Analyzes PE ratio, PB ratio, ROE, debt levels, profitability, and growth metrics. Outputs financial health assessment and fair value estimate."
-                            />
-                            <AgentCard
-                                emoji="📉"
-                                name="Technical Agent"
-                                score="technical_score"
-                                description="Evaluates RSI, MACD, moving averages, support/resistance levels, chart patterns. Provides entry/exit price targets and stop-loss levels."
-                            />
-                            <AgentCard
-                                emoji="📰"
-                                name="Sentiment Agent"
-                                score="sentiment_score"
-                                description="Assesses news sentiment from ET/Moneycontrol, social buzz, upcoming events (earnings, dividends), and FII/DII activity."
-                            />
-                            <AgentCard
-                                emoji="🌍"
-                                name="Macro Agent"
-                                score="macro_score"
-                                description="Considers India VIX, RBI policy, INR movements, sector trends, global market conditions. Rates market regime as bullish/bearish/neutral."
-                            />
-                            <AgentCard
-                                emoji="⚖️"
-                                name="Regulatory Agent"
-                                score="compliance_score"
-                                description="Reviews SEBI compliance, corporate governance, promoter holding patterns, past regulatory issues. Flags ESG and governance risks."
-                            />
-                        </div>
+                            {/* Price & Returns */}
+                            <FieldGroup title="Price & Returns (10)">
+                                <Field name="price_last" desc="Latest closing price" />
+                                <Field name="high_52w" desc="52-week high price" />
+                                <Field name="low_52w" desc="52-week low price" />
+                                <Field name="return_1d" desc="1-day return %" />
+                                <Field name="return_1w" desc="1-week return %" />
+                                <Field name="return_1m" desc="1-month return %" />
+                                <Field name="return_3m" desc="3-month return %" />
+                                <Field name="return_6m" desc="6-month return %" />
+                                <Field name="return_1y" desc="1-year return %" />
+                                <Field name="cagr_3y_pct" desc="3-year compound annual growth rate" />
+                                <Field name="cagr_5y_pct" desc="5-year compound annual growth rate" />
+                            </FieldGroup>
 
-                        <h4 className="font-medium text-white mb-3">Understanding Agent Output</h4>
-                        <div className="space-y-2">
-                            <Field name="Score (0-100)" description="Each agent outputs a score. &gt;70 = Bullish, 50-70 = Neutral, &lt;50 = Bearish. Click agent card to see detailed reasoning." />
-                            <Field name="Signal" description="Quick summary: BUY, HOLD, SELL, BULLISH, BEARISH, etc." />
-                            <Field name="Reasoning" description="Click any agent card to expand and see the full analysis text explaining why the score was given." />
-                            <Field name="Key Risks" description="Identified risk factors that could impact the stock negatively." />
-                            <Field name="Key Catalysts" description="Positive factors that could drive the stock higher." />
-                        </div>
+                            {/* Fundamental - Size & Value */}
+                            <FieldGroup title="Fundamental - Size & Valuation (10)">
+                                <Field name="market_cap_cr" desc="Market capitalization in Crores" />
+                                <Field name="enterprise_value_cr" desc="Enterprise value (MCap + Debt - Cash)" />
+                                <Field name="shares_outstanding" desc="Total shares issued" />
+                                <Field name="free_float_pct" desc="% of shares available for trading" />
+                                <Field name="pe_ttm" desc="Price/Earnings (Trailing 12M). Lower = potentially undervalued" />
+                                <Field name="pb" desc="Price/Book. < 1 = trading below book value" />
+                                <Field name="ps_ratio" desc="Price/Sales ratio" />
+                                <Field name="ev_ebitda_ttm" desc="EV/EBITDA. Lower = potentially undervalued" />
+                                <Field name="peg_ratio" desc="PE/Growth. < 1 = growth at reasonable price" />
+                                <Field name="dividend_yield_pct" desc="Annual dividend as % of price" />
+                            </FieldGroup>
 
-                        <h4 className="font-medium text-white mt-4 mb-3">Final Synthesis</h4>
-                        <div className="space-y-2">
-                            <Field name="Recommendation" description="BUY / HOLD / SELL - synthesized from all 5 agents with appropriate weighting." />
-                            <Field name="Composite Score" description="Weighted average of all agent scores (0-100)." />
-                            <Field name="Target Price" description="AI-estimated fair value based on fundamental and technical analysis." />
-                            <Field name="Confidence Level" description="HIGH / MEDIUM / LOW based on data quality and agent agreement." />
-                            <Field name="AI Summary" description="Natural language explanation synthesizing all agent perspectives." />
-                        </div>
+                            {/* Fundamental - Performance */}
+                            <FieldGroup title="Fundamental - Performance & Health (13)">
+                                <Field name="revenue_ttm_cr" desc="Revenue (Trailing 12M) in Crores" />
+                                <Field name="ebitda_ttm_cr" desc="EBITDA (Trailing 12M) in Crores" />
+                                <Field name="net_income_ttm_cr" desc="Net Income (Trailing 12M) in Crores" />
+                                <Field name="eps_ttm" desc="Earnings Per Share (Trailing 12M)" />
+                                <Field name="roe_ttm" desc="Return on Equity %. > 15% = good" />
+                                <Field name="roa_pct" desc="Return on Assets %" />
+                                <Field name="debt_equity" desc="Debt/Equity ratio. < 1 = conservative" />
+                                <Field name="interest_coverage" desc="EBIT/Interest. > 3 = safe" />
+                                <Field name="revenue_growth_yoy_pct" desc="Year-over-year revenue growth %" />
+                                <Field name="eps_growth_yoy_pct" desc="Year-over-year EPS growth %" />
+                                <Field name="gross_profit_margin_pct" desc="Gross profit margin %" />
+                                <Field name="operating_profit_margin_pct" desc="Operating profit margin %" />
+                                <Field name="net_profit_margin_pct" desc="Net profit margin %" />
+                            </FieldGroup>
 
-                        <h4 className="font-medium text-white mt-4 mb-3">Export Options</h4>
-                        <div className="flex gap-4">
-                            <div className="flex items-center gap-2 text-slate-300">
-                                <FileJson className="w-4 h-4 text-blue-400" />
-                                <span><strong>JSON</strong>: Full structured data for programmatic use</span>
-                            </div>
-                            <div className="flex items-center gap-2 text-slate-300">
-                                <Download className="w-4 h-4 text-purple-400" />
-                                <span><strong>PDF</strong>: Printable report for documentation</span>
-                            </div>
+                            {/* Cash Flow */}
+                            <FieldGroup title="Cash Flow (4)">
+                                <Field name="ocf_ttm_cr" desc="Operating Cash Flow (Trailing 12M)" />
+                                <Field name="capex_ttm_cr" desc="Capital Expenditure (Trailing 12M)" />
+                                <Field name="fcf_ttm_cr" desc="Free Cash Flow = OCF - CapEx" />
+                                <Field name="fcf_yield_pct" desc="FCF / Market Cap %" />
+                            </FieldGroup>
+
+                            {/* Technical Indicators */}
+                            <FieldGroup title="Technical Indicators (19)">
+                                <Field name="sma20" desc="20-day Simple Moving Average" />
+                                <Field name="sma50" desc="50-day SMA. Price > SMA50 = bullish" />
+                                <Field name="sma200" desc="200-day SMA. Golden cross = SMA50 > SMA200" />
+                                <Field name="rsi14" desc="RSI(14). > 70 = overbought, < 30 = oversold" />
+                                <Field name="macd_line" desc="MACD line value" />
+                                <Field name="macd_signal" desc="MACD signal line" />
+                                <Field name="macd_hist" desc="MACD histogram (line - signal)" />
+                                <Field name="adx14" desc="ADX(14). > 25 = trending, < 20 = ranging" />
+                                <Field name="atr14" desc="Average True Range. Volatility measure" />
+                                <Field name="bb_upper" desc="Bollinger Band upper (2 std dev)" />
+                                <Field name="bb_lower" desc="Bollinger Band lower (2 std dev)" />
+                                <Field name="aroon_up" desc="Aroon Up (0-100). > 70 = uptrend" />
+                                <Field name="aroon_down" desc="Aroon Down (0-100). > 70 = downtrend" />
+                                <Field name="stoch_k" desc="Stochastic %K (fast)" />
+                                <Field name="stoch_d" desc="Stochastic %D (slow signal)" />
+                                <Field name="obv" desc="On-Balance Volume for trend confirmation" />
+                                <Field name="avg_volume_1w" desc="Average volume last week" />
+                                <Field name="volume_vs_3m_avg_pct" desc="Current volume vs 3M average %" />
+                                <Field name="avg_daily_turnover_3m_cr" desc="Avg daily turnover in Crores" />
+                            </FieldGroup>
+
+                            {/* Scores */}
+                            <FieldGroup title="Scores (7)">
+                                <Field name="overall_score" desc="Composite score (0-100) combining all factors" />
+                                <Field name="score_fundamental" desc="Fundamental health score (0-100)" />
+                                <Field name="score_technical" desc="Technical strength score (0-100)" />
+                                <Field name="score_risk" desc="Risk score. Lower = less risky" />
+                                <Field name="score_sentiment" desc="Market sentiment score (0-100)" />
+                                <Field name="score_macro" desc="Macro environment score (0-100)" />
+                                <Field name="macro_composite" desc="Combined macro indicator" />
+                            </FieldGroup>
+
+                            {/* Sentiment */}
+                            <FieldGroup title="Analyst & Sentiment (7)">
+                                <Field name="recommendation" desc="Consensus: Strong Buy/Buy/Hold/Sell" />
+                                <Field name="consensus_rating" desc="Average analyst rating (1-5)" />
+                                <Field name="target_price" desc="Analyst consensus target price" />
+                                <Field name="upside_pct" desc="Potential upside to target %" />
+                                <Field name="num_analysts" desc="Number of covering analysts" />
+                                <Field name="news_sentiment_score" desc="News sentiment (-1 to +1)" />
+                                <Field name="social_sentiment" desc="Social media sentiment score" />
+                            </FieldGroup>
+
+                            {/* Analysis */}
+                            <FieldGroup title="Deep Analysis & Quality (8)">
+                                <Field name="quality_score" desc="Earnings quality & consistency (0-100)" />
+                                <Field name="momentum_score" desc="Price momentum strength (0-100)" />
+                                <Field name="alpha_1y_pct" desc="1-year alpha vs benchmark %" />
+                                <Field name="sortino_1y" desc="Sortino ratio (downside risk-adjusted)" />
+                                <Field name="economic_moat_score" desc="Competitive advantage score" />
+                                <Field name="altman_z" desc="Altman Z-Score. > 3 = safe, < 1.8 = distress" />
+                                <Field name="piotroski_f" desc="Piotroski F-Score (0-9). > 7 = strong" />
+                                <Field name="esg_score" desc="Environmental/Social/Governance score" />
+                            </FieldGroup>
+
+                            {/* Deep Dive */}
+                            <FieldGroup title="Qualitative Notes (4)">
+                                <Field name="moat_notes" desc="Competitive advantage analysis" />
+                                <Field name="risk_notes" desc="Key risk factors identified" />
+                                <Field name="catalysts" desc="Upcoming potential catalysts" />
+                                <Field name="sector_notes" desc="Sector-specific observations" />
+                            </FieldGroup>
                         </div>
                     </CollapsibleSection>
 
-                    {/* Stock Detail View */}
-                    <CollapsibleSection title="Stock Detail View (Charts)" icon={<TrendingUp className="w-5 h-5" />}>
-                        <p className="text-slate-300 mb-4">
-                            Click on any stock in the sidebar to switch to Detail view with interactive charts.
-                        </p>
-                        <div className="space-y-2">
-                            <Field name="Price Chart" description="Historical price with SMA 20/50/200 overlays. Identify support/resistance visually." />
-                            <Field name="RSI Chart" description="Momentum indicator with overbought (70) and oversold (30) zones marked." />
-                            <Field name="MACD Chart" description="Shows MACD line, signal line, and histogram for trend momentum." />
-                            <Field name="Volume Chart" description="Trading volume over time. Spikes indicate significant activity or news." />
-                            <Field name="Returns Chart" description="Bar chart showing period-over-period return distribution." />
-                            <Field name="Key Metrics Panel" description="All available data fields for the selected stock in one view." />
+                    {/* WEEKLY FIELDS */}
+                    <CollapsibleSection title="Weekly Report Fields (17)" icon={<Calendar className="w-5 h-5" />}>
+                        <div className="space-y-4 text-sm">
+                            <FieldGroup title="Basic (3)">
+                                <Field name="ticker" desc="Stock symbol" />
+                                <Field name="company_name" desc="Company name" />
+                                <Field name="week_ending" desc="Week ending date" />
+                            </FieldGroup>
+                            <FieldGroup title="Price (4)">
+                                <Field name="weekly_open" desc="Opening price of the week" />
+                                <Field name="weekly_high" desc="Highest price during week" />
+                                <Field name="weekly_low" desc="Lowest price during week" />
+                                <Field name="weekly_close" desc="Closing price of the week" />
+                            </FieldGroup>
+                            <FieldGroup title="Returns (3)">
+                                <Field name="weekly_return_pct" desc="This week's return %" />
+                                <Field name="return_4w" desc="4-week rolling return %" />
+                                <Field name="return_13w" desc="13-week (quarterly) return %" />
+                            </FieldGroup>
+                            <FieldGroup title="Volume (2)">
+                                <Field name="weekly_volume" desc="Total volume for the week" />
+                                <Field name="weekly_volume_ratio" desc="Volume vs 4-week average" />
+                            </FieldGroup>
+                            <FieldGroup title="Technical (5)">
+                                <Field name="weekly_rsi14" desc="Weekly RSI(14)" />
+                                <Field name="weekly_sma10" desc="10-week SMA" />
+                                <Field name="weekly_sma20" desc="20-week SMA" />
+                                <Field name="weekly_trend" desc="UP/DOWN/NEUTRAL based on price action" />
+                            </FieldGroup>
                         </div>
                     </CollapsibleSection>
 
-                    {/* Controls & Filters */}
+                    {/* MONTHLY FIELDS */}
+                    <CollapsibleSection title="Monthly Report Fields (18)" icon={<BarChart3 className="w-5 h-5" />}>
+                        <div className="space-y-4 text-sm">
+                            <FieldGroup title="Basic (3)">
+                                <Field name="ticker" desc="Stock symbol" />
+                                <Field name="company_name" desc="Company name" />
+                                <Field name="month" desc="Month (YYYY-MM format)" />
+                            </FieldGroup>
+                            <FieldGroup title="Price (4)">
+                                <Field name="monthly_open" desc="Opening price of month" />
+                                <Field name="monthly_high" desc="Highest price during month" />
+                                <Field name="monthly_low" desc="Lowest price during month" />
+                                <Field name="monthly_close" desc="Closing price of month" />
+                            </FieldGroup>
+                            <FieldGroup title="Returns (5)">
+                                <Field name="monthly_return_pct" desc="This month's return %" />
+                                <Field name="return_3m" desc="3-month rolling return %" />
+                                <Field name="return_6m" desc="6-month rolling return %" />
+                                <Field name="return_12m" desc="12-month rolling return %" />
+                                <Field name="ytd_return_pct" desc="Year-to-date return %" />
+                            </FieldGroup>
+                            <FieldGroup title="Volume & Technical (5)">
+                                <Field name="monthly_volume" desc="Total volume for month" />
+                                <Field name="monthly_sma3" desc="3-month SMA" />
+                                <Field name="monthly_sma6" desc="6-month SMA" />
+                                <Field name="monthly_sma12" desc="12-month SMA" />
+                                <Field name="monthly_trend" desc="Long-term trend direction" />
+                            </FieldGroup>
+                        </div>
+                    </CollapsibleSection>
+
+                    {/* SEASONALITY FIELDS */}
+                    <CollapsibleSection title="Seasonality Fields (16)" icon={<Layers className="w-5 h-5" />}>
+                        <div className="space-y-4 text-sm">
+                            <FieldGroup title="Basic (2)">
+                                <Field name="ticker" desc="Stock symbol" />
+                                <Field name="company_name" desc="Company name" />
+                            </FieldGroup>
+                            <FieldGroup title="Monthly Averages - Q1 (3)">
+                                <Field name="jan_avg" desc="January historical avg return %" />
+                                <Field name="feb_avg" desc="February historical avg return %" />
+                                <Field name="mar_avg" desc="March historical avg return %" />
+                            </FieldGroup>
+                            <FieldGroup title="Monthly Averages - Q2 (3)">
+                                <Field name="apr_avg" desc="April historical avg return %" />
+                                <Field name="may_avg" desc="May historical avg return %" />
+                                <Field name="jun_avg" desc="June historical avg return %" />
+                            </FieldGroup>
+                            <FieldGroup title="Monthly Averages - Q3 (3)">
+                                <Field name="jul_avg" desc="July historical avg return %" />
+                                <Field name="aug_avg" desc="August historical avg return %" />
+                                <Field name="sep_avg" desc="September historical avg return %" />
+                            </FieldGroup>
+                            <FieldGroup title="Monthly Averages - Q4 (3)">
+                                <Field name="oct_avg" desc="October historical avg return %" />
+                                <Field name="nov_avg" desc="November historical avg return %" />
+                                <Field name="dec_avg" desc="December historical avg return %" />
+                            </FieldGroup>
+                            <FieldGroup title="Summary (2)">
+                                <Field name="best_month" desc="Best performing month historically" />
+                                <Field name="worst_month" desc="Worst performing month historically" />
+                            </FieldGroup>
+                        </div>
+                    </CollapsibleSection>
+
+                    {/* CHARTS */}
+                    <CollapsibleSection title="Chart Components (6)" icon={<LineChart className="w-5 h-5" />}>
+                        <div className="space-y-4 text-sm">
+                            <FieldGroup title="Daily Charts">
+                                <Field name="Price Chart" desc="Candlestick/line chart with SMA 20/50/200 overlays" />
+                                <Field name="RSI Chart" desc="RSI(14) with overbought (70) and oversold (30) zones" />
+                                <Field name="MACD Chart" desc="MACD line, signal line, and histogram" />
+                                <Field name="Score Bar" desc="Bar chart comparing fundamental, technical, risk scores" />
+                            </FieldGroup>
+                            <FieldGroup title="Weekly/Monthly Charts">
+                                <Field name="Volume Chart" desc="Volume bars with average line overlay" />
+                                <Field name="Returns Chart" desc="Period returns bar chart with color coding" />
+                            </FieldGroup>
+                            <FieldGroup title="Seasonality Charts">
+                                <Field name="Seasonality Heatmap" desc="12-month grid colored by avg return" />
+                                <Field name="Radar Chart" desc="Quarterly performance radar visualization" />
+                            </FieldGroup>
+                        </div>
+                    </CollapsibleSection>
+
+                    {/* AI ANALYSIS */}
+                    <CollapsibleSection title="AI Agent Analysis" icon={<Brain className="w-5 h-5" />}>
+                        <div className="space-y-4 text-sm">
+                            <p className="text-slate-300">
+                                Click <span className="px-1.5 py-0.5 bg-gradient-to-r from-blue-600 to-purple-600 rounded text-xs">Analyze</span> on any stock.
+                                Click agent cards to expand detailed analysis with reasoning.
+                            </p>
+                            <FieldGroup title="5 Specialist Agents">
+                                <Field name="📈 Fundamental" desc="PE, PB, ROE, debt, profitability → fundamental_score" />
+                                <Field name="📉 Technical" desc="RSI, MACD, SMA, patterns → technical_score" />
+                                <Field name="📰 Sentiment" desc="News, social buzz, events → sentiment_score" />
+                                <Field name="🌍 Macro" desc="VIX, RBI, sector trends → macro_score" />
+                                <Field name="⚖️ Regulatory" desc="SEBI, governance, compliance → regulatory_score" />
+                            </FieldGroup>
+                            <FieldGroup title="Synthesis Output">
+                                <Field name="Recommendation" desc="BUY/HOLD/SELL synthesized from all agents" />
+                                <Field name="Composite Score" desc="Weighted average of agent scores (0-100)" />
+                                <Field name="Target Price" desc="AI-estimated fair value" />
+                                <Field name="Confidence" desc="HIGH/MEDIUM/LOW based on data quality" />
+                            </FieldGroup>
+                            <FieldGroup title="Export Options">
+                                <Field name="JSON" desc="Full structured data for programmatic use" />
+                                <Field name="PDF" desc="Printable report with all analysis" />
+                            </FieldGroup>
+                        </div>
+                    </CollapsibleSection>
+
+                    {/* Controls */}
                     <CollapsibleSection title="Controls & Navigation" icon={<Activity className="w-5 h-5" />}>
-                        <div className="space-y-2">
-                            <Field name="Date Selector" description="Choose analysis date (Daily view only). Shows data as of that date." />
-                            <Field name="Search" description="Filter stocks by ticker symbol or company name. Instant filter as you type." />
-                            <Field name="Column Picker (⚙️)" description="Customize which columns are visible in the table. Your selection persists." />
-                            <Field name="Timeframe Toggle (1D/1W/1M)" description="Switch between 1-day, 1-week, and 1-month return periods in the table." />
-                            <Field name="View Toggle (Grid/Detail)" description="Switch between table view (all stocks) and chart view (single stock detail)." />
-                            <Field name="Report Tabs" description="Switch between Daily, Weekly, Monthly, and Seasonality views." />
-                            <Field name="Help Icon (❓)" description="Opens this help page." />
-                            <Field name="Logout (🚪)" description="Sign out of the application." />
+                        <div className="space-y-2 text-sm">
+                            <Field name="Report Tabs" desc="Switch: Daily | Weekly | Monthly | Seasonality" />
+                            <Field name="Date Selector" desc="Pick analysis date (Daily view)" />
+                            <Field name="Search" desc="Filter by ticker or company name" />
+                            <Field name="Column Picker (⚙️)" desc="Show/hide columns in table" />
+                            <Field name="Timeframe Toggle" desc="1D/1W/1M return period" />
+                            <Field name="View Toggle" desc="Grid (table) or Detail (charts)" />
+                            <Field name="Help (❓)" desc="Opens this documentation" />
                         </div>
                     </CollapsibleSection>
 
-                    {/* Caching */}
-                    <CollapsibleSection title="Caching & Performance" icon={<Activity className="w-5 h-5" />}>
-                        <div className="space-y-2">
-                            <Field name="Cache Duration" description="AI analysis results are cached for 24 hours to improve performance and reduce API costs." />
-                            <Field name="Cache Indicator" description="Shows 'Cached (Xm ago)' when using cached results. Fresh analysis runs when cache expires." />
-                            <Field name="Cost Display" description="Shows token usage and estimated cost per analysis (~$0.01-0.03 per analysis)." />
-                        </div>
-                        <div className="mt-3 bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 text-sm text-amber-300">
-                            ⚠️ <strong>Note</strong>: To force a fresh analysis before cache expires, use the API to clear cache manually:
-                            <code className="block mt-1 text-xs bg-slate-900 p-2 rounded">DELETE /api/agent/cache/TICKER</code>
-                        </div>
-                    </CollapsibleSection>
-
-                    {/* Back to Dashboard */}
-                    <div className="pt-8 border-t border-slate-800">
-                        <Link
-                            href="/"
-                            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-white font-medium transition-colors"
-                        >
-                            <ChevronLeft className="w-4 h-4" />
-                            Back to Dashboard
+                    {/* Back */}
+                    <div className="pt-4">
+                        <Link href="/" className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-white text-sm font-medium transition-colors">
+                            <ChevronLeft className="w-4 h-4" /> Back to Dashboard
                         </Link>
                     </div>
                 </div>
@@ -254,81 +353,39 @@ export default function HelpPage() {
     );
 }
 
-// Collapsible Section Component
-function CollapsibleSection({
-    title,
-    icon,
-    children,
-    defaultOpen = false
-}: {
-    title: string;
-    icon: React.ReactNode;
-    children: React.ReactNode;
-    defaultOpen?: boolean;
-}) {
+// Collapsible Section
+function CollapsibleSection({ title, icon, children, defaultOpen = false }: { title: string; icon: React.ReactNode; children: React.ReactNode; defaultOpen?: boolean }) {
     const [isOpen, setIsOpen] = useState(defaultOpen);
-
     return (
-        <section className="bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden">
-            <button
-                onClick={() => setIsOpen(!isOpen)}
-                className="w-full flex items-center justify-between p-4 hover:bg-slate-800/50 transition-colors"
-            >
-                <div className="flex items-center gap-3">
+        <section className="bg-slate-900/50 border border-slate-800 rounded-lg overflow-hidden">
+            <button onClick={() => setIsOpen(!isOpen)} className="w-full flex items-center justify-between p-3 hover:bg-slate-800/50 transition-colors">
+                <div className="flex items-center gap-2">
                     <span className="text-blue-500">{icon}</span>
-                    <span className="text-lg font-semibold text-white">{title}</span>
+                    <span className="font-medium text-white text-sm">{title}</span>
                 </div>
-                {isOpen ? (
-                    <ChevronDown className="w-5 h-5 text-slate-400" />
-                ) : (
-                    <ChevronRight className="w-5 h-5 text-slate-400" />
-                )}
+                {isOpen ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
             </button>
-            {isOpen && (
-                <div className="px-6 pb-6 animate-in slide-in-from-top-2 duration-200">
-                    {children}
-                </div>
-            )}
+            {isOpen && <div className="px-4 pb-4">{children}</div>}
         </section>
     );
 }
 
-// Field Group Component
+// Field Group
 function FieldGroup({ title, children }: { title: string; children: React.ReactNode }) {
     return (
         <div>
-            <h4 className="text-sm font-medium text-slate-300 uppercase tracking-wide mb-2 pb-1 border-b border-slate-700">
-                {title}
-            </h4>
-            <div className="space-y-2">
-                {children}
-            </div>
+            <h4 className="text-xs font-medium text-slate-400 uppercase tracking-wide mb-1.5 pb-1 border-b border-slate-700/50">{title}</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-1">{children}</div>
         </div>
     );
 }
 
-// Field Component
-function Field({ name, description }: { name: string; description: string }) {
+// Field
+function Field({ name, desc }: { name: string; desc: string }) {
     return (
-        <div className="flex gap-2 text-sm">
-            <span className="font-medium text-blue-400 min-w-32 shrink-0">{name}:</span>
-            <span className="text-slate-400">{description}</span>
-        </div>
-    );
-}
-
-// Agent Card Component
-function AgentCard({ emoji, name, score, description }: { emoji: string; name: string; score: string; description: string }) {
-    return (
-        <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
-            <div className="flex items-start gap-3">
-                <span className="text-2xl">{emoji}</span>
-                <div>
-                    <div className="font-semibold text-white">{name}</div>
-                    <div className="text-xs text-slate-500 mb-1">Output: {score}</div>
-                    <p className="text-sm text-slate-400">{description}</p>
-                </div>
-            </div>
+        <div className="flex gap-2 text-xs py-0.5">
+            <code className="font-mono text-blue-400 min-w-24 shrink-0">{name}</code>
+            <span className="text-slate-500">{desc}</span>
         </div>
     );
 }

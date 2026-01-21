@@ -49,8 +49,43 @@ const AGENTS = [
 // Helper function to safely convert values to numbers (handles string responses from API)
 function safeNumber(value: any): number | null {
     if (value === null || value === undefined) return null;
+    // LLM sometimes returns "null" as a string instead of actual null
+    if (typeof value === 'string' && value.toLowerCase() === 'null') return null;
     const num = typeof value === 'number' ? value : parseFloat(value);
     return isNaN(num) ? null : num;
+}
+
+// Helper to extract score from agent analysis - tries multiple approaches
+function getAgentScore(analysis: any, scoreKeys: string[]): number | null {
+    if (!analysis) return null;
+
+    // 1. Try the specified score keys in order
+    for (const key of scoreKeys) {
+        const val = safeNumber(analysis[key]);
+        if (val !== null) return val;
+    }
+
+    // 2. Search for any field ending in "_score" or "score" at top level
+    for (const [key, value] of Object.entries(analysis)) {
+        if (key.toLowerCase().includes('score') && typeof value !== 'object') {
+            const val = safeNumber(value);
+            if (val !== null) return val;
+        }
+    }
+
+    // 3. Search in nested objects (one level deep)
+    for (const [key, value] of Object.entries(analysis)) {
+        if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+            for (const [nestedKey, nestedValue] of Object.entries(value as object)) {
+                if (nestedKey.toLowerCase().includes('score') && typeof nestedValue !== 'object') {
+                    const val = safeNumber(nestedValue);
+                    if (val !== null) return val;
+                }
+            }
+        }
+    }
+
+    return null;
 }
 
 const API_BASE = process.env.NEXT_PUBLIC_AGENT_API_URL || 'https://nifty-agents-api.onrender.com';
@@ -254,15 +289,7 @@ export default function AIAnalysisModal({ ticker, isOpen, onClose }: AIAnalysisM
                                 {AGENTS.map(agent => {
                                     const status = agentProgress[agent.key] || 'idle';
                                     const analysis = result?.agent_analyses?.[agent.key];
-                                    // Try multiple score field names in order of priority
-                                    let score: number | null = null;
-                                    for (const key of agent.scoreKeys) {
-                                        const val = safeNumber(analysis?.[key]);
-                                        if (val !== null) {
-                                            score = val;
-                                            break;
-                                        }
-                                    }
+                                    const score = getAgentScore(analysis, agent.scoreKeys);
                                     const signal = getAgentSignal(analysis, agent.key);
                                     const isExpanded = expandedAgents.has(agent.key);
 

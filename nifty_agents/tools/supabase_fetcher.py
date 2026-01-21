@@ -357,6 +357,10 @@ def get_stock_scores(
         "pb": data.get("pb"),
         "roe": data.get("roe_ttm"),
         "rsi": data.get("rsi14"),
+        # Add MACD indicators
+        "macd_line": data.get("macd_line"),
+        "macd_signal": data.get("macd_signal"),
+        "macd_hist": data.get("macd_hist"),
         "source": "supabase_scores",
         "timestamp": datetime.now().isoformat()
     }
