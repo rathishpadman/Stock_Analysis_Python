@@ -46,6 +46,13 @@ const AGENTS = [
     { key: 'regulatory_agent', name: 'Regulatory', emoji: '⚖️', color: 'emerald' },
 ];
 
+// Helper function to safely convert values to numbers (handles string responses from API)
+function safeNumber(value: any): number | null {
+    if (value === null || value === undefined) return null;
+    const num = typeof value === 'number' ? value : parseFloat(value);
+    return isNaN(num) ? null : num;
+}
+
 const API_BASE = process.env.NEXT_PUBLIC_AGENT_API_URL || 'https://nifty-agents-api.onrender.com';
 
 export default function AIAnalysisModal({ ticker, isOpen, onClose }: AIAnalysisModalProps) {
@@ -206,7 +213,7 @@ export default function AIAnalysisModal({ ticker, isOpen, onClose }: AIAnalysisM
                             {AGENTS.map(agent => {
                                 const status = agentProgress[agent.key] || 'idle';
                                 const analysis = result?.agent_analyses?.[agent.key];
-                                const score = analysis?.score || analysis?.overall_score;
+                                const score = safeNumber(analysis?.score) ?? safeNumber(analysis?.overall_score);
 
                                 return (
                                     <div
@@ -225,9 +232,9 @@ export default function AIAnalysisModal({ ticker, isOpen, onClose }: AIAnalysisM
                                             {status === 'running' && (
                                                 <span className="text-xs text-blue-400">Running...</span>
                                             )}
-                                            {status === 'complete' && score && (
+                                            {status === 'complete' && score !== null && (
                                                 <span className={`text-lg font-bold ${score >= 70 ? 'text-emerald-400' :
-                                                        score >= 50 ? 'text-amber-400' : 'text-rose-400'
+                                                    score >= 50 ? 'text-amber-400' : 'text-rose-400'
                                                     }`}>
                                                     {score.toFixed(0)}
                                                 </span>
@@ -250,23 +257,23 @@ export default function AIAnalysisModal({ ticker, isOpen, onClose }: AIAnalysisM
                                 <div className="bg-slate-800/50 rounded-lg p-4 text-center border border-slate-700">
                                     <div className="text-xs text-slate-400 mb-1">RECOMMENDATION</div>
                                     <div className={`text-xl font-bold ${result.recommendation?.toLowerCase() === 'buy' ? 'text-emerald-400' :
-                                            result.recommendation?.toLowerCase() === 'sell' ? 'text-rose-400' : 'text-amber-400'
+                                        result.recommendation?.toLowerCase() === 'sell' ? 'text-rose-400' : 'text-amber-400'
                                         }`}>
                                         {result.recommendation?.toUpperCase() || 'HOLD'}
                                     </div>
                                 </div>
                                 <div className="bg-slate-800/50 rounded-lg p-4 text-center border border-slate-700">
                                     <div className="text-xs text-slate-400 mb-1">COMPOSITE SCORE</div>
-                                    <div className={`text-xl font-bold ${(result.composite_score || 0) >= 70 ? 'text-emerald-400' :
-                                            (result.composite_score || 0) >= 50 ? 'text-amber-400' : 'text-rose-400'
+                                    <div className={`text-xl font-bold ${(safeNumber(result.composite_score) || 0) >= 70 ? 'text-emerald-400' :
+                                        (safeNumber(result.composite_score) || 0) >= 50 ? 'text-amber-400' : 'text-rose-400'
                                         }`}>
-                                        {result.composite_score?.toFixed(1) || '--'}
+                                        {safeNumber(result.composite_score)?.toFixed(1) || '--'}
                                     </div>
                                 </div>
                                 <div className="bg-slate-800/50 rounded-lg p-4 text-center border border-slate-700">
                                     <div className="text-xs text-slate-400 mb-1">TARGET PRICE</div>
                                     <div className="text-xl font-bold text-cyan-400">
-                                        {result.target_price ? `₹${result.target_price.toLocaleString()}` : '--'}
+                                        {safeNumber(result.target_price) ? `₹${safeNumber(result.target_price)!.toLocaleString()}` : '--'}
                                     </div>
                                 </div>
                                 <div className="bg-slate-800/50 rounded-lg p-4 text-center border border-slate-700">
@@ -279,10 +286,10 @@ export default function AIAnalysisModal({ ticker, isOpen, onClose }: AIAnalysisM
 
                             {/* Duration & Cost */}
                             <div className="flex items-center justify-between text-xs text-slate-500 px-2">
-                                <span>Analysis completed in {result.analysis_duration_seconds?.toFixed(1)}s</span>
+                                <span>Analysis completed in {safeNumber(result.analysis_duration_seconds)?.toFixed(1) || '--'}s</span>
                                 <span>
-                                    Cost: ${result.observability?.total_cost_usd?.toFixed(6) || '0.000000'} |
-                                    Tokens: {result.observability?.total_tokens?.toLocaleString() || 0}
+                                    Cost: ${safeNumber(result.observability?.total_cost_usd)?.toFixed(6) || '0.000000'} |
+                                    Tokens: {safeNumber(result.observability?.total_tokens)?.toLocaleString() || 0}
                                 </span>
                             </div>
 
@@ -378,11 +385,11 @@ function generatePrintableReport(result: AnalysisResult): string {
         </div>
         <div class="card">
           <div class="card-label">COMPOSITE SCORE</div>
-          <div class="card-value" style="color: #3b82f6">${result.composite_score?.toFixed(1) || '--'}</div>
+          <div class="card-value" style="color: #3b82f6">${safeNumber(result.composite_score)?.toFixed(1) || '--'}</div>
         </div>
         <div class="card">
           <div class="card-label">TARGET PRICE</div>
-          <div class="card-value" style="color: #06b6d4">₹${result.target_price?.toLocaleString() || '--'}</div>
+          <div class="card-value" style="color: #06b6d4">₹${safeNumber(result.target_price)?.toLocaleString() || '--'}</div>
         </div>
         <div class="card">
           <div class="card-label">CONFIDENCE</div>
@@ -409,7 +416,7 @@ function generatePrintableReport(result: AnalysisResult): string {
         <p>${result.predictor_analysis.synthesis_reasoning}</p>
       ` : ''}
 
-      <p class="timestamp">Generated: ${new Date().toLocaleString()} | Analysis Duration: ${result.analysis_duration_seconds?.toFixed(1)}s</p>
+      <p class="timestamp">Generated: ${new Date().toLocaleString()} | Analysis Duration: ${safeNumber(result.analysis_duration_seconds)?.toFixed(1) || '--'}s</p>
     </body>
     </html>
   `;

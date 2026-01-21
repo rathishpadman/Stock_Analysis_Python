@@ -11,7 +11,7 @@ import { MonthlyPriceChart, MonthlyReturnsChart, RollingReturnsChart, MonthlyVol
 import { SeasonalityBarChart, SeasonalityRadarChart, QuarterlyBreakdown, SeasonalityStats } from '@/components/SeasonalityCharts';
 import { ScoreBarChart, PriceChart, RSIChart, MACDChart } from '@/components/Charts';
 import { ALL_FIELDS, DEFAULT_COLUMNS, WEEKLY_FIELDS, DEFAULT_WEEKLY_COLUMNS, MONTHLY_FIELDS, DEFAULT_MONTHLY_COLUMNS, SEASONALITY_FIELDS, DEFAULT_SEASONALITY_COLUMNS } from '@/lib/constants';
-import { Settings2, Search, Filter, LogOut, Loader2, BarChart3, TrendingUp, ShieldCheck, Info, Calendar, Flame, AlertTriangle, Activity, ChevronLeft } from 'lucide-react';
+import { Settings2, Search, Filter, LogOut, Loader2, BarChart3, TrendingUp, ShieldCheck, Info, Calendar, Flame, AlertTriangle, Activity, ChevronLeft, HelpCircle } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import StockTable from '@/components/StockTable';
@@ -411,6 +411,14 @@ export default function DashboardPage() {
           >
             <Settings2 className="h-4 w-4" />
           </button>
+
+          <a
+            href="/help"
+            className="p-2 bg-slate-900 hover:bg-slate-800 border border-white/5 rounded text-slate-500 hover:text-blue-400 transition-all"
+            title="Help & Documentation"
+          >
+            <HelpCircle className="h-4 w-4" />
+          </a>
 
           <button
             onClick={signOut}
