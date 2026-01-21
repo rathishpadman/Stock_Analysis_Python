@@ -39,11 +39,11 @@ interface AIAnalysisModalProps {
 }
 
 const AGENTS = [
-    { key: 'fundamental', name: 'Fundamental', emoji: '📈', color: 'blue', scoreKey: 'fundamental_score' },
-    { key: 'technical', name: 'Technical', emoji: '📉', color: 'cyan', scoreKey: 'technical_score' },
-    { key: 'sentiment', name: 'Sentiment', emoji: '📰', color: 'amber', scoreKey: 'sentiment_score' },
-    { key: 'macro', name: 'Macro', emoji: '🌍', color: 'purple', scoreKey: 'macro_score' },
-    { key: 'regulatory', name: 'Regulatory', emoji: '⚖️', color: 'emerald', scoreKey: 'compliance_score' },
+    { key: 'fundamental', name: 'Fundamental', emoji: '📈', color: 'blue', scoreKeys: ['fundamental_score', 'score', 'overall_score'] },
+    { key: 'technical', name: 'Technical', emoji: '📉', color: 'cyan', scoreKeys: ['technical_score', 'score', 'overall_score'] },
+    { key: 'sentiment', name: 'Sentiment', emoji: '📰', color: 'amber', scoreKeys: ['sentiment_score', 'score', 'overall_score'] },
+    { key: 'macro', name: 'Macro', emoji: '🌍', color: 'purple', scoreKeys: ['macro_score', 'score', 'overall_score'] },
+    { key: 'regulatory', name: 'Regulatory', emoji: '⚖️', color: 'emerald', scoreKeys: ['regulatory_score', 'compliance_score', 'score', 'overall_score'] },
 ];
 
 // Helper function to safely convert values to numbers (handles string responses from API)
@@ -254,7 +254,15 @@ export default function AIAnalysisModal({ ticker, isOpen, onClose }: AIAnalysisM
                                 {AGENTS.map(agent => {
                                     const status = agentProgress[agent.key] || 'idle';
                                     const analysis = result?.agent_analyses?.[agent.key];
-                                    const score = safeNumber(analysis?.[agent.scoreKey]) ?? safeNumber(analysis?.score);
+                                    // Try multiple score field names in order of priority
+                                    let score: number | null = null;
+                                    for (const key of agent.scoreKeys) {
+                                        const val = safeNumber(analysis?.[key]);
+                                        if (val !== null) {
+                                            score = val;
+                                            break;
+                                        }
+                                    }
                                     const signal = getAgentSignal(analysis, agent.key);
                                     const isExpanded = expandedAgents.has(agent.key);
 
@@ -282,7 +290,7 @@ export default function AIAnalysisModal({ ticker, isOpen, onClose }: AIAnalysisM
                                             {status === 'complete' && (
                                                 <div className="flex items-center justify-between">
                                                     <span className={`text-sm font-bold ${(score ?? 0) >= 70 ? 'text-emerald-400' :
-                                                            (score ?? 0) >= 50 ? 'text-amber-400' : 'text-rose-400'
+                                                        (score ?? 0) >= 50 ? 'text-amber-400' : 'text-rose-400'
                                                         }`}>
                                                         {score !== null ? score.toFixed(0) : '--'}
                                                     </span>
