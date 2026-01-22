@@ -80,7 +80,7 @@ export function SeasonalityBarChart({ data, ticker }: SeasonalityChartProps) {
                     <span className="flex items-center gap-1"><span className="w-3 h-3 bg-blue-500 rounded"></span>Current</span>
                 </div>
             </div>
-            <ResponsiveContainer width="100%" height={280}>
+            <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={chartData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
                     <XAxis
@@ -111,9 +111,9 @@ export function SeasonalityBarChart({ data, ticker }: SeasonalityChartProps) {
                                 key={`cell-${index}`}
                                 fill={
                                     entry.isBest ? '#22c55e' :
-                                    entry.isWorst ? '#ef4444' :
-                                    entry.isCurrentMonth ? '#3b82f6' :
-                                    entry.value >= 0 ? '#10b981' : '#f43f5e'
+                                        entry.isWorst ? '#ef4444' :
+                                            entry.isCurrentMonth ? '#3b82f6' :
+                                                entry.value >= 0 ? '#10b981' : '#f43f5e'
                                 }
                                 stroke={entry.isCurrentMonth ? '#60a5fa' : 'transparent'}
                                 strokeWidth={entry.isCurrentMonth ? 2 : 0}
@@ -154,7 +154,7 @@ export function SeasonalityRadarChart({ data, ticker }: SeasonalityChartProps) {
                     Seasonality Radar
                 </h3>
             </div>
-            <ResponsiveContainer width="100%" height={280}>
+            <ResponsiveContainer width="100%" height={300}>
                 <RadarChart data={chartData}>
                     <PolarGrid stroke="#334155" />
                     <PolarAngleAxis
@@ -225,11 +225,10 @@ export function QuarterlyBreakdown({ data, ticker }: SeasonalityChartProps) {
                 {quarters.map((q, index) => (
                     <div
                         key={q.quarter}
-                        className={`p-3 rounded-lg border ${
-                            q === bestQuarter ? 'border-emerald-500/50 bg-emerald-500/10' :
-                            q === worstQuarter ? 'border-rose-500/50 bg-rose-500/10' :
-                            'border-slate-700 bg-slate-800/50'
-                        }`}
+                        className={`p-3 rounded-lg border ${q === bestQuarter ? 'border-emerald-500/50 bg-emerald-500/10' :
+                                q === worstQuarter ? 'border-rose-500/50 bg-rose-500/10' :
+                                    'border-slate-700 bg-slate-800/50'
+                            }`}
                     >
                         <div className="text-[10px] text-slate-500 uppercase mb-1">{q.quarter}</div>
                         <div className={`text-xl font-bold ${q.value >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
