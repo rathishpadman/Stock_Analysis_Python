@@ -135,6 +135,50 @@ class NiftyAgentOrchestrator:
             self.model = None
             logger.warning("Google GenAI not available. Set GOOGLE_API_KEY.")
     
+    def _store_analysis_to_supabase(self, ticker: str, report: Dict[str, Any]) -> None:
+        """
+        Store AI analysis to Supabase for history tracking.
+        
+        Args:
+            ticker: Stock ticker
+            report: Complete analysis report
+        """
+        try:
+            # Import Supabase client
+            from ..tools.supabase_fetcher import get_supabase_client
+            supabase = get_supabase_client()
+            
+            if not supabase:
+                logger.debug("Supabase client not available, skipping storage")
+                return
+            
+            # Extract key fields
+            synthesis = report.get("synthesis", {})
+            observability = report.get("observability", {})
+            
+            # Prepare record
+            record = {
+                "ticker": ticker.upper(),
+                "composite_score": report.get("composite_score"),
+                "recommendation": synthesis.get("overall_recommendation") or synthesis.get("recommendation"),
+                "signal": synthesis.get("action_signal"),
+                "cost_usd": observability.get("total_cost_usd") or observability.get("cost", {}).get("total_usd"),
+                "full_response": report,
+                "agent_analyses": report.get("agent_analyses"),
+                "synthesis": synthesis
+            }
+            
+            # Insert to Supabase
+            result = supabase.table("ai_analysis_history").insert(record).execute()
+            
+            if result.data:
+                logger.info(f"Stored analysis for {ticker} to Supabase (id: {result.data[0].get('id')})")
+            else:
+                logger.warning(f"Failed to store analysis for {ticker}: no data returned")
+                
+        except Exception as e:
+            logger.warning(f"Error storing analysis to Supabase: {e}")
+    
     def _validate_ticker(self, ticker: str) -> Dict[str, Any]:
         """Validate that ticker is a valid NSE stock."""
         ticker_clean = ticker.replace(".NS", "").upper()
@@ -867,6 +911,12 @@ Respond ONLY with valid JSON.
                 "report": report,
                 "timestamp": datetime.now()
             }
+        
+        # Store analysis to Supabase for history
+        try:
+            self._store_analysis_to_supabase(ticker_clean, report)
+        except Exception as storage_err:
+            logger.warning(f"Failed to store analysis to Supabase: {storage_err}")
         
         return report
     

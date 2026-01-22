@@ -74,7 +74,7 @@ export function MonthlyPriceChart({ data, ticker }: MonthlyChartProps) {
                     <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-emerald-500"></span>SMA 12</span>
                 </div>
             </div>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={350}>
                 <ComposedChart data={sortedData}>
                     <defs>
                         <linearGradient id="monthlyPriceGradient" x1="0" y1="0" x2="0" y2="1">
@@ -111,9 +111,9 @@ export function MonthlyPriceChart({ data, ticker }: MonthlyChartProps) {
                         formatter={(value, name) => [
                             `₹${(value as number)?.toFixed(2) ?? '-'}`,
                             name === 'monthly_close' ? 'Close' :
-                            name === 'monthly_sma3' ? 'SMA 3' :
-                            name === 'monthly_sma6' ? 'SMA 6' :
-                            name === 'monthly_sma12' ? 'SMA 12' : String(name)
+                                name === 'monthly_sma3' ? 'SMA 3' :
+                                    name === 'monthly_sma6' ? 'SMA 6' :
+                                        name === 'monthly_sma12' ? 'SMA 12' : String(name)
                         ]}
                     />
                     <Area
@@ -279,8 +279,8 @@ export function RollingReturnsChart({ data, ticker }: MonthlyChartProps) {
                         formatter={(value, name) => [
                             `${(value as number)?.toFixed(2) ?? '-'}%`,
                             name === 'return_3m' ? '3M Return' :
-                            name === 'return_6m' ? '6M Return' :
-                            name === 'return_12m' ? '12M Return' : String(name)
+                                name === 'return_6m' ? '6M Return' :
+                                    name === 'return_12m' ? '12M Return' : String(name)
                         ]}
                     />
                     <ReferenceLine y={0} stroke="#64748b" strokeDasharray="3 3" />

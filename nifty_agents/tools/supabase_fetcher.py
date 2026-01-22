@@ -55,6 +55,12 @@ def _get_supabase_client() -> Optional[Any]:
         return None
 
 
+# Public alias for external imports
+def get_supabase_client() -> Optional[Any]:
+    """Public wrapper for _get_supabase_client."""
+    return _get_supabase_client()
+
+
 def get_daily_stock_data(
     ticker: str,
     limit: int = 1

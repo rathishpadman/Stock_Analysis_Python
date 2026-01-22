@@ -40,7 +40,7 @@ interface WeeklyChartProps {
 
 export function WeeklyPriceChart({ data, ticker }: WeeklyChartProps) {
     // Sort data by date ascending for proper charting
-    const sortedData = [...data].sort((a, b) => 
+    const sortedData = [...data].sort((a, b) =>
         new Date(a.week_ending).getTime() - new Date(b.week_ending).getTime()
     );
 
@@ -49,7 +49,7 @@ export function WeeklyPriceChart({ data, ticker }: WeeklyChartProps) {
             <h3 className="text-lg font-semibold text-white mb-4">
                 {ticker} Weekly Price (52 Weeks)
             </h3>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={350}>
                 <ComposedChart data={sortedData}>
                     <defs>
                         <linearGradient id="weeklyPriceGradient" x1="0" y1="0" x2="0" y2="1">
@@ -85,9 +85,9 @@ export function WeeklyPriceChart({ data, ticker }: WeeklyChartProps) {
                         labelFormatter={(label) => `Week: ${label}`}
                         formatter={(value, name) => [
                             `₹${(value as number)?.toFixed(2) ?? '-'}`,
-                            name === 'weekly_close' ? 'Close' : 
-                            name === 'weekly_sma10' ? 'SMA 10' : 
-                            name === 'weekly_sma20' ? 'SMA 20' : String(name)
+                            name === 'weekly_close' ? 'Close' :
+                                name === 'weekly_sma10' ? 'SMA 10' :
+                                    name === 'weekly_sma20' ? 'SMA 20' : String(name)
                         ]}
                     />
                     <Area
@@ -134,7 +134,7 @@ export function WeeklyPriceChart({ data, ticker }: WeeklyChartProps) {
 }
 
 export function WeeklyRSIChart({ data, ticker }: WeeklyChartProps) {
-    const sortedData = [...data].sort((a, b) => 
+    const sortedData = [...data].sort((a, b) =>
         new Date(a.week_ending).getTime() - new Date(b.week_ending).getTime()
     );
 
@@ -143,7 +143,7 @@ export function WeeklyRSIChart({ data, ticker }: WeeklyChartProps) {
             <h3 className="text-lg font-semibold text-white mb-4">
                 Weekly RSI (14)
             </h3>
-            <ResponsiveContainer width="100%" height={150}>
+            <ResponsiveContainer width="100%" height={180}>
                 <AreaChart data={sortedData}>
                     <defs>
                         <linearGradient id="weeklyRsiGradient" x1="0" y1="0" x2="0" y2="1">
@@ -199,7 +199,7 @@ export function WeeklyRSIChart({ data, ticker }: WeeklyChartProps) {
 }
 
 export function WeeklyReturnsChart({ data, ticker }: WeeklyChartProps) {
-    const sortedData = [...data].sort((a, b) => 
+    const sortedData = [...data].sort((a, b) =>
         new Date(a.week_ending).getTime() - new Date(b.week_ending).getTime()
     );
 
@@ -208,7 +208,7 @@ export function WeeklyReturnsChart({ data, ticker }: WeeklyChartProps) {
             <h3 className="text-lg font-semibold text-white mb-4">
                 Weekly Returns %
             </h3>
-            <ResponsiveContainer width="100%" height={150}>
+            <ResponsiveContainer width="100%" height={180}>
                 <BarChart data={sortedData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
                     <XAxis
@@ -240,9 +240,9 @@ export function WeeklyReturnsChart({ data, ticker }: WeeklyChartProps) {
                     <ReferenceLine y={0} stroke="#64748b" />
                     <Bar dataKey="weekly_return_pct" radius={[2, 2, 0, 0]}>
                         {sortedData.map((entry, index) => (
-                            <Cell 
-                                key={`cell-${index}`} 
-                                fill={(entry.weekly_return_pct || 0) >= 0 ? '#22c55e' : '#ef4444'} 
+                            <Cell
+                                key={`cell-${index}`}
+                                fill={(entry.weekly_return_pct || 0) >= 0 ? '#22c55e' : '#ef4444'}
                             />
                         ))}
                     </Bar>
@@ -253,7 +253,7 @@ export function WeeklyReturnsChart({ data, ticker }: WeeklyChartProps) {
 }
 
 export function WeeklyVolumeChart({ data, ticker }: WeeklyChartProps) {
-    const sortedData = [...data].sort((a, b) => 
+    const sortedData = [...data].sort((a, b) =>
         new Date(a.week_ending).getTime() - new Date(b.week_ending).getTime()
     );
 
@@ -265,7 +265,7 @@ export function WeeklyVolumeChart({ data, ticker }: WeeklyChartProps) {
             <h3 className="text-lg font-semibold text-white mb-4">
                 Weekly Volume
             </h3>
-            <ResponsiveContainer width="100%" height={120}>
+            <ResponsiveContainer width="100%" height={150}>
                 <BarChart data={sortedData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
                     <XAxis
@@ -301,9 +301,9 @@ export function WeeklyVolumeChart({ data, ticker }: WeeklyChartProps) {
                     <ReferenceLine y={avgVolume} stroke="#f59e0b" strokeDasharray="3 3" />
                     <Bar dataKey="weekly_volume" fill="#64748b" radius={[2, 2, 0, 0]}>
                         {sortedData.map((entry, index) => (
-                            <Cell 
-                                key={`cell-${index}`} 
-                                fill={(entry.weekly_volume || 0) > avgVolume ? '#3b82f6' : '#64748b'} 
+                            <Cell
+                                key={`cell-${index}`}
+                                fill={(entry.weekly_volume || 0) > avgVolume ? '#3b82f6' : '#64748b'}
                             />
                         ))}
                     </Bar>
@@ -326,7 +326,7 @@ export function WeeklyStats({ data, ticker }: WeeklyChartProps) {
     const low52w = Math.min(...prices);
     const distFromHigh = ((latest.weekly_close - high52w) / high52w * 100);
     const distFromLow = ((latest.weekly_close - low52w) / low52w * 100);
-    
+
     // Calculate average return
     const returns = data.map(d => d.weekly_return_pct).filter(Boolean) as number[];
     const avgReturn = returns.reduce((a, b) => a + b, 0) / returns.length;
