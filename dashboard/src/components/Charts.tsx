@@ -37,7 +37,7 @@ export function PriceChart({ data, ticker }: StockChartProps) {
             <h3 className="text-lg font-semibold text-white mb-4">
                 {ticker} Price Chart
             </h3>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={350}>
                 <AreaChart data={data}>
                     <defs>
                         <linearGradient id="priceGradient" x1="0" y1="0" x2="0" y2="1">
@@ -135,7 +135,7 @@ export function RSIChart({ data, ticker }: StockChartProps) {
             <h3 className="text-lg font-semibold text-white mb-4">
                 RSI (14)
             </h3>
-            <ResponsiveContainer width="100%" height={150}>
+            <ResponsiveContainer width="100%" height={180}>
                 <AreaChart data={data}>
                     <defs>
                         <linearGradient id="rsiGradient" x1="0" y1="0" x2="0" y2="1">
@@ -191,7 +191,7 @@ export function MACDChart({ data, ticker }: StockChartProps) {
             <h3 className="text-lg font-semibold text-white mb-4">
                 MACD Momentum
             </h3>
-            <ResponsiveContainer width="100%" height={150}>
+            <ResponsiveContainer width="100%" height={180}>
                 <AreaChart data={data}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
                     <XAxis

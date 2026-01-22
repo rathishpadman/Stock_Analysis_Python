@@ -241,6 +241,45 @@ async def clear_all_cache():
     }
 
 
+@app.get("/api/agent/history/{ticker}", tags=["Cache"], summary="Get Cached Analysis Summary")
+async def get_analysis_history(ticker: str):
+    """
+    Get cached analysis summary for a ticker (for hover tooltip display).
+    
+    Args:
+        ticker: Stock ticker to check
+        
+    Returns:
+        Cached analysis metadata including score, date, and recommendation
+    """
+    ticker_clean = ticker.upper().strip()
+    
+    if ticker_clean in orchestrator.cache:
+        entry = orchestrator.cache[ticker_clean]
+        cache_age = (datetime.now() - entry.get("timestamp", datetime.min)).seconds
+        result = entry.get("result", {})
+        
+        # Extract key fields for tooltip display
+        synthesis = result.get("synthesis", {})
+        
+        return {
+            "has_cached": True,
+            "ticker": ticker_clean,
+            "analyzed_at": entry.get("timestamp", datetime.min).isoformat(),
+            "cache_age_seconds": cache_age,
+            "cache_age_hours": round(cache_age / 3600, 1),
+            "composite_score": result.get("composite_score"),
+            "recommendation": synthesis.get("overall_recommendation") or synthesis.get("recommendation"),
+            "signal": synthesis.get("action_signal") or result.get("signal"),
+            "expires_in_hours": round(max(0, 24 - cache_age / 3600), 1)
+        }
+    
+    return {
+        "has_cached": False,
+        "ticker": ticker_clean,
+        "message": f"No cached analysis for {ticker_clean}"
+    }
+
 
 @app.get(
     "/api/agent/analyze/{ticker}",

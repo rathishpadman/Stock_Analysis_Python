@@ -8,13 +8,18 @@ export async function GET(
     const params = await props.params;
     const { ticker } = params;
 
-    // Fetch last 90 days of data for the specific ticker
+    // Get days parameter from query string (default 90, max 365)
+    const url = new URL(request.url);
+    const daysParam = url.searchParams.get('days');
+    const days = Math.min(Math.max(parseInt(daysParam || '90', 10), 7), 365);
+
+    // Fetch historical data for the specific ticker
     const { data, error } = await supabase
         .from('daily_stocks')
-        .select('date, price:price_last, rsi:rsi14, sma20, sma50, sma200, macd_line, macd_signal')
+        .select('date, price:price_last, rsi:rsi14, sma20, sma50, sma200, macd_line, macd_signal, macd_hist, volume, return_1d')
         .eq('ticker', ticker)
         .order('date', { ascending: true })
-        .limit(90);
+        .limit(days);
 
     if (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });

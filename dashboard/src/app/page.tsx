@@ -16,6 +16,7 @@ import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import StockTable from '@/components/StockTable';
 import AIAnalysisModal from '@/components/AIAnalysisModal';
+import DateRangeSelector, { rangeToDays } from '@/components/DateRangeSelector';
 
 type ReportView = 'daily' | 'weekly' | 'monthly' | 'seasonality';
 type DetailSource = 'daily' | 'weekly' | 'monthly' | 'seasonality';
@@ -57,6 +58,9 @@ export default function DashboardPage() {
   // Collapsible sections state (default collapsed for table-first focus)
   const [showMarketMovers, setShowMarketMovers] = useState(false);
   const [showTechnicalSignals, setShowTechnicalSignals] = useState(false);
+
+  // Chart date range state (for detail view)
+  const [chartRange, setChartRange] = useState('3m');
 
   // Get current fields and columns based on reportView
   const currentFields = useMemo(() => {
@@ -134,7 +138,7 @@ export default function DashboardPage() {
   useEffect(() => {
     if (selectedStock) {
       if (detailSource === 'daily') {
-        fetchHistoricalData(selectedStock);
+        fetchHistoricalData(selectedStock, rangeToDays(chartRange));
       } else if (detailSource === 'weekly') {
         fetchWeeklyHistoricalData(selectedStock);
       } else if (detailSource === 'monthly') {
@@ -143,7 +147,7 @@ export default function DashboardPage() {
         fetchSeasonalityDetailData(selectedStock);
       }
     }
-  }, [selectedStock, detailSource]);
+  }, [selectedStock, detailSource, chartRange]);
 
   // Fetch Weekly Data when view changes
   useEffect(() => {
@@ -230,12 +234,12 @@ export default function DashboardPage() {
     }
   };
 
-  const fetchHistoricalData = async (ticker: string) => {
+  const fetchHistoricalData = async (ticker: string, days: number = 90) => {
     setChartsLoading(true);
     try {
-      const res = await fetch(`/api/stocks/${ticker}`);
+      const res = await fetch(`/api/stocks/${ticker}?days=${days}`);
       const data = await res.json();
-      setHistoricalData(data);
+      setHistoricalData(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Failed to fetch historical data:', error);
     } finally {
@@ -925,6 +929,17 @@ export default function DashboardPage() {
                         <span className="text-lg">{(selectedStockData.return_1d || 0) >= 0 ? '+' : ''}{selectedStockData.return_1d?.toFixed(2)}%</span>
                       </div>
                     </div>
+                  </div>
+
+                  {/* Chart Date Range Selector */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-slate-500 uppercase font-bold">Chart Range</span>
+                      <DateRangeSelector selectedRange={chartRange} onRangeChange={setChartRange} />
+                    </div>
+                    <span className="text-xs text-slate-500">
+                      Showing {historicalData.length} data points
+                    </span>
                   </div>
 
                   {/* Charts Section */}

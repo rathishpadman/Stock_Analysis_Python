@@ -1,0 +1,113 @@
+{
+  "ticker": "IRCTC",
+  "timestamp": "2026-01-20T20:01:38.494019",
+  "base_data_size": 36084,
+  "agent_results": {
+    "fundamental_agent": {
+      "agent": "fundamental_agent",
+      "data_size_chars": 1799,
+      "required_present": [
+        "fundamentals.pe_ratio",
+        "fundamentals.pb_ratio",
+        "fundamentals.roe",
+        "fundamentals.debt_to_equity",
+        "fundamentals.sector",
+        "current_price"
+      ],
+      "required_missing": [],
+      "required_null": [],
+      "optional_present": [
+        "fundamentals.market_cap",
+        "fundamentals.profit_margin"
+      ],
+      "optional_missing": [
+        "supabase_data.scores"
+      ],
+      "irrelevant_present": []
+    },
+    "technical_agent": {
+      "agent": "technical_agent",
+      "data_size_chars": 5809,
+      "required_present": [
+        "price_history.data",
+        "current_price"
+      ],
+      "required_missing": [],
+      "required_null": [
+        "quote.volume"
+      ],
+      "optional_present": [],
+      "optional_missing": [
+        "supabase_data.scores.rsi14",
+        "supabase_data.scores.macd_signal",
+        "macro.market_regime"
+      ],
+      "irrelevant_present": []
+    },
+    "sentiment_agent": {
+      "agent": "sentiment_agent",
+      "data_size_chars": 632,
+      "required_present": [
+        "sentiment.overall_sentiment",
+        "sentiment.headlines"
+      ],
+      "required_missing": [],
+      "required_null": [
+        "macro.india_vix"
+      ],
+      "optional_present": [
+        "sentiment.sentiment_score"
+      ],
+      "optional_missing": [
+        "macro.market_regime",
+        "fundamentals.sector"
+      ],
+      "irrelevant_present": []
+    },
+    "macro_agent": {
+      "agent": "macro_agent",
+      "data_size_chars": 1012,
+      "required_present": [
+        "macro.rbi_rates",
+        "macro.india_vix",
+        "macro.market_regime"
+      ],
+      "required_missing": [],
+      "required_null": [
+        "fundamentals.sector"
+      ],
+      "optional_present": [],
+      "optional_missing": [
+        "macro.nifty_pe",
+        "fundamentals.pe_ratio"
+      ],
+      "irrelevant_present": []
+    },
+    "regulatory_agent": {
+      "agent": "regulatory_agent",
+      "data_size_chars": 384,
+      "required_present": [],
+      "required_missing": [],
+      "required_null": [
+        "fundamentals.sector",
+        "fundamentals.industry"
+      ],
+      "optional_present": [],
+      "optional_missing": [
+        "sentiment.announcements",
+        "supabase_data.scores.quality_score"
+      ],
+      "irrelevant_present": []
+    }
+  },
+  "base_data_keys": [
+    "ticker",
+    "timestamp",
+    "sentiment",
+    "macro",
+    "price_history",
+    "fundamentals",
+    "supabase_data",
+    "quote"
+  ]
+}
