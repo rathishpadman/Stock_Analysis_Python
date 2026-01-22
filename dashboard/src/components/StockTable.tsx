@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { ALL_FIELDS } from '@/lib/constants';
-import { ChevronUp, ChevronDown, Activity } from 'lucide-react';
+import { ChevronUp, ChevronDown } from 'lucide-react';
+import AnalyzeButton from './AnalyzeButton';
 
 interface Stock {
     ticker: string;
@@ -102,17 +103,10 @@ export default function StockTable({ stocks, visibleColumns, onSelectStock, onRe
                                 {/* AI Analysis Button */}
                                 {onRequestAnalysis && (
                                     <td className="whitespace-nowrap px-4 py-4 text-center">
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                onRequestAnalysis(stock.ticker);
-                                            }}
-                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 rounded-lg text-xs font-medium text-white transition-all shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40"
-                                            title={`Run AI Analysis for ${stock.ticker}`}
-                                        >
-                                            <Activity className="w-3.5 h-3.5" />
-                                            Analyze
-                                        </button>
+                                        <AnalyzeButton
+                                            ticker={stock.ticker}
+                                            onAnalyze={onRequestAnalysis}
+                                        />
                                     </td>
                                 )}
                             </tr>
