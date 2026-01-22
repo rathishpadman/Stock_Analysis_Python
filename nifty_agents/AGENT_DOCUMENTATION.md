@@ -4,13 +4,14 @@
 1. [Overview](#overview)
 2. [Architecture](#architecture)
 3. [Agent Flow Explained](#agent-flow-explained-for-beginners)
-4. [Components](#components)
-5. [Data Sources](#data-sources)
-6. [API Reference](#api-reference)
-7. [Setup & Installation](#setup--installation)
-8. [Usage Examples](#usage-examples)
-9. [Testing](#testing)
-10. [Troubleshooting](#troubleshooting)
+4. [Agent Personas & System Prompts](#agent-personas--system-prompts)
+5. [Components](#components)
+6. [Data Sources](#data-sources)
+7. [API Reference](#api-reference)
+8. [Setup & Installation](#setup--installation)
+9. [Usage Examples](#usage-examples)
+10. [Testing](#testing)
+11. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -279,6 +280,77 @@ Parallel (Fast):
   └─ Regulatory (3s) ──┘
   Total: ~3-5 seconds
 ```
+
+---
+
+## Agent Personas & System Prompts
+
+The intelligence of the NIFTY Agent system lies in its **specialized system prompts**. Each agent is "primed" with a specific persona, expert knowledge base, and Indian market context.
+
+### Design Philosophy
+1. **Domain Isolation**: Each agent only analyzes data relevant to its expertise to prevent "hallucination dilution."
+2. **Indian Market Context Injection**: Prompts include specific NSE/BSE and SEBI context (e.g., T+1 settlement, Promoter holding importance).
+3. **Structured Reasoning**: Agents are forced to provide scores (0-100) and structured JSON responses for consistent dashboard rendering.
+
+### 1. The Fundamental Analyst
+*   **Persona**: A conservative Chartered Accountant/CFA focusing on long-term value.
+*   **Expertise**: Ind AS accounting, ROE/ROCE, Debt-to-Equity, and Promoter Integrity.
+*   **Prompt Logic**:
+    ```python
+    "Focus on promoter integrity and shareholding pattern. Express confidence levels. 
+    Acknowledge missing data rather than fabricating."
+    ```
+*   **Key Output**: Financial Health Score, Valuation vs Peers, and Moat Quality.
+
+### 2. The Technical Analyst
+*   **Persona**: A disciplined momentum trader focusing on price action and charts.
+*   **Expertise**: Candlestick patterns, 20/50/200 DMA, RSI/MACD, and Support/Resistance.
+*   **Prompt Logic**:
+    ```python
+    "Identify the primary trend (bullish/bearish). Provide specific price levels for 
+    entries, targets, and stop-losses. Consider Nifty direction."
+    ```
+*   **Key Output**: Trend Strength, Momentum Divergences, and Specific Trading Levels.
+
+### 3. The Sentiment Analyst
+*   **Persona**: A news junkie monitoring "street buzz" and institutional flows.
+*   **Expertise**: News aggregation (RSS), Social Media Sentiment, and India VIX Interpretation.
+*   **Prompt Logic**:
+    ```python
+    "Separate facts from rumors. Note recency (focus on 1-2 weeks). 
+    Monitor FII/DII daily data shifts."
+    ```
+*   **Key Output**: Net Sentiment Score (-1 to +1), Market Buzz meter, and Narrative themes.
+
+### 4. The Macro Economist
+*   **Persona**: An analyst tracking high-frequency indicators and central bank policies.
+*   **Expertise**: RBI Monetary Policy, CPI/WPI Inflation, INR/USD relations, and Crude Oil impacts.
+*   **Prompt Logic**:
+    ```python
+    "Connect macro factors to specific sector impacts. India has unique dynamics 
+    (Monsoon, Budget) - avoid generic global analysis."
+    ```
+*   **Key Output**: Market Regime (Bullish/Bearish/Cautious), India VIX fear gauge, and RBI Policy stance.
+
+### 5. The Regulatory Expert
+*   **Persona**: A legal consultant focusing on SEBI compliance and corporate law.
+*   **Expertise**: Companies Act 2013, Insider Trading regs, and SEBI Enforcement.
+*   **Prompt Logic**:
+    ```python
+    "Regulatory risk is binary. Check for past issues with promoters. 
+    ESG mandates are now critical."
+    ```
+*   **Key Output**: Compliance Status (Clean/Red Flags), Pending Litigations, and ESG score.
+
+### 6. The Investment Predictor (The Synthesizer)
+*   **Persona**: A Senior Fund Manager making the "Final Call."
+*   **Expertise**: Conflict resolution between specialists and final risk-reward math.
+*   **Prompt Logic**:
+    ```python
+    "Integrate all 5 perspectives. Weigh conflicting signals. Identify consensus. 
+    Weight factors based on current market regime."
+    ```
+*   **Key Output**: Recommendation (Buy/Hold/Sell/Reduce), Final Composite Score, Upside/Downside potential, and Key Thesis.
 
 ---
 
