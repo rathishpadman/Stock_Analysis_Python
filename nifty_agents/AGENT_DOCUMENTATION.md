@@ -40,6 +40,62 @@ Our system automates this by having **specialized AI agents** collaborate to ana
 
 ---
 
+### Granular Execution Flow: "Analyze" Button Click
+
+When a user clicks the **"Analyze"** button on the dashboard, the following sequence of operations occurs across the front-end, back-end, and database layers:
+
+#### 1. Front-End Trigger (`AnalyzeButton.tsx`)
+- **Action**: Hovering over the button triggers `fetchCachedInfo()`.
+- **Logic**: It calls `/api/agent/history/{ticker}` on the Render backend to check for recent analysis.
+- **State**: If found, it shows the **"View"** state with a preview of the score and recommendation in a tooltip.
+- **Click**: Tapping the button calls the `onAnalyze(ticker)` callback, passing the symbol to the parent `StockTable` which opens the `AIAnalysisModal`.
+
+#### 2. API Request Preparation (`AIAnalysisModal.tsx`)
+- **Action**: The modal initializes and immediately hits the analysis endpoint.
+- **URL**: `GET https://nifty-agent-api.onrender.com/api/agent/analyze/{ticker}`
+- **UI**: Shows real-time progress steps: *"Gathering data..."*, *"Agents analyzing..."*, *"Synthesizing results..."*.
+
+#### 3. Orchestration Logic (`orchestrator.py`)
+The `analyze_async()` method in the `NiftyAgentOrchestrator` class manages the core logic:
+
+```python
+async def analyze_async(self, ticker: str):
+    # Step A: Validate Ticker (NSE check)
+    ticker_clean = self._validate_ticker(ticker)
+    
+    # Step B: Gather Base Data (Parallel Fetching)
+    base_data = await self._gather_base_data(ticker_clean)
+    # Fetches: yfinance, RSS News, Supabase Pipeline Scores, Macro Indicators
+    
+    # Step C: Dispatch Specialist Agents (Simultaneous)
+    tasks = [self._call_agent(name, base_data) for name in AGENT_NAMES]
+    agent_responses = await asyncio.gather(*tasks)
+    
+    # Step D: Synthesis (Predictor)
+    report = await self._call_predictor(ticker_clean, agent_responses)
+    
+    # Step E: Persistence & Cache
+    self._store_analysis_to_supabase(ticker_clean, report) # New!
+    self.cache[ticker_clean] = report
+    
+    return report
+```
+
+#### 4. Database Persistence (`ai_analysis_history`)
+- **Table**: Results are saved to Supabase to enable historical tracking and tooltips.
+- **Schema**:
+    - `ticker`: Stock code
+    - `composite_score`: Overall 0-100 rating
+    - `recommendation`: Final signal (Buy/Hold/Sell)
+    - `full_response`: Complete JSON of all agent reasoning
+    - `cost_usd`: Token-based API cost tracking
+
+#### 5. User View Delivery
+- The report is rendered in a premium glassmorphic modal with expandable reasoning for each agent.
+- Export options (PDF/JSON) allow saving the finalized AI research.
+
+---
+
 ## Architecture
 
 ```
@@ -71,8 +127,8 @@ Our system automates this by having **specialized AI agents** collaborate to ana
 └────────┬────────┘  └────────┬────────┘  └────────┬────────┘
          │                    │                    │
          └────────────────────┼────────────────────┘
-                              │
-                              ▼
+                               │
+                               ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                        SPECIALIST AGENTS (Parallel)                          │
 │                                                                              │
@@ -352,13 +408,19 @@ Performs comprehensive multi-agent analysis.
 }
 ```
 
-#### 3. Quick Summary
-```http
-GET /api/agent/quick/{ticker}
 ```
-Returns pre-computed scores without LLM analysis (faster, no API cost).
 
-#### 4. Batch Analysis
+#### 3. Analysis History
+```http
+GET /api/agent/history/{ticker}
+```
+Checks for existing analysis in Supabase. Used for the dashboard **Hover Tooltip**.
+
+**Benefits**:
+- Instant UI feedback with `has_cached: true`.
+- Reduces unnecessary LLM costs if a fresh analysis isn't needed.
+
+#### 4. Quick Summary
 ```http
 POST /api/agent/batch
 Content-Type: application/json
