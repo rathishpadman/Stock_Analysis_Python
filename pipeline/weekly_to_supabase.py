@@ -123,7 +123,7 @@ def run_weekly_pipeline():
     weekly_df = build_weekly_analysis_sheet(symbols, company_names, settings.weekly_history_weeks, settings.yahoo_suffix)
     if not weekly_df.empty:
         payload = prepare_weekly_payload(weekly_df)
-        supabase.table("weekly_analysis").upsert(payload).execute()
+        supabase.table("weekly_analysis").upsert(payload, on_conflict="ticker,week_ending").execute()
         print(f"Uploaded {len(payload)} weekly rows")
 
 if __name__ == "__main__":
