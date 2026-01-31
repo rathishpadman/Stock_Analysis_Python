@@ -41,6 +41,7 @@ import asyncio
 import json
 import logging
 import time
+import traceback
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -156,6 +157,27 @@ class NiftyAgentOrchestrator:
             synthesis = report.get("synthesis", {})
             observability = report.get("observability", {})
             
+            # Helper to make data JSON-serializable
+            def make_serializable(obj):
+                """Convert non-serializable types to JSON-compatible format."""
+                if isinstance(obj, dict):
+                    return {k: make_serializable(v) for k, v in obj.items()}
+                elif isinstance(obj, list):
+                    return [make_serializable(v) for v in obj]
+                elif isinstance(obj, datetime):
+                    return obj.isoformat()
+                elif hasattr(obj, 'isoformat'):  # Other date types
+                    return obj.isoformat()
+                elif hasattr(obj, '__dict__'):  # Custom objects
+                    return str(obj)
+                else:
+                    return obj
+            
+            # Serialize the report to ensure it's JSON-compatible
+            serializable_report = make_serializable(report)
+            serializable_analyses = make_serializable(report.get("agent_analyses", {}))
+            serializable_synthesis = make_serializable(synthesis)
+            
             # Prepare record
             record = {
                 "ticker": ticker.upper(),
@@ -163,21 +185,24 @@ class NiftyAgentOrchestrator:
                 "recommendation": synthesis.get("overall_recommendation") or synthesis.get("recommendation"),
                 "signal": synthesis.get("action_signal"),
                 "cost_usd": observability.get("total_cost_usd") or observability.get("cost", {}).get("total_usd"),
-                "full_response": report,
-                "agent_analyses": report.get("agent_analyses"),
-                "synthesis": synthesis
+                "full_response": serializable_report,
+                "agent_analyses": serializable_analyses,
+                "synthesis": serializable_synthesis
             }
             
             # Insert to Supabase
+            logger.debug(f"Attempting to store analysis for {ticker} to ai_analysis_history")
             result = supabase.table("ai_analysis_history").insert(record).execute()
             
             if result.data:
-                logger.info(f"Stored analysis for {ticker} to Supabase (id: {result.data[0].get('id')})")
+                logger.info(f"✅ Stored analysis for {ticker} to Supabase (id: {result.data[0].get('id')})")
             else:
-                logger.warning(f"Failed to store analysis for {ticker}: no data returned")
+                logger.warning(f"⚠️ Failed to store analysis for {ticker}: no data returned")
                 
         except Exception as e:
-            logger.warning(f"Error storing analysis to Supabase: {e}")
+            # Log the full error for debugging - don't fail silently
+            logger.error(f"❌ Error storing analysis to Supabase for {ticker}: {e}")
+            logger.debug(f"Full error details: {traceback.format_exc()}")
     
     def _validate_ticker(self, ticker: str) -> Dict[str, Any]:
         """Validate that ticker is a valid NSE stock."""
