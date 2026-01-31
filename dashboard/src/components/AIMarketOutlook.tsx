@@ -20,6 +20,9 @@ import {
     Cpu
 } from 'lucide-react';
 
+// Use same pattern as AIAnalysisModal - direct call to Render
+const API_BASE = process.env.NEXT_PUBLIC_AGENT_API_URL || 'https://nifty-agents-api.onrender.com';
+
 // Types for different analysis types
 interface WeeklyAnalysis {
     analysis_type: 'weekly';
@@ -734,15 +737,40 @@ export default function AIMarketOutlook({ type, ticker, sector }: AIMarketOutloo
         setError(null);
         
         try {
-            const params = new URLSearchParams({ type });
-            if (ticker) params.set('ticker', ticker);
-            if (sector) params.set('sector', sector);
+            // Map type to Render API endpoint (same pattern as AIAnalysisModal)
+            let endpoint: string;
+            switch (type) {
+                case 'weekly':
+                    endpoint = '/api/agent/weekly-outlook';
+                    break;
+                case 'monthly':
+                    endpoint = '/api/agent/monthly-thesis';
+                    break;
+                case 'seasonality':
+                    endpoint = '/api/agent/seasonality';
+                    break;
+                default:
+                    throw new Error(`Unknown analysis type: ${type}`);
+            }
             
-            const response = await fetch(`/api/ai-outlook?${params.toString()}`);
+            // Build URL with query params for seasonality
+            let url = `${API_BASE}${endpoint}`;
+            if (type === 'seasonality' && (ticker || sector)) {
+                const params = new URLSearchParams();
+                if (ticker) params.set('ticker', ticker);
+                if (sector) params.set('sector', sector);
+                url += `?${params.toString()}`;
+            }
+            
+            console.log(`[AIMarketOutlook] Fetching from: ${url}`);
+            
+            const response = await fetch(url, {
+                headers: { 'Accept': 'application/json' }
+            });
             
             if (!response.ok) {
-                const errData = await response.json();
-                throw new Error(errData.error || `HTTP ${response.status}`);
+                const errText = await response.text();
+                throw new Error(`API error ${response.status}: ${errText}`);
             }
             
             const result = await response.json();
@@ -750,6 +778,7 @@ export default function AIMarketOutlook({ type, ticker, sector }: AIMarketOutloo
             setIsExpanded(true);
             
         } catch (err) {
+            console.error('[AIMarketOutlook] Error:', err);
             setError(err instanceof Error ? err.message : 'Failed to fetch analysis');
         } finally {
             setLoading(false);
