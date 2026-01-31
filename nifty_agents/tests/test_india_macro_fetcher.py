@@ -105,15 +105,25 @@ class TestGetIndiaVix:
         result = get_india_vix()
         assert result["fear_level"] == "low"
         
-        # Medium VIX (15-25) = Medium Fear
-        mock_nse.get_index_quote.return_value = {"index": "INDIA VIX", "last": 20.0, "percentChange": 0}
+        # Moderate VIX (15-20) = Moderate Fear
+        mock_nse.get_index_quote.return_value = {"index": "INDIA VIX", "last": 17.0, "percentChange": 0}
         result = get_india_vix()
-        assert result["fear_level"] == "medium"
+        assert result["fear_level"] == "moderate"
         
-        # High VIX (> 25) = High Fear
-        mock_nse.get_index_quote.return_value = {"index": "INDIA VIX", "last": 30.0, "percentChange": 0}
+        # Elevated VIX (20-25) = Elevated Fear
+        mock_nse.get_index_quote.return_value = {"index": "INDIA VIX", "last": 22.0, "percentChange": 0}
+        result = get_india_vix()
+        assert result["fear_level"] == "elevated"
+        
+        # High VIX (25-30) = High Fear
+        mock_nse.get_index_quote.return_value = {"index": "INDIA VIX", "last": 28.0, "percentChange": 0}
         result = get_india_vix()
         assert result["fear_level"] == "high"
+        
+        # Extreme VIX (> 30) = Extreme Fear
+        mock_nse.get_index_quote.return_value = {"index": "INDIA VIX", "last": 35.0, "percentChange": 0}
+        result = get_india_vix()
+        assert result["fear_level"] == "extreme"
 
 
 class TestGetRbiRates:
