@@ -275,30 +275,235 @@ function AgentCard({
     );
 }
 
-// Render weekly analysis
+// Helper to safely render any value
+function renderValue(value: unknown): React.ReactNode {
+    if (value === null || value === undefined) return null;
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+        return String(value);
+    }
+    if (Array.isArray(value)) {
+        return value.map((v, i) => (
+            <span key={i} className="inline-block px-2 py-0.5 mr-1 mb-1 bg-gray-100 dark:bg-gray-700 rounded text-xs">
+                {typeof v === 'object' ? JSON.stringify(v) : String(v)}
+            </span>
+        ));
+    }
+    if (typeof value === 'object') {
+        return <pre className="text-xs bg-gray-50 dark:bg-gray-800 p-2 rounded overflow-x-auto">{JSON.stringify(value, null, 2)}</pre>;
+    }
+    return String(value);
+}
+
+// Generic key-value renderer for dynamic data
+function DataSection({ title, data, icon }: { title: string; data: Record<string, unknown>; icon?: React.ReactNode }) {
+    if (!data || Object.keys(data).length === 0) return null;
+    
+    return (
+        <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+            <div className="flex items-center gap-2 p-3 bg-gray-50 dark:bg-gray-800">
+                {icon}
+                <span className="font-medium text-gray-900 dark:text-gray-100">{title}</span>
+            </div>
+            <div className="p-3 space-y-2 text-sm">
+                {Object.entries(data).map(([key, value]) => {
+                    if (value === null || value === undefined) return null;
+                    const formattedKey = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                    return (
+                        <div key={key} className="flex flex-wrap gap-2">
+                            <span className="font-medium text-gray-600 dark:text-gray-400 min-w-[120px]">{formattedKey}:</span>
+                            <span className="text-gray-800 dark:text-gray-200">{renderValue(value)}</span>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+}
+
+// Render weekly analysis - handles both old and new formats
 function WeeklyAnalysisView({ data }: { data: WeeklyAnalysis }) {
     const { agent_analyses, synthesis } = data;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const syn = synthesis as Record<string, any> || {};
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const agents = agent_analyses as Record<string, any> || {};
     
     return (
         <div className="space-y-4">
-            {/* Headline */}
-            {synthesis?.headline && (
+            {/* Executive Summary / Headline */}
+            {(syn.executive_summary || syn.headline || syn.weekly_thesis) && (
                 <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                    <p className="text-lg font-medium text-blue-800 dark:text-blue-200">
-                        {synthesis.headline}
+                    <h4 className="font-semibold text-blue-800 dark:text-blue-200 mb-2">
+                        {syn.executive_summary?.headline || syn.headline || 'Weekly Outlook'}
+                    </h4>
+                    <p className="text-sm text-blue-700 dark:text-blue-300">
+                        {syn.executive_summary?.one_liner || syn.weekly_thesis?.narrative || syn.executive_summary?.narrative || ''}
                     </p>
+                    {syn.executive_summary?.conviction_score !== undefined && (
+                        <div className="mt-2 flex items-center gap-2">
+                            <span className="text-xs text-blue-600">Conviction:</span>
+                            <ConfidenceMeter value={syn.executive_summary.conviction_score / 10} />
+                        </div>
+                    )}
                 </div>
             )}
-            
-            {/* Key Insights */}
-            {synthesis?.key_insights && synthesis.key_insights.length > 0 && (
+
+            {/* Top Actionable Ideas */}
+            {syn.top_3_actionable_ideas && syn.top_3_actionable_ideas.length > 0 && (
+                <div className="space-y-2">
+                    <h4 className="font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                        <Target className="w-4 h-4 text-green-500" />
+                        Top Actionable Ideas
+                    </h4>
+                    <div className="grid gap-2">
+                        {syn.top_3_actionable_ideas.map((idea: Record<string, unknown>, i: number) => (
+                            <div key={i} className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                                <div className="flex items-center justify-between mb-1">
+                                    <span className="font-medium text-green-800 dark:text-green-200">
+                                        #{String(idea.rank ?? i + 1)} {String(idea.type ?? '')} - {String(idea.name ?? idea.sector ?? '')}
+                                    </span>
+                                    {idea.risk_reward != null && (
+                                        <span className="text-xs px-2 py-0.5 bg-green-200 dark:bg-green-800 rounded">
+                                            R:R {String(idea.risk_reward)}
+                                        </span>
+                                    )}
+                                </div>
+                                <p className="text-sm text-green-700 dark:text-green-300">{String(idea.rationale ?? idea.action ?? '')}</p>
+                                {(idea.entry_zone != null || idea.stop_loss_pct != null || idea.target_pct != null) && (
+                                    <div className="mt-2 flex flex-wrap gap-3 text-xs">
+                                        {idea.entry_zone != null && <span>Entry: ₹{JSON.stringify(idea.entry_zone)}</span>}
+                                        {idea.stop_loss_pct != null && <span className="text-red-600">SL: {String(idea.stop_loss_pct)}%</span>}
+                                        {idea.target_pct != null && <span className="text-green-600">Target: {String(idea.target_pct)}%</span>}
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Sector Allocation */}
+            {syn.sector_allocation && syn.sector_allocation.length > 0 && (
+                <div className="space-y-2">
+                    <h4 className="font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                        <BarChart2 className="w-4 h-4 text-purple-500" />
+                        Sector Allocation
+                    </h4>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                        {syn.sector_allocation.map((sec: Record<string, unknown>, i: number) => (
+                            <div key={i} className={`p-2 rounded border ${
+                                sec.stance === 'overweight' ? 'bg-green-50 dark:bg-green-900/20 border-green-200' :
+                                sec.stance === 'underweight' ? 'bg-red-50 dark:bg-red-900/20 border-red-200' :
+                                'bg-gray-50 dark:bg-gray-800 border-gray-200'
+                            }`}>
+                                <div className="font-medium text-sm">{String(sec.sector || '')}</div>
+                                <div className="text-xs text-gray-500">{String(sec.stance || '')} ({String(sec.weight_pct || 0)}%)</div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Risk Management */}
+            {syn.risk_management && (
+                <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                    <h5 className="text-sm font-medium text-yellow-700 dark:text-yellow-400 mb-2 flex items-center gap-2">
+                        <Shield className="w-4 h-4" />
+                        Risk Management
+                    </h5>
+                    <div className="text-sm text-yellow-800 dark:text-yellow-200 space-y-1">
+                        {syn.risk_management.position_sizing && (
+                            <p>Position Size: {syn.risk_management.position_sizing.recommendation}</p>
+                        )}
+                        {syn.risk_management.stop_loss_guidance && (
+                            <p>Stop Loss: {syn.risk_management.stop_loss_guidance.index_stop_loss}</p>
+                        )}
+                        {syn.risk_management.hedging && (
+                            <p>Hedge: {syn.risk_management.hedging.recommendation}</p>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* Events Calendar */}
+            {syn.events_calendar && syn.events_calendar.length > 0 && (
+                <div className="space-y-2">
+                    <h4 className="font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                        <Calendar className="w-4 h-4 text-gray-500" />
+                        Events This Week
+                    </h4>
+                    <div className="flex flex-wrap gap-2">
+                        {syn.events_calendar.map((event: Record<string, unknown>, i: number) => (
+                            <span key={i} className={`px-2 py-1 text-sm rounded ${
+                                event.expected_impact === 'bullish' ? 'bg-green-100 text-green-800' :
+                                event.expected_impact === 'bearish' ? 'bg-red-100 text-red-800' :
+                                'bg-gray-100 text-gray-800'
+                            }`}>
+                                {String(event.date || '')} - {String(event.event || '')}
+                            </span>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Monday Checklist */}
+            {syn.monday_checklist && syn.monday_checklist.length > 0 && (
+                <div className="space-y-2">
+                    <h4 className="font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                        <Zap className="w-4 h-4 text-yellow-500" />
+                        Monday Checklist
+                    </h4>
+                    <ul className="space-y-1">
+                        {syn.monday_checklist.map((item: string, i: number) => (
+                            <li key={i} className="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                <span className="text-blue-500 mt-1">☐</span>
+                                {item}
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
+
+            {/* Agent Details - Dynamic rendering */}
+            <div className="space-y-3 mt-4">
+                <h4 className="font-medium text-gray-900 dark:text-gray-100">Agent Analyses</h4>
+                
+                {agents.trend && (
+                    <DataSection 
+                        title="Trend Analysis" 
+                        data={agents.trend}
+                        icon={<TrendingUp className="w-4 h-4 text-blue-500" />}
+                    />
+                )}
+                
+                {agents.sector_rotation && (
+                    <DataSection 
+                        title="Sector Rotation" 
+                        data={typeof agents.sector_rotation === 'object' && !agents.sector_rotation.raw_response 
+                            ? agents.sector_rotation 
+                            : { summary: 'See detailed sector data above' }}
+                        icon={<BarChart2 className="w-4 h-4 text-purple-500" />}
+                    />
+                )}
+                
+                {agents.risk_regime && (
+                    <DataSection 
+                        title="Risk Assessment" 
+                        data={agents.risk_regime}
+                        icon={<Shield className="w-4 h-4 text-orange-500" />}
+                    />
+                )}
+            </div>
+
+            {/* Fallback: Legacy format key_insights */}
+            {syn.key_insights && syn.key_insights.length > 0 && (
                 <div className="space-y-2">
                     <h4 className="font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
                         <Zap className="w-4 h-4 text-yellow-500" />
                         Key Insights
                     </h4>
                     <ul className="space-y-1">
-                        {synthesis.key_insights.map((insight, i) => (
+                        {syn.key_insights.map((insight: string, i: number) => (
                             <li key={i} className="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300">
                                 <span className="text-blue-500 mt-1">•</span>
                                 {insight}
@@ -307,256 +512,244 @@ function WeeklyAnalysisView({ data }: { data: WeeklyAnalysis }) {
                     </ul>
                 </div>
             )}
-            
-            {/* Sector Focus */}
-            {synthesis?.sector_focus && (
-                <div className="grid grid-cols-2 gap-4">
-                    {synthesis.sector_focus.buy && synthesis.sector_focus.buy.length > 0 && (
-                        <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                            <h5 className="text-sm font-medium text-green-700 dark:text-green-400 mb-2">
-                                Sectors to Accumulate
-                            </h5>
-                            <div className="flex flex-wrap gap-1">
-                                {synthesis.sector_focus.buy.map((sector, i) => (
-                                    <span key={i} className="px-2 py-0.5 bg-green-100 dark:bg-green-800 text-green-800 dark:text-green-200 text-xs rounded">
-                                        {sector}
-                                    </span>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                    {synthesis.sector_focus.avoid && synthesis.sector_focus.avoid.length > 0 && (
-                        <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
-                            <h5 className="text-sm font-medium text-red-700 dark:text-red-400 mb-2">
-                                Sectors to Avoid
-                            </h5>
-                            <div className="flex flex-wrap gap-1">
-                                {synthesis.sector_focus.avoid.map((sector, i) => (
-                                    <span key={i} className="px-2 py-0.5 bg-red-100 dark:bg-red-800 text-red-800 dark:text-red-200 text-xs rounded">
-                                        {sector}
-                                    </span>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                </div>
-            )}
-            
-            {/* Agent Details */}
-            <div className="space-y-3 mt-4">
-                <h4 className="font-medium text-gray-900 dark:text-gray-100">Agent Analyses</h4>
-                
-                {agent_analyses?.trend && (
-                    <AgentCard 
-                        title="Trend Analysis" 
-                        icon={<TrendingUp className="w-4 h-4 text-blue-500" />}
-                        confidence={agent_analyses.trend.confidence}
-                    >
-                        <p><strong>Primary Trend:</strong> {agent_analyses.trend.primary_trend}</p>
-                        <p><strong>Trend Strength:</strong> {agent_analyses.trend.trend_strength}</p>
-                        <p>{agent_analyses.trend.weekly_outlook}</p>
-                    </AgentCard>
-                )}
-                
-                {agent_analyses?.sector_rotation && (
-                    <AgentCard 
-                        title="Sector Rotation" 
-                        icon={<BarChart2 className="w-4 h-4 text-purple-500" />}
-                        confidence={agent_analyses.sector_rotation.confidence}
-                    >
-                        <p><strong>Rotation Direction:</strong> {agent_analyses.sector_rotation.rotation_direction}</p>
-                        <p><strong>Leading:</strong> {agent_analyses.sector_rotation.leading_sectors?.join(', ')}</p>
-                        <p><strong>Lagging:</strong> {agent_analyses.sector_rotation.lagging_sectors?.join(', ')}</p>
-                        <p>{agent_analyses.sector_rotation.sector_outlook}</p>
-                    </AgentCard>
-                )}
-                
-                {agent_analyses?.risk_regime && (
-                    <AgentCard 
-                        title="Risk Assessment" 
-                        icon={<Shield className="w-4 h-4 text-orange-500" />}
-                        confidence={agent_analyses.risk_regime.confidence}
-                    >
-                        <p><strong>Risk Regime:</strong> {agent_analyses.risk_regime.risk_regime}</p>
-                        <p><strong>VIX Signal:</strong> {agent_analyses.risk_regime.vix_signal}</p>
-                        <p><strong>Market Breadth:</strong> {agent_analyses.risk_regime.market_breadth}</p>
-                        <p>{agent_analyses.risk_regime.risk_adjusted_advice}</p>
-                    </AgentCard>
-                )}
-            </div>
-            
-            {/* Risk Guidance */}
-            {synthesis?.risk_guidance && (
-                <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-                    <h5 className="text-sm font-medium text-yellow-700 dark:text-yellow-400 mb-1 flex items-center gap-2">
-                        <Shield className="w-4 h-4" />
-                        Risk Management
-                    </h5>
-                    <p className="text-sm text-yellow-800 dark:text-yellow-200">{synthesis.risk_guidance}</p>
-                </div>
-            )}
-            
-            {/* Events to Watch */}
-            {synthesis?.events_to_watch && synthesis.events_to_watch.length > 0 && (
-                <div className="space-y-2">
-                    <h4 className="font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-gray-500" />
-                        Events to Watch
-                    </h4>
-                    <div className="flex flex-wrap gap-2">
-                        {synthesis.events_to_watch.map((event, i) => (
-                            <span key={i} className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-sm rounded">
-                                {event}
-                            </span>
-                        ))}
-                    </div>
-                </div>
-            )}
         </div>
     );
 }
 
-// Render monthly analysis
+// Render monthly analysis - handles both old and new formats
 function MonthlyAnalysisView({ data }: { data: MonthlyAnalysis }) {
     const { agent_analyses, synthesis } = data;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const syn = synthesis as Record<string, any> || {};
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const agents = agent_analyses as Record<string, any> || {};
     
     return (
         <div className="space-y-4">
-            {/* Monthly Thesis */}
-            {synthesis?.monthly_thesis && (
+            {/* Monthly Thesis - new format */}
+            {(syn.monthly_thesis?.headline || syn.monthly_thesis) && (
                 <div className="p-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
-                    <h4 className="font-medium text-purple-800 dark:text-purple-200 mb-2">Investment Thesis</h4>
+                    <h4 className="font-semibold text-purple-800 dark:text-purple-200 mb-2">
+                        {syn.monthly_thesis?.headline || 'Investment Thesis'}
+                    </h4>
                     <p className="text-sm text-purple-700 dark:text-purple-300">
-                        {synthesis.monthly_thesis}
+                        {syn.monthly_thesis?.narrative || (typeof syn.monthly_thesis === 'string' ? syn.monthly_thesis : '')}
                     </p>
+                    {syn.monthly_thesis?.conviction_score !== undefined && (
+                        <div className="mt-2 flex items-center gap-2">
+                            <span className="text-xs text-purple-600">Conviction:</span>
+                            <ConfidenceMeter value={syn.monthly_thesis.conviction_score / 10} />
+                        </div>
+                    )}
                 </div>
             )}
             
-            {/* Asset Allocation */}
-            {synthesis?.asset_allocation && (
+            {/* Asset Allocation - new format */}
+            {syn.asset_allocation && (
                 <div className="space-y-2">
                     <h4 className="font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
                         <Target className="w-4 h-4 text-blue-500" />
-                        Recommended Asset Allocation
+                        Asset Allocation
                     </h4>
                     <div className="grid grid-cols-4 gap-2">
-                        {Object.entries(synthesis.asset_allocation).map(([asset, allocation]) => (
-                            <div key={asset} className="p-2 bg-gray-100 dark:bg-gray-700 rounded text-center">
-                                <div className="text-lg font-bold text-gray-900 dark:text-gray-100">{allocation}</div>
-                                <div className="text-xs text-gray-500 capitalize">{asset}</div>
+                        {syn.asset_allocation.equity_pct !== undefined && (
+                            <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded text-center">
+                                <div className="text-lg font-bold text-blue-900 dark:text-blue-100">{syn.asset_allocation.equity_pct}%</div>
+                                <div className="text-xs text-blue-600">Equity</div>
+                            </div>
+                        )}
+                        {syn.asset_allocation.debt_pct !== undefined && (
+                            <div className="p-2 bg-gray-100 dark:bg-gray-700 rounded text-center">
+                                <div className="text-lg font-bold text-gray-900 dark:text-gray-100">{syn.asset_allocation.debt_pct}%</div>
+                                <div className="text-xs text-gray-500">Debt</div>
+                            </div>
+                        )}
+                        {syn.asset_allocation.gold_pct !== undefined && (
+                            <div className="p-2 bg-yellow-100 dark:bg-yellow-900/30 rounded text-center">
+                                <div className="text-lg font-bold text-yellow-900 dark:text-yellow-100">{syn.asset_allocation.gold_pct}%</div>
+                                <div className="text-xs text-yellow-600">Gold</div>
+                            </div>
+                        )}
+                        {syn.asset_allocation.cash_pct !== undefined && (
+                            <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded text-center">
+                                <div className="text-lg font-bold text-green-900 dark:text-green-100">{syn.asset_allocation.cash_pct}%</div>
+                                <div className="text-xs text-green-600">Cash</div>
+                            </div>
+                        )}
+                    </div>
+                    {syn.asset_allocation.rationale && (
+                        <p className="text-sm text-gray-600 dark:text-gray-400 italic">{syn.asset_allocation.rationale}</p>
+                    )}
+                </div>
+            )}
+
+            {/* Sector Allocation - new format */}
+            {syn.sector_allocation && syn.sector_allocation.length > 0 && (
+                <div className="space-y-2">
+                    <h4 className="font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                        <BarChart2 className="w-4 h-4 text-purple-500" />
+                        Sector Allocation
+                    </h4>
+                    <div className="overflow-x-auto">
+                        <table className="min-w-full text-sm">
+                            <thead>
+                                <tr className="bg-gray-50 dark:bg-gray-800">
+                                    <th className="px-3 py-2 text-left">Sector</th>
+                                    <th className="px-3 py-2 text-center">Weight</th>
+                                    <th className="px-3 py-2 text-center">Stance</th>
+                                    <th className="px-3 py-2 text-center">Exp. Return</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {syn.sector_allocation.map((sec: Record<string, unknown>, i: number) => (
+                                    <tr key={i} className="border-b dark:border-gray-700">
+                                        <td className="px-3 py-2 font-medium">{String(sec.sector || '')}</td>
+                                        <td className="px-3 py-2 text-center">{String(sec.weight_pct || 0)}%</td>
+                                        <td className="px-3 py-2 text-center">
+                                            <span className={`px-2 py-0.5 rounded text-xs ${
+                                                sec.vs_benchmark === 'overweight' ? 'bg-green-100 text-green-700' :
+                                                sec.vs_benchmark === 'underweight' ? 'bg-red-100 text-red-700' :
+                                                'bg-gray-100 text-gray-700'
+                                            }`}>
+                                                {String(sec.vs_benchmark || 'neutral')}
+                                            </span>
+                                        </td>
+                                        <td className="px-3 py-2 text-center text-green-600">{String(sec.expected_return_pct || 0)}%</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+
+            {/* Top Monthly Ideas - new format */}
+            {syn.top_monthly_ideas && syn.top_monthly_ideas.length > 0 && (
+                <div className="space-y-2">
+                    <h4 className="font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                        <Target className="w-4 h-4 text-green-500" />
+                        Top Monthly Ideas
+                    </h4>
+                    <div className="grid gap-2">
+                        {syn.top_monthly_ideas.map((idea: Record<string, unknown>, i: number) => (
+                            <div key={i} className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                                <div className="flex items-center justify-between mb-1">
+                                    <span className="font-medium text-green-800 dark:text-green-200">
+                                        #{String(idea.rank ?? i + 1)} {String(idea.type ?? '')} - {String(idea.name ?? '')}
+                                    </span>
+                                    {idea.risk_reward != null && (
+                                        <span className="text-xs px-2 py-0.5 bg-green-200 dark:bg-green-800 rounded">
+                                            R:R {String(idea.risk_reward)}
+                                        </span>
+                                    )}
+                                </div>
+                                <p className="text-sm text-green-700 dark:text-green-300">{String(idea.rationale ?? '')}</p>
+                                <div className="mt-2 flex flex-wrap gap-3 text-xs">
+                                    {idea.entry_zone != null && <span>Entry: {JSON.stringify(idea.entry_zone)}</span>}
+                                    {idea.stop_loss_pct != null && <span className="text-red-600">SL: {String(idea.stop_loss_pct)}%</span>}
+                                    {idea.target_return_pct != null && <span className="text-green-600">Target: {String(idea.target_return_pct)}%</span>}
+                                    {idea.holding_period != null && <span>Hold: {String(idea.holding_period)}</span>}
+                                </div>
                             </div>
                         ))}
                     </div>
                 </div>
             )}
-            
-            {/* Themes */}
-            <div className="grid grid-cols-2 gap-4">
-                {synthesis?.top_themes && synthesis.top_themes.length > 0 && (
-                    <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                        <h5 className="text-sm font-medium text-green-700 dark:text-green-400 mb-2">
-                            Top Themes
-                        </h5>
-                        <ul className="space-y-1">
-                            {synthesis.top_themes.map((theme, i) => (
-                                <li key={i} className="text-sm text-green-800 dark:text-green-200 flex items-start gap-2">
-                                    <span className="text-green-500">✓</span>
-                                    {theme}
+
+            {/* Week by Week Focus - new format */}
+            {syn.week_by_week_focus && syn.week_by_week_focus.length > 0 && (
+                <div className="space-y-2">
+                    <h4 className="font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                        <Calendar className="w-4 h-4 text-blue-500" />
+                        Week-by-Week Focus
+                    </h4>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                        {syn.week_by_week_focus.map((week: Record<string, unknown>, i: number) => (
+                            <div key={i} className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800">
+                                <div className="font-medium text-blue-800 dark:text-blue-200 text-sm">Week {String(week.week ?? i + 1)}</div>
+                                <div className="text-xs text-blue-600 dark:text-blue-400">{String(week.focus ?? '')}</div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Risk Dashboard - new format */}
+            {syn.risk_dashboard && (
+                <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                    <h5 className="text-sm font-medium text-yellow-700 dark:text-yellow-400 mb-2 flex items-center gap-2">
+                        <Shield className="w-4 h-4" />
+                        Risk Dashboard
+                    </h5>
+                    <div className="grid grid-cols-3 gap-2 text-sm">
+                        {syn.risk_dashboard.portfolio_var_pct !== undefined && (
+                            <div className="text-center">
+                                <div className="font-bold text-yellow-800">{syn.risk_dashboard.portfolio_var_pct}%</div>
+                                <div className="text-xs text-yellow-600">Portfolio VAR</div>
+                            </div>
+                        )}
+                        {syn.risk_dashboard.max_drawdown_expected_pct !== undefined && (
+                            <div className="text-center">
+                                <div className="font-bold text-red-600">{syn.risk_dashboard.max_drawdown_expected_pct}%</div>
+                                <div className="text-xs text-yellow-600">Max Drawdown</div>
+                            </div>
+                        )}
+                        {syn.risk_dashboard.stop_loss_level?.nifty && (
+                            <div className="text-center">
+                                <div className="font-bold text-yellow-800">{syn.risk_dashboard.stop_loss_level.nifty}</div>
+                                <div className="text-xs text-yellow-600">NIFTY Stop</div>
+                            </div>
+                        )}
+                    </div>
+                    {syn.risk_dashboard.key_risks && syn.risk_dashboard.key_risks.length > 0 && (
+                        <ul className="mt-2 space-y-1">
+                            {syn.risk_dashboard.key_risks.map((risk: Record<string, unknown>, i: number) => (
+                                <li key={i} className="text-xs text-yellow-800 dark:text-yellow-200">
+                                    ⚠ {String(risk.risk ?? risk)} ({String(risk.probability_pct ?? 0)}% prob, {String(risk.impact_pct ?? 0)}% impact)
                                 </li>
                             ))}
                         </ul>
-                    </div>
-                )}
-                {synthesis?.avoid_themes && synthesis.avoid_themes.length > 0 && (
-                    <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
-                        <h5 className="text-sm font-medium text-red-700 dark:text-red-400 mb-2">
-                            Avoid These
-                        </h5>
-                        <ul className="space-y-1">
-                            {synthesis.avoid_themes.map((theme, i) => (
-                                <li key={i} className="text-sm text-red-800 dark:text-red-200 flex items-start gap-2">
-                                    <span className="text-red-500">✗</span>
-                                    {theme}
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
-                )}
-            </div>
-            
-            {/* Agent Details */}
+                    )}
+                </div>
+            )}
+
+            {/* Agent Details - Dynamic rendering */}
             <div className="space-y-3 mt-4">
                 <h4 className="font-medium text-gray-900 dark:text-gray-100">Agent Analyses</h4>
                 
-                {agent_analyses?.macro_cycle && (
-                    <AgentCard 
+                {agents.macro_cycle && (
+                    <DataSection 
                         title="Macro Cycle" 
+                        data={agents.macro_cycle}
                         icon={<BarChart2 className="w-4 h-4 text-blue-500" />}
-                        confidence={agent_analyses.macro_cycle.confidence}
-                    >
-                        <p><strong>Economic Phase:</strong> {agent_analyses.macro_cycle.economic_cycle_phase}</p>
-                        <p><strong>Inflation:</strong> {agent_analyses.macro_cycle.inflation_outlook}</p>
-                        <p><strong>RBI Bias:</strong> {agent_analyses.macro_cycle.rbi_policy_bias}</p>
-                        <p>{agent_analyses.macro_cycle.monthly_macro_outlook}</p>
-                    </AgentCard>
+                    />
                 )}
                 
-                {agent_analyses?.fund_flows && (
-                    <AgentCard 
+                {agents.fund_flows && (
+                    <DataSection 
                         title="Fund Flows" 
+                        data={agents.fund_flows}
                         icon={<DollarSign className="w-4 h-4 text-green-500" />}
-                        confidence={agent_analyses.fund_flows.confidence}
-                    >
-                        <p><strong>FII Stance:</strong> {agent_analyses.fund_flows.fii_stance}</p>
-                        <p><strong>DII Stance:</strong> {agent_analyses.fund_flows.dii_stance}</p>
-                        <p><strong>Consensus:</strong> {agent_analyses.fund_flows.institutional_consensus}</p>
-                        <p>{agent_analyses.fund_flows.flow_outlook}</p>
-                    </AgentCard>
+                    />
                 )}
                 
-                {agent_analyses?.valuations && (
-                    <AgentCard 
+                {agents.valuations && (
+                    <DataSection 
                         title="Valuations" 
+                        data={agents.valuations}
                         icon={<Target className="w-4 h-4 text-purple-500" />}
-                        confidence={agent_analyses.valuations.confidence}
-                    >
-                        <p><strong>Market Valuation:</strong> {agent_analyses.valuations.market_valuation}</p>
-                        <p><strong>P/E Percentile:</strong> {agent_analyses.valuations.pe_percentile}</p>
-                        <p>{agent_analyses.valuations.valuation_advice}</p>
-                    </AgentCard>
+                    />
                 )}
             </div>
-            
-            {/* Key Risks */}
-            {synthesis?.key_risks && synthesis.key_risks.length > 0 && (
-                <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-                    <h5 className="text-sm font-medium text-yellow-700 dark:text-yellow-400 mb-2 flex items-center gap-2">
-                        <AlertTriangle className="w-4 h-4" />
-                        Key Risks
-                    </h5>
+
+            {/* Fallback: Legacy formats */}
+            {syn.top_themes && syn.top_themes.length > 0 && (
+                <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                    <h5 className="text-sm font-medium text-green-700 dark:text-green-400 mb-2">Top Themes</h5>
                     <ul className="space-y-1">
-                        {synthesis.key_risks.map((risk, i) => (
-                            <li key={i} className="text-sm text-yellow-800 dark:text-yellow-200 flex items-start gap-2">
-                                <span className="text-yellow-500">⚠</span>
-                                {risk}
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-            )}
-            
-            {/* Action Items */}
-            {synthesis?.action_items && synthesis.action_items.length > 0 && (
-                <div className="space-y-2">
-                    <h4 className="font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
-                        <Zap className="w-4 h-4 text-blue-500" />
-                        Action Items
-                    </h4>
-                    <ul className="space-y-1">
-                        {synthesis.action_items.map((action, i) => (
-                            <li key={i} className="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300">
-                                <span className="text-blue-500 font-bold">{i + 1}.</span>
-                                {action}
+                        {syn.top_themes.map((theme: string, i: number) => (
+                            <li key={i} className="text-sm text-green-800 dark:text-green-200 flex items-start gap-2">
+                                <span className="text-green-500">✓</span>{theme}
                             </li>
                         ))}
                     </ul>
@@ -566,52 +759,189 @@ function MonthlyAnalysisView({ data }: { data: MonthlyAnalysis }) {
     );
 }
 
-// Render seasonality analysis
+// Render seasonality analysis - handles both old and new formats
 function SeasonalityAnalysisView({ data }: { data: SeasonalityAnalysis }) {
     const { agent_analyses, synthesis, current_month } = data;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const syn = synthesis as Record<string, any> || {};
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const agents = agent_analyses as Record<string, any> || {};
     
     return (
         <div className="space-y-4">
-            {/* Seasonality Verdict */}
-            {synthesis?.actionable_insight && (
+            {/* Seasonality Thesis - new format */}
+            {(syn.seasonality_thesis || syn.actionable_insight) && (
                 <div className="p-4 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-lg">
                     <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm text-indigo-600 dark:text-indigo-400">
-                            {current_month} Seasonality
+                        <span className="text-sm font-semibold text-indigo-800 dark:text-indigo-200">
+                            {syn.seasonality_thesis?.headline || `${current_month} Seasonality`}
                         </span>
-                        {synthesis.probability_of_positive_month && (
-                            <span className="text-sm font-medium text-indigo-700 dark:text-indigo-300">
-                                {synthesis.probability_of_positive_month} probability of positive month
+                        {(syn.seasonality_thesis?.probability_of_positive_month_pct || syn.probability_of_positive_month) && (
+                            <span className="text-sm font-medium px-2 py-0.5 bg-indigo-200 dark:bg-indigo-800 rounded">
+                                {syn.seasonality_thesis?.probability_of_positive_month_pct || syn.probability_of_positive_month}% win probability
                             </span>
                         )}
                     </div>
                     <p className="text-sm text-indigo-700 dark:text-indigo-300">
-                        {synthesis.actionable_insight}
+                        {syn.seasonality_thesis?.statistical_backing || syn.actionable_insight || ''}
                     </p>
+                    {syn.seasonality_thesis?.expected_return_range_pct && (
+                        <p className="text-xs text-indigo-600 mt-1">
+                            Expected range: {syn.seasonality_thesis.expected_return_range_pct.low}% to {syn.seasonality_thesis.expected_return_range_pct.high}%
+                        </p>
+                    )}
                 </div>
             )}
-            
-            {/* Seasonal Alpha */}
-            {synthesis?.seasonal_alpha_opportunity && (
-                <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-                    <h5 className="text-sm font-medium text-green-700 dark:text-green-400 mb-1 flex items-center gap-2">
-                        <Sparkles className="w-4 h-4" />
-                        Alpha Opportunity
-                    </h5>
-                    <p className="text-sm text-green-800 dark:text-green-200">{synthesis.seasonal_alpha_opportunity}</p>
+
+            {/* Composite Score - new format */}
+            {syn.composite_seasonal_score && (
+                <div className="grid grid-cols-4 gap-2">
+                    <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded text-center">
+                        <div className="text-lg font-bold text-blue-800">{syn.composite_seasonal_score.historical_pattern_score}</div>
+                        <div className="text-xs text-blue-600">Historical</div>
+                    </div>
+                    <div className="p-2 bg-purple-50 dark:bg-purple-900/20 rounded text-center">
+                        <div className="text-lg font-bold text-purple-800">{syn.composite_seasonal_score.event_calendar_score}</div>
+                        <div className="text-xs text-purple-600">Events</div>
+                    </div>
+                    <div className="p-2 bg-green-50 dark:bg-green-900/20 rounded text-center">
+                        <div className="text-lg font-bold text-green-800">{syn.composite_seasonal_score.sector_seasonality_score}</div>
+                        <div className="text-xs text-green-600">Sectors</div>
+                    </div>
+                    <div className="p-2 bg-indigo-100 dark:bg-indigo-900/30 rounded text-center border-2 border-indigo-300">
+                        <div className="text-lg font-bold text-indigo-800">{syn.composite_seasonal_score.composite_score}</div>
+                        <div className="text-xs text-indigo-600">Composite</div>
+                    </div>
                 </div>
             )}
-            
-            {/* Sector Positioning */}
-            {synthesis?.sector_positioning && (
+
+            {/* Current Month Playbook - new format */}
+            {syn.current_month_playbook && (
+                <div className="space-y-3">
+                    <h4 className="font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                        <Zap className="w-4 h-4 text-yellow-500" />
+                        Current Month Playbook
+                    </h4>
+                    
+                    {syn.current_month_playbook.primary_strategy && (
+                        <p className="text-sm bg-gray-50 dark:bg-gray-800 p-3 rounded">{syn.current_month_playbook.primary_strategy}</p>
+                    )}
+
+                    {/* Position Sizing */}
+                    {syn.current_month_playbook.position_sizing && (
+                        <div className="grid grid-cols-3 gap-2 text-sm">
+                            <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded text-center">
+                                <div className="font-bold">{syn.current_month_playbook.position_sizing.base_equity_pct}%</div>
+                                <div className="text-xs text-gray-500">Base Equity</div>
+                            </div>
+                            <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded text-center">
+                                <div className="font-bold text-blue-700">{syn.current_month_playbook.position_sizing.seasonal_adjustment_pct > 0 ? '+' : ''}{syn.current_month_playbook.position_sizing.seasonal_adjustment_pct}%</div>
+                                <div className="text-xs text-blue-600">Seasonal Adj</div>
+                            </div>
+                            <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded text-center border-2 border-green-300">
+                                <div className="font-bold text-green-700">{syn.current_month_playbook.position_sizing.final_equity_pct}%</div>
+                                <div className="text-xs text-green-600">Final Equity</div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Sector Tilts */}
+                    {syn.current_month_playbook.sector_tilts && syn.current_month_playbook.sector_tilts.length > 0 && (
+                        <div className="space-y-1">
+                            <h5 className="text-sm font-medium">Sector Tilts</h5>
+                            <div className="grid gap-1">
+                                {syn.current_month_playbook.sector_tilts.map((tilt: Record<string, unknown>, i: number) => (
+                                    <div key={i} className={`p-2 rounded text-sm flex justify-between ${
+                                        tilt.action === 'overweight' ? 'bg-green-50' :
+                                        tilt.action === 'underweight' ? 'bg-red-50' : 'bg-gray-50'
+                                    }`}>
+                                        <span className="font-medium">{String(tilt.sector)}</span>
+                                        <span>{String(tilt.action)} ({String(tilt.size_pct)}%)</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Event Trades */}
+                    {syn.current_month_playbook.event_trades && syn.current_month_playbook.event_trades.length > 0 && (
+                        <div className="space-y-2">
+                            <h5 className="text-sm font-medium">Event Trades</h5>
+                            {syn.current_month_playbook.event_trades.map((trade: Record<string, unknown>, i: number) => (
+                                <div key={i} className="p-2 bg-purple-50 dark:bg-purple-900/20 rounded text-sm">
+                                    <div className="font-medium">{String(trade.event)}</div>
+                                    <div className="text-purple-700">{String(trade.trade)}</div>
+                                    <div className="text-xs text-gray-500 mt-1">
+                                        {String(trade.entry_date)} → {String(trade.exit_date)} | R:R {String(trade.risk_reward)}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Monthly Action Calendar - new format */}
+            {syn.monthly_action_calendar && syn.monthly_action_calendar.length > 0 && (
+                <div className="space-y-2">
+                    <h4 className="font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                        <Calendar className="w-4 h-4 text-blue-500" />
+                        Monthly Calendar
+                    </h4>
+                    <div className="overflow-x-auto">
+                        <table className="min-w-full text-xs">
+                            <thead>
+                                <tr className="bg-gray-50 dark:bg-gray-800">
+                                    <th className="px-2 py-1 text-left">Month</th>
+                                    <th className="px-2 py-1 text-center">Bias</th>
+                                    <th className="px-2 py-1 text-center">Hist. Return</th>
+                                    <th className="px-2 py-1 text-center">Equity %</th>
+                                    <th className="px-2 py-1 text-left">Leaders</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {syn.monthly_action_calendar.slice(0, 6).map((month: Record<string, unknown>, i: number) => (
+                                    <tr key={i} className="border-b dark:border-gray-700">
+                                        <td className="px-2 py-1 font-medium">{String(month.month || '')}</td>
+                                        <td className="px-2 py-1 text-center">
+                                            <span className={`px-1 rounded ${
+                                                month.seasonal_bias === 'bullish' ? 'bg-green-100 text-green-700' :
+                                                month.seasonal_bias === 'bearish' ? 'bg-red-100 text-red-700' :
+                                                'bg-gray-100 text-gray-700'
+                                            }`}>
+                                                {String(month.seasonal_bias || '')}
+                                            </span>
+                                        </td>
+                                        <td className="px-2 py-1 text-center">{String(month.historical_return_pct || 0)}%</td>
+                                        <td className="px-2 py-1 text-center">{String(month.recommended_equity_allocation_pct || 0)}%</td>
+                                        <td className="px-2 py-1">{Array.isArray(month.sector_leaders) ? month.sector_leaders.join(', ') : ''}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+
+            {/* Bottom Line - new format */}
+            {syn.bottom_line && (
+                <div className="p-3 bg-blue-100 dark:bg-blue-900/30 border border-blue-300 dark:border-blue-700 rounded-lg">
+                    <h5 className="text-sm font-semibold text-blue-800 dark:text-blue-200 mb-1">Bottom Line</h5>
+                    <p className="text-sm text-blue-700 dark:text-blue-300">{syn.bottom_line.one_liner}</p>
+                    <div className="text-xs text-blue-600 mt-1">
+                        Confidence: {syn.bottom_line.confidence} | Horizon: {syn.bottom_line.time_horizon}
+                    </div>
+                </div>
+            )}
+
+            {/* Fallback: Legacy sector positioning */}
+            {syn.sector_positioning && (
                 <div className="grid grid-cols-2 gap-4">
-                    {synthesis.sector_positioning.overweight && synthesis.sector_positioning.overweight.length > 0 && (
+                    {syn.sector_positioning.overweight && syn.sector_positioning.overweight.length > 0 && (
                         <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                            <h5 className="text-sm font-medium text-green-700 dark:text-green-400 mb-2">
-                                Overweight (Seasonal Tailwinds)
-                            </h5>
+                            <h5 className="text-sm font-medium text-green-700 dark:text-green-400 mb-2">Overweight</h5>
                             <div className="flex flex-wrap gap-1">
-                                {synthesis.sector_positioning.overweight.map((sector, i) => (
+                                {syn.sector_positioning.overweight.map((sector: string, i: number) => (
                                     <span key={i} className="px-2 py-0.5 bg-green-100 dark:bg-green-800 text-green-800 dark:text-green-200 text-xs rounded">
                                         {sector}
                                     </span>
@@ -619,13 +949,11 @@ function SeasonalityAnalysisView({ data }: { data: SeasonalityAnalysis }) {
                             </div>
                         </div>
                     )}
-                    {synthesis.sector_positioning.underweight && synthesis.sector_positioning.underweight.length > 0 && (
+                    {syn.sector_positioning.underweight && syn.sector_positioning.underweight.length > 0 && (
                         <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
-                            <h5 className="text-sm font-medium text-red-700 dark:text-red-400 mb-2">
-                                Underweight (Seasonal Headwinds)
-                            </h5>
+                            <h5 className="text-sm font-medium text-red-700 dark:text-red-400 mb-2">Underweight</h5>
                             <div className="flex flex-wrap gap-1">
-                                {synthesis.sector_positioning.underweight.map((sector, i) => (
+                                {syn.sector_positioning.underweight.map((sector: string, i: number) => (
                                     <span key={i} className="px-2 py-0.5 bg-red-100 dark:bg-red-800 text-red-800 dark:text-red-200 text-xs rounded">
                                         {sector}
                                     </span>
@@ -635,84 +963,66 @@ function SeasonalityAnalysisView({ data }: { data: SeasonalityAnalysis }) {
                     )}
                 </div>
             )}
-            
-            {/* Event Opportunities */}
-            {synthesis?.event_opportunities && synthesis.event_opportunities.length > 0 && (
-                <div className="space-y-2">
-                    <h4 className="font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-purple-500" />
-                        Event-Driven Opportunities
-                    </h4>
-                    <div className="flex flex-wrap gap-2">
-                        {synthesis.event_opportunities.map((opp, i) => (
-                            <span key={i} className="px-2 py-1 bg-purple-100 dark:bg-purple-800 text-purple-700 dark:text-purple-200 text-sm rounded">
-                                {opp}
-                            </span>
-                        ))}
-                    </div>
-                </div>
-            )}
-            
-            {/* Agent Details */}
+
+            {/* Agent Details - Dynamic rendering */}
             <div className="space-y-3 mt-4">
                 <h4 className="font-medium text-gray-900 dark:text-gray-100">Agent Analyses</h4>
                 
-                {agent_analyses?.historical_patterns && (
-                    <AgentCard 
+                {agents.historical_patterns && (
+                    <DataSection 
                         title="Historical Patterns" 
+                        data={agents.historical_patterns}
                         icon={<BarChart2 className="w-4 h-4 text-blue-500" />}
-                        confidence={agent_analyses.historical_patterns.confidence}
-                    >
-                        <p><strong>Avg Return:</strong> {agent_analyses.historical_patterns.historical_avg_return}</p>
-                        <p><strong>Win Rate:</strong> {agent_analyses.historical_patterns.historical_win_rate}</p>
-                        <p><strong>Pattern Strength:</strong> {agent_analyses.historical_patterns.pattern_strength}</p>
-                        <p><strong>Signal:</strong> {agent_analyses.historical_patterns.seasonality_signal}</p>
-                    </AgentCard>
+                    />
                 )}
                 
-                {agent_analyses?.event_calendar && (
-                    <AgentCard 
+                {agents.event_calendar && (
+                    <DataSection 
                         title="Event Calendar" 
+                        data={typeof agents.event_calendar === 'object' && !agents.event_calendar.raw_response 
+                            ? agents.event_calendar 
+                            : { summary: 'See event details above' }}
                         icon={<Calendar className="w-4 h-4 text-purple-500" />}
-                        confidence={agent_analyses.event_calendar.confidence}
-                    >
-                        {agent_analyses.event_calendar.upcoming_events?.map((event, i) => (
-                            <div key={i} className="flex items-center justify-between py-1 border-b border-gray-200 dark:border-gray-700 last:border-0">
-                                <span>{event.event}</span>
-                                <span className={`px-2 py-0.5 rounded text-xs ${
-                                    event.expected_impact === 'bullish' ? 'bg-green-100 text-green-700' :
-                                    event.expected_impact === 'bearish' ? 'bg-red-100 text-red-700' :
-                                    'bg-gray-100 text-gray-700'
-                                }`}>
-                                    {event.expected_impact}
-                                </span>
-                            </div>
-                        ))}
-                        <p className="mt-2">{agent_analyses.event_calendar.event_based_outlook}</p>
-                    </AgentCard>
+                    />
                 )}
                 
-                {agent_analyses?.sector_seasonality && (
-                    <AgentCard 
+                {agents.sector_seasonality && (
+                    <DataSection 
                         title="Sector Seasonality" 
+                        data={typeof agents.sector_seasonality === 'object' && !agents.sector_seasonality.raw_response 
+                            ? agents.sector_seasonality 
+                            : { summary: 'See sector details above' }}
                         icon={<TrendingUp className="w-4 h-4 text-green-500" />}
-                        confidence={agent_analyses.sector_seasonality.confidence}
-                    >
-                        <p><strong>Top Picks:</strong> {agent_analyses.sector_seasonality.top_seasonal_picks?.join(', ')}</p>
-                        <p><strong>Avoid:</strong> {agent_analyses.sector_seasonality.sectors_to_avoid_seasonally?.join(', ')}</p>
-                    </AgentCard>
+                    />
                 )}
             </div>
-            
-            {/* Seasonal Risks */}
-            {synthesis?.seasonal_risks && synthesis.seasonal_risks.length > 0 && (
+
+            {/* Risk Warnings - new format */}
+            {syn.risk_warnings && syn.risk_warnings.length > 0 && (
+                <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                    <h5 className="text-sm font-medium text-yellow-700 dark:text-yellow-400 mb-2 flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4" />
+                        Risk Warnings
+                    </h5>
+                    <ul className="space-y-1">
+                        {syn.risk_warnings.map((risk: Record<string, unknown>, i: number) => (
+                            <li key={i} className="text-sm text-yellow-800 dark:text-yellow-200">
+                                ⚠ {String(risk.risk ?? risk)} {risk.probability_pct != null ? `(${String(risk.probability_pct)}% prob)` : ''}
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
+
+            {/* Fallback: Legacy seasonal_risks */}
+            {syn.seasonal_risks && syn.seasonal_risks.length > 0 && !syn.risk_warnings && (
                 <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
                     <h5 className="text-sm font-medium text-yellow-700 dark:text-yellow-400 mb-2 flex items-center gap-2">
                         <AlertTriangle className="w-4 h-4" />
                         Seasonal Risks
                     </h5>
                     <ul className="space-y-1">
-                        {synthesis.seasonal_risks.map((risk, i) => (
+                        {syn.seasonal_risks.map((risk: string, i: number) => (
                             <li key={i} className="text-sm text-yellow-800 dark:text-yellow-200 flex items-start gap-2">
                                 <span className="text-yellow-500">⚠</span>
                                 {risk}
