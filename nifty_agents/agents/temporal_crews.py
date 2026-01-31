@@ -822,9 +822,13 @@ class MonthlyAnalysisCrew(BaseTemporalCrew):
             # Gather macro data
             logger.info("Fetching monthly analysis data...")
             
+            # Get macro indicators first, then derive regime
+            macro_indicators = get_macro_indicators()
+            market_regime = determine_market_regime(macro_indicators)
+            
             macro_data = {
-                "macro_indicators": get_macro_indicators(),
-                "market_regime": determine_market_regime()
+                "macro_indicators": macro_indicators,
+                "market_regime": market_regime
             }
             
             flow_data = {

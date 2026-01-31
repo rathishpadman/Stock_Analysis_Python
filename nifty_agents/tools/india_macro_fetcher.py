@@ -91,8 +91,10 @@ def get_rbi_rates() -> Dict[str, Any]:
     else:
         rates = DEFAULT_RBI_RATES.copy()
     
-    # Determine policy stance based on repo rate
-    repo_rate = rates.get("repo_rate", 6.0)
+    # Determine policy stance based on repo rate (with null safety)
+    repo_rate = rates.get("repo_rate")
+    if repo_rate is None:
+        repo_rate = 6.0  # Default to neutral rate
     if repo_rate >= 7.0:
         rates["policy_stance"] = "hawkish"
         rates["stance_description"] = "Tight monetary policy - higher rates to control inflation"
@@ -145,8 +147,14 @@ def get_india_vix() -> Dict[str, Any]:
                 "timestamp": datetime.now().isoformat()
             }
         
-        vix_value = vix_data.get("last", 0)
-        change_pct = vix_data.get("percentChange", 0)
+        vix_value = vix_data.get("last") or 0
+        change_pct = vix_data.get("percentChange") or 0
+        
+        # Safely convert to float for comparisons
+        try:
+            vix_value = float(vix_value) if vix_value else 0
+        except (TypeError, ValueError):
+            vix_value = 0
         
         # Determine fear level
         if vix_value < 15:
@@ -212,19 +220,36 @@ def get_nifty_valuations() -> Dict[str, Any]:
         if not nifty_data:
             return {"error": "Could not fetch NIFTY data"}
         
-        pe = nifty_data.get("pe", 0)
-        pb = nifty_data.get("pb", 0)
-        dy = nifty_data.get("dy", 0)
+        # Safe extraction with type conversion
+        pe = nifty_data.get("pe")
+        pb = nifty_data.get("pb")
+        dy = nifty_data.get("dy")
         
-        # PE interpretation
-        if pe < 18:
-            pe_interpretation = "undervalued"
-        elif pe < 22:
-            pe_interpretation = "fair_value"
-        elif pe < 25:
-            pe_interpretation = "slightly_overvalued"
+        try:
+            pe = float(pe) if pe is not None else 0
+        except (TypeError, ValueError):
+            pe = 0
+        try:
+            pb = float(pb) if pb is not None else 0
+        except (TypeError, ValueError):
+            pb = 0
+        try:
+            dy = float(dy) if dy is not None else 0
+        except (TypeError, ValueError):
+            dy = 0
+        
+        # PE interpretation (only if we have valid PE)
+        if pe > 0:
+            if pe < 18:
+                pe_interpretation = "undervalued"
+            elif pe < 22:
+                pe_interpretation = "fair_value"
+            elif pe < 25:
+                pe_interpretation = "slightly_overvalued"
+            else:
+                pe_interpretation = "overvalued"
         else:
-            pe_interpretation = "overvalued"
+            pe_interpretation = "unknown"
         
         return {
             "index": "NIFTY 50",
@@ -272,38 +297,50 @@ def determine_market_regime(indicators: Dict[str, Any]) -> str:
     score = 0  # Positive = bullish, Negative = bearish
     
     # VIX contribution (-2 to +2)
-    vix_data = indicators.get("india_vix", {})
-    vix_value = vix_data.get("value", 20)
-    if vix_value:
-        if vix_value < 15:
-            score += 2  # Low fear = bullish
-        elif vix_value < 20:
-            score += 1
-        elif vix_value < 25:
-            score -= 1
-        else:
-            score -= 2  # High fear = bearish
+    vix_data = indicators.get("india_vix", {}) or {}
+    vix_value = vix_data.get("value")
+    if vix_value is not None:
+        try:
+            vix_value = float(vix_value)
+            if vix_value < 15:
+                score += 2  # Low fear = bullish
+            elif vix_value < 20:
+                score += 1
+            elif vix_value < 25:
+                score -= 1
+            else:
+                score -= 2  # High fear = bearish
+        except (TypeError, ValueError):
+            pass  # Skip if invalid
     
     # NIFTY PE contribution (-2 to +2)
     nifty_pe = indicators.get("nifty_pe")
-    if nifty_pe:
-        if nifty_pe < 18:
-            score += 2  # Undervalued = bullish
-        elif nifty_pe < 22:
-            score += 1
-        elif nifty_pe < 25:
-            score -= 1
-        else:
-            score -= 2  # Overvalued = bearish
+    if nifty_pe is not None:
+        try:
+            nifty_pe = float(nifty_pe)
+            if nifty_pe < 18:
+                score += 2  # Undervalued = bullish
+            elif nifty_pe < 22:
+                score += 1
+            elif nifty_pe < 25:
+                score -= 1
+            else:
+                score -= 2  # Overvalued = bearish
+        except (TypeError, ValueError):
+            pass  # Skip if invalid
     
     # RBI rates contribution (-1 to +1)
-    rbi_data = indicators.get("rbi_rates", {})
-    repo_rate = rbi_data.get("repo_rate", 6.0)
-    if repo_rate:
-        if repo_rate < 5.5:
-            score += 1  # Dovish = bullish for equities
-        elif repo_rate > 7.0:
-            score -= 1  # Hawkish = bearish for equities
+    rbi_data = indicators.get("rbi_rates", {}) or {}
+    repo_rate = rbi_data.get("repo_rate")
+    if repo_rate is not None:
+        try:
+            repo_rate = float(repo_rate)
+            if repo_rate < 5.5:
+                score += 1  # Dovish = bullish for equities
+            elif repo_rate > 7.0:
+                score -= 1  # Hawkish = bearish for equities
+        except (TypeError, ValueError):
+            pass  # Skip if invalid
     
     # Determine regime based on score
     if score >= 3:
