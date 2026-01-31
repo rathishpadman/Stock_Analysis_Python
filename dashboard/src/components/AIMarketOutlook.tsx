@@ -275,6 +275,49 @@ function AgentCard({
     );
 }
 
+// Helper to format price ranges
+function formatPriceRange(zone: unknown): string {
+    if (!zone || typeof zone !== 'object') return String(zone ?? '');
+    const z = zone as Record<string, unknown>;
+    const low = z.low ?? z.min ?? z.entry_low;
+    const high = z.high ?? z.max ?? z.entry_high;
+    if (low === 'N/A' && high === 'N/A') return 'N/A';
+    if (low && high && low !== 'N/A' && high !== 'N/A') return `₹${low} - ₹${high}`;
+    if (low && low !== 'N/A') return `₹${low}`;
+    if (high && high !== 'N/A') return `₹${high}`;
+    return 'N/A';
+}
+
+// Helper to format nested objects as readable key-value pairs
+function formatObject(obj: Record<string, unknown>, indent = 0): React.ReactNode {
+    const entries = Object.entries(obj).filter(([, v]) => v != null);
+    if (entries.length === 0) return null;
+    
+    return (
+        <div className={indent > 0 ? 'ml-4 border-l-2 border-gray-200 dark:border-gray-700 pl-3' : ''}>
+            {entries.map(([key, value]) => {
+                const label = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                
+                if (typeof value === 'object' && !Array.isArray(value) && value !== null) {
+                    return (
+                        <div key={key} className="mb-2">
+                            <span className="font-medium text-gray-600 dark:text-gray-400">{label}:</span>
+                            {formatObject(value as Record<string, unknown>, indent + 1)}
+                        </div>
+                    );
+                }
+                
+                return (
+                    <div key={key} className="flex flex-wrap gap-1 py-0.5">
+                        <span className="font-medium text-gray-600 dark:text-gray-400">{label}:</span>
+                        <span className="text-gray-800 dark:text-gray-200">{renderValue(value)}</span>
+                    </div>
+                );
+            })}
+        </div>
+    );
+}
+
 // Helper to safely render any value
 function renderValue(value: unknown): React.ReactNode {
     if (value === null || value === undefined) return null;
@@ -282,14 +325,28 @@ function renderValue(value: unknown): React.ReactNode {
         return String(value);
     }
     if (Array.isArray(value)) {
-        return value.map((v, i) => (
-            <span key={i} className="inline-block px-2 py-0.5 mr-1 mb-1 bg-gray-100 dark:bg-gray-700 rounded text-xs">
-                {typeof v === 'object' ? JSON.stringify(v) : String(v)}
-            </span>
-        ));
+        // Check if it's an array of simple values or objects
+        const hasObjects = value.some(v => typeof v === 'object' && v !== null);
+        if (!hasObjects) {
+            return value.map((v, i) => (
+                <span key={i} className="inline-block px-2 py-0.5 mr-1 mb-1 bg-gray-100 dark:bg-gray-700 rounded text-xs">
+                    {String(v)}
+                </span>
+            ));
+        }
+        // For arrays of objects, render each as a mini-card
+        return (
+            <div className="space-y-1 mt-1">
+                {value.map((v, i) => (
+                    <div key={i} className="text-xs bg-gray-50 dark:bg-gray-800 p-2 rounded">
+                        {typeof v === 'object' ? formatObject(v as Record<string, unknown>) : String(v)}
+                    </div>
+                ))}
+            </div>
+        );
     }
     if (typeof value === 'object') {
-        return <pre className="text-xs bg-gray-50 dark:bg-gray-800 p-2 rounded overflow-x-auto">{JSON.stringify(value, null, 2)}</pre>;
+        return formatObject(value as Record<string, unknown>);
     }
     return String(value);
 }
@@ -371,7 +428,7 @@ function WeeklyAnalysisView({ data }: { data: WeeklyAnalysis }) {
                                 <p className="text-sm text-green-700 dark:text-green-300">{String(idea.rationale ?? idea.action ?? '')}</p>
                                 {(idea.entry_zone != null || idea.stop_loss_pct != null || idea.target_pct != null) && (
                                     <div className="mt-2 flex flex-wrap gap-3 text-xs">
-                                        {idea.entry_zone != null && <span>Entry: ₹{JSON.stringify(idea.entry_zone)}</span>}
+                                        {idea.entry_zone != null && <span>Entry: {formatPriceRange(idea.entry_zone)}</span>}
                                         {idea.stop_loss_pct != null && <span className="text-red-600">SL: {String(idea.stop_loss_pct)}%</span>}
                                         {idea.target_pct != null && <span className="text-green-600">Target: {String(idea.target_pct)}%</span>}
                                     </div>
