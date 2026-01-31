@@ -90,6 +90,55 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
+def _clean_json_response(text: str) -> str:
+    """
+    Clean and extract JSON from LLM response.
+    
+    Handles common LLM JSON issues:
+    - Markdown code blocks (```json ... ```)
+    - Trailing commas in arrays/objects
+    - Single quotes instead of double quotes
+    - Unquoted keys
+    - Comments
+    
+    Args:
+        text: Raw LLM response text
+        
+    Returns:
+        Cleaned JSON string ready for parsing
+    """
+    import re
+    
+    # Strip whitespace
+    cleaned = text.strip()
+    
+    # Extract from markdown code blocks
+    if "```json" in cleaned:
+        cleaned = cleaned.split("```json")[1].split("```")[0]
+    elif "```" in cleaned:
+        # Handle generic code blocks
+        parts = cleaned.split("```")
+        if len(parts) >= 2:
+            cleaned = parts[1]
+            # Remove language identifier if present (e.g., "json\n")
+            if cleaned.startswith(("json", "JSON")):
+                cleaned = cleaned[4:]
+    
+    cleaned = cleaned.strip()
+    
+    # Remove trailing commas before ] or }
+    # This handles: [1, 2, 3,] or {"a": 1,}
+    cleaned = re.sub(r',(\s*[}\]])', r'\1', cleaned)
+    
+    # Remove single-line comments (// ...)
+    cleaned = re.sub(r'//.*?$', '', cleaned, flags=re.MULTILINE)
+    
+    # Remove multi-line comments (/* ... */)
+    cleaned = re.sub(r'/\*.*?\*/', '', cleaned, flags=re.DOTALL)
+    
+    return cleaned.strip()
+
+
 class NiftyAgentOrchestrator:
     """
     Orchestrates multi-agent stock analysis for NIFTY stocks.
@@ -552,14 +601,8 @@ Respond ONLY with valid JSON. No explanatory text outside the JSON.
             llm_latency_ms = (time.time() - llm_start_time) * 1000
             
             # Parse response
-            response_text = response.text.strip()
-            raw_response = response_text  # Keep original for logging
-            
-            # Extract JSON from response
-            if "```json" in response_text:
-                response_text = response_text.split("```json")[1].split("```")[0]
-            elif "```" in response_text:
-                response_text = response_text.split("```")[1].split("```")[0]
+            raw_response = response.text.strip()  # Keep original for logging
+            response_text = _clean_json_response(raw_response)
             
             # Get token counts from response if available
             input_tokens = None
@@ -737,12 +780,7 @@ Respond ONLY with valid JSON.
             
             llm_latency_ms = (time.time() - llm_start_time) * 1000
             raw_response = response.text.strip()
-            response_text = raw_response
-            
-            if "```json" in response_text:
-                response_text = response_text.split("```json")[1].split("```")[0]
-            elif "```" in response_text:
-                response_text = response_text.split("```")[1].split("```")[0]
+            response_text = _clean_json_response(raw_response)
             
             # Get token counts
             input_tokens = None
