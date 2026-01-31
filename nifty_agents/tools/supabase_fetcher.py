@@ -568,3 +568,216 @@ def search_stocks(
     except Exception as e:
         logger.error(f"Error searching stocks: {e}")
         return [{"error": str(e)}]
+
+
+# =============================================================================
+# Additional Helper Functions for Temporal Analysis
+# =============================================================================
+
+def get_sector_performance(
+    sectors: List[str] = None,
+    period: str = "1W"
+) -> Dict[str, Any]:
+    """
+    Get sector-wise performance data.
+    
+    Args:
+        sectors: List of sector names (if None, gets all)
+        period: Time period ("1W", "1M", "3M")
+        
+    Returns:
+        Dict with sector performance metrics
+    """
+    client = _get_supabase_client()
+    if not client:
+        return {"error": "Supabase not configured"}
+    
+    try:
+        # Get latest data grouped by sector
+        response = client.table("daily_stocks") \
+            .select("sector, return_1w, return_1m, technical_score, composite_score") \
+            .order("date", desc=True) \
+            .limit(500) \
+            .execute()
+        
+        if not response.data:
+            return {"sectors": {}, "note": "No data available"}
+        
+        # Get latest date's data
+        latest_date = response.data[0].get("date")
+        latest_data = [d for d in response.data if d.get("date") == latest_date]
+        
+        # Aggregate by sector
+        sector_data = {}
+        for row in latest_data:
+            sector = row.get("sector", "Unknown")
+            if sectors and sector not in sectors:
+                continue
+            
+            if sector not in sector_data:
+                sector_data[sector] = {
+                    "stocks": [],
+                    "return_1w": [],
+                    "return_1m": [],
+                    "avg_score": []
+                }
+            
+            if row.get("return_1w") is not None:
+                sector_data[sector]["return_1w"].append(row["return_1w"])
+            if row.get("return_1m") is not None:
+                sector_data[sector]["return_1m"].append(row["return_1m"])
+            if row.get("composite_score") is not None:
+                sector_data[sector]["avg_score"].append(row["composite_score"])
+        
+        # Compute averages
+        result = {}
+        for sector, data in sector_data.items():
+            result[sector] = {
+                "avg_return_1w": sum(data["return_1w"]) / len(data["return_1w"]) if data["return_1w"] else 0,
+                "avg_return_1m": sum(data["return_1m"]) / len(data["return_1m"]) if data["return_1m"] else 0,
+                "avg_composite_score": sum(data["avg_score"]) / len(data["avg_score"]) if data["avg_score"] else 0,
+                "stock_count": len(data["return_1w"])
+            }
+        
+        # Sort by weekly return
+        sorted_sectors = sorted(result.items(), key=lambda x: x[1]["avg_return_1w"], reverse=True)
+        
+        return {
+            "sectors": dict(sorted_sectors),
+            "top_sectors": [s[0] for s in sorted_sectors[:3]],
+            "lagging_sectors": [s[0] for s in sorted_sectors[-3:]],
+            "period": period
+        }
+        
+    except Exception as e:
+        logger.error(f"Error fetching sector performance: {e}")
+        return {"error": str(e)}
+
+
+def get_market_breadth() -> Dict[str, Any]:
+    """
+    Get market breadth indicators.
+    
+    Returns:
+        Dict with advance/decline data and breadth metrics
+    """
+    client = _get_supabase_client()
+    if not client:
+        return {"error": "Supabase not configured"}
+    
+    try:
+        # Get latest day's data
+        response = client.table("daily_stocks") \
+            .select("ticker, return_1d, close, sma_200, rsi_14") \
+            .order("date", desc=True) \
+            .limit(500) \
+            .execute()
+        
+        if not response.data:
+            return {"error": "No data available"}
+        
+        # Get latest date only
+        latest_date = response.data[0].get("date") if response.data else None
+        latest_data = [d for d in response.data if d.get("date") == latest_date]
+        
+        advances = 0
+        declines = 0
+        unchanged = 0
+        above_200dma = 0
+        oversold_rsi = 0
+        overbought_rsi = 0
+        
+        for row in latest_data:
+            ret = row.get("return_1d", 0) or 0
+            close = row.get("close", 0) or 0
+            sma_200 = row.get("sma_200", 0) or 0
+            rsi = row.get("rsi_14", 50) or 50
+            
+            # A/D count
+            if ret > 0.1:
+                advances += 1
+            elif ret < -0.1:
+                declines += 1
+            else:
+                unchanged += 1
+            
+            # Above 200 DMA
+            if close > 0 and sma_200 > 0 and close > sma_200:
+                above_200dma += 1
+            
+            # RSI extremes
+            if rsi < 30:
+                oversold_rsi += 1
+            elif rsi > 70:
+                overbought_rsi += 1
+        
+        total = advances + declines + unchanged
+        
+        return {
+            "advances": advances,
+            "declines": declines,
+            "unchanged": unchanged,
+            "ad_ratio": round(advances / max(declines, 1), 2),
+            "advance_pct": round(100 * advances / max(total, 1), 1),
+            "above_200dma": above_200dma,
+            "above_200dma_pct": round(100 * above_200dma / max(total, 1), 1),
+            "oversold_count": oversold_rsi,
+            "overbought_count": overbought_rsi,
+            "breadth_signal": "bullish" if advances > declines * 1.5 else ("bearish" if declines > advances * 1.5 else "neutral"),
+            "total_stocks": total
+        }
+        
+    except Exception as e:
+        logger.error(f"Error fetching market breadth: {e}")
+        return {"error": str(e)}
+
+
+def get_index_summary(
+    index: str = "NIFTY_200"
+) -> Dict[str, Any]:
+    """
+    Get index-level summary statistics.
+    
+    Args:
+        index: Index name (NIFTY_50, NIFTY_200, NIFTY_500)
+        
+    Returns:
+        Dict with index summary metrics
+    """
+    client = _get_supabase_client()
+    if not client:
+        return {"error": "Supabase not configured"}
+    
+    try:
+        response = client.table("daily_stocks") \
+            .select("ticker, composite_score, technical_score, fundamental_score, return_1d, return_1w, return_1m") \
+            .eq("index", index) \
+            .order("date", desc=True) \
+            .limit(500) \
+            .execute()
+        
+        if not response.data:
+            return {"error": f"No data for {index}"}
+        
+        # Get latest date
+        latest_date = response.data[0].get("date")
+        latest_data = [d for d in response.data if d.get("date") == latest_date]
+        
+        # Compute stats
+        composite_scores = [d.get("composite_score", 0) or 0 for d in latest_data]
+        returns_1d = [d.get("return_1d", 0) or 0 for d in latest_data]
+        returns_1w = [d.get("return_1w", 0) or 0 for d in latest_data]
+        
+        return {
+            "index": index,
+            "stock_count": len(latest_data),
+            "avg_composite_score": round(sum(composite_scores) / len(composite_scores), 1) if composite_scores else 0,
+            "avg_return_1d": round(sum(returns_1d) / len(returns_1d), 2) if returns_1d else 0,
+            "avg_return_1w": round(sum(returns_1w) / len(returns_1w), 2) if returns_1w else 0,
+            "high_score_count": len([s for s in composite_scores if s >= 70]),
+            "low_score_count": len([s for s in composite_scores if s <= 30])
+        }
+        
+    except Exception as e:
+        logger.error(f"Error fetching index summary: {e}")
+        return {"error": str(e)}

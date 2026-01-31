@@ -1141,6 +1141,215 @@ async def clear_logs():
 
 
 # ============================================================================
+# Temporal Analysis Endpoints (Weekly, Monthly, Seasonality)
+# ============================================================================
+
+# Import temporal crews
+try:
+    from .agents.temporal_crews import (
+        WeeklyAnalysisCrew,
+        MonthlyAnalysisCrew,
+        SeasonalityAnalysisCrew,
+        get_weekly_outlook,
+        get_monthly_thesis,
+        get_seasonality_insights
+    )
+    TEMPORAL_CREWS_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"Temporal crews not available: {e}")
+    TEMPORAL_CREWS_AVAILABLE = False
+
+
+@app.get(
+    "/api/agent/weekly-outlook",
+    tags=["Temporal Analysis"],
+    summary="Get Weekly Market Outlook"
+)
+async def weekly_outlook():
+    """
+    Get AI-generated weekly market outlook for Indian equities.
+    
+    Uses multiple specialized agents:
+    - Trend Agent: Technical analysis of weekly patterns
+    - Sector Rotation Agent: Money flow analysis
+    - Risk Regime Agent: Market risk assessment
+    - Weekly Synthesizer: Combines all insights
+    
+    Returns:
+        Complete weekly analysis with stance, insights, and recommendations
+    """
+    if not TEMPORAL_CREWS_AVAILABLE:
+        raise HTTPException(
+            status_code=503, 
+            detail="Temporal analysis crews not available"
+        )
+    
+    try:
+        result = await get_weekly_outlook()
+        
+        # Make response JSON-serializable
+        def make_serializable(obj):
+            if isinstance(obj, dict):
+                return {k: make_serializable(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [make_serializable(v) for v in obj]
+            elif hasattr(obj, 'isoformat'):
+                return obj.isoformat()
+            elif hasattr(obj, '__dict__'):
+                return make_serializable(obj.__dict__)
+            else:
+                try:
+                    json.dumps(obj)
+                    return obj
+                except (TypeError, ValueError):
+                    return str(obj)
+        
+        return JSONResponse(content=make_serializable(result))
+        
+    except Exception as e:
+        logger.error(f"Weekly outlook failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get(
+    "/api/agent/monthly-thesis",
+    tags=["Temporal Analysis"],
+    summary="Get Monthly Investment Thesis"
+)
+async def monthly_thesis():
+    """
+    Get AI-generated monthly investment thesis for Indian markets.
+    
+    Uses multiple specialized agents:
+    - Macro Cycle Agent: Economic cycle analysis
+    - Fund Flow Agent: Institutional flow tracking
+    - Valuation Regime Agent: Market-wide valuations
+    - Monthly Strategist: Investment thesis synthesis
+    
+    Returns:
+        Complete monthly analysis with thesis, asset allocation, and themes
+    """
+    if not TEMPORAL_CREWS_AVAILABLE:
+        raise HTTPException(
+            status_code=503,
+            detail="Temporal analysis crews not available"
+        )
+    
+    try:
+        result = await get_monthly_thesis()
+        
+        # Make response JSON-serializable
+        def make_serializable(obj):
+            if isinstance(obj, dict):
+                return {k: make_serializable(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [make_serializable(v) for v in obj]
+            elif hasattr(obj, 'isoformat'):
+                return obj.isoformat()
+            elif hasattr(obj, '__dict__'):
+                return make_serializable(obj.__dict__)
+            else:
+                try:
+                    json.dumps(obj)
+                    return obj
+                except (TypeError, ValueError):
+                    return str(obj)
+        
+        return JSONResponse(content=make_serializable(result))
+        
+    except Exception as e:
+        logger.error(f"Monthly thesis failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get(
+    "/api/agent/seasonality",
+    tags=["Temporal Analysis"],
+    summary="Get Seasonality Insights"
+)
+async def seasonality_insights(
+    ticker: Optional[str] = Query(None, description="Optional ticker for stock-specific seasonality"),
+    sector: Optional[str] = Query(None, description="Optional sector to focus on")
+):
+    """
+    Get AI-generated seasonality insights for Indian markets.
+    
+    Uses multiple specialized agents:
+    - Historical Pattern Agent: Monthly return patterns analysis
+    - Event Calendar Agent: Recurring event impacts
+    - Sector Seasonality Agent: Sector-specific patterns
+    - Seasonality Synthesizer: Actionable insights
+    
+    Args:
+        ticker: Optional specific stock ticker for focused analysis
+        sector: Optional sector for sector-specific patterns
+    
+    Returns:
+        Seasonality analysis with probability, patterns, and recommendations
+    """
+    if not TEMPORAL_CREWS_AVAILABLE:
+        raise HTTPException(
+            status_code=503,
+            detail="Temporal analysis crews not available"
+        )
+    
+    try:
+        result = await get_seasonality_insights(ticker=ticker, sector=sector)
+        
+        # Make response JSON-serializable
+        def make_serializable(obj):
+            if isinstance(obj, dict):
+                return {k: make_serializable(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [make_serializable(v) for v in obj]
+            elif hasattr(obj, 'isoformat'):
+                return obj.isoformat()
+            elif hasattr(obj, '__dict__'):
+                return make_serializable(obj.__dict__)
+            else:
+                try:
+                    json.dumps(obj)
+                    return obj
+                except (TypeError, ValueError):
+                    return str(obj)
+        
+        return JSONResponse(content=make_serializable(result))
+        
+    except Exception as e:
+        logger.error(f"Seasonality insights failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get(
+    "/api/agent/temporal/status",
+    tags=["Temporal Analysis"],
+    summary="Check Temporal Analysis Status"
+)
+async def temporal_status():
+    """
+    Check if temporal analysis crews are available and configured.
+    
+    Returns:
+        Status of temporal analysis capabilities
+    """
+    return {
+        "temporal_crews_available": TEMPORAL_CREWS_AVAILABLE,
+        "available_endpoints": [
+            "/api/agent/weekly-outlook",
+            "/api/agent/monthly-thesis",
+            "/api/agent/seasonality"
+        ] if TEMPORAL_CREWS_AVAILABLE else [],
+        "crews": {
+            "weekly": "WeeklyAnalysisCrew - 4 agents",
+            "monthly": "MonthlyAnalysisCrew - 4 agents",
+            "seasonality": "SeasonalityAnalysisCrew - 4 agents"
+        } if TEMPORAL_CREWS_AVAILABLE else {},
+        "model": get_model_from_env(),
+        "api_key_configured": bool(os.environ.get("GOOGLE_API_KEY"))
+    }
+
+
+# ============================================================================
 # Startup/Shutdown Events
 # ============================================================================
 
