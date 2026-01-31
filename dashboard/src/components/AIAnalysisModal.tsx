@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Download, FileJson, Activity, Loader2, AlertCircle, CheckCircle, RefreshCw } from 'lucide-react';
+import { X, Download, FileJson, Activity, Loader2, AlertCircle, CheckCircle, RefreshCw, ChevronDown, ChevronRight, Cpu, DollarSign, Zap, Clock, BarChart2 } from 'lucide-react';
 
 interface AgentAnalysis {
     score?: number;
@@ -10,6 +10,29 @@ interface AgentAnalysis {
     reasoning?: string;
     error?: string;
     [key: string]: any;
+}
+
+// Detailed observability data from the agent system
+interface ObservabilityData {
+    trace_id?: string;
+    ticker?: string;
+    model?: string;
+    start_timestamp?: string;
+    end_timestamp?: string;
+    duration_seconds?: number;
+    total_input_tokens?: number;
+    total_output_tokens?: number;
+    total_tokens?: number;
+    total_cost_usd?: number;
+    agents_count?: number;
+    spans_count?: number;
+    error_count?: number;
+    success_rate_pct?: number;
+    errors?: Array<{
+        agent_name?: string;
+        error_message?: string;
+        error_type?: string;
+    }>;
 }
 
 interface AnalysisResult {
@@ -25,10 +48,7 @@ interface AnalysisResult {
     analysis_duration_seconds?: number;
     cached?: boolean;
     cache_age_seconds?: number;
-    observability?: {
-        total_cost_usd?: number;
-        total_tokens?: number;
-    };
+    observability?: ObservabilityData;
     error?: string;
 }
 
@@ -96,6 +116,7 @@ export default function AIAnalysisModal({ ticker, isOpen, onClose }: AIAnalysisM
     const [result, setResult] = useState<AnalysisResult | null>(null);
     const [agentProgress, setAgentProgress] = useState<Record<string, 'idle' | 'running' | 'complete' | 'error'>>({});
     const [expandedAgents, setExpandedAgents] = useState<Set<string>>(new Set());
+    const [showObservability, setShowObservability] = useState(false);
     const modalRef = useRef<HTMLDivElement>(null);
 
     // Fetch analysis when modal opens with a ticker
@@ -112,6 +133,7 @@ export default function AIAnalysisModal({ ticker, isOpen, onClose }: AIAnalysisM
             setError(null);
             setAgentProgress({});
             setExpandedAgents(new Set());
+            setShowObservability(false);
         }
     }, [isOpen]);
 
@@ -439,13 +461,182 @@ export default function AIAnalysisModal({ ticker, isOpen, onClose }: AIAnalysisM
                                 </div>
                             </div>
 
-                            {/* Duration & Cost */}
-                            <div className="flex items-center justify-between text-xs text-slate-500 px-2">
-                                <span>Analysis completed in {safeNumber(result.analysis_duration_seconds)?.toFixed(1) || '--'}s</span>
-                                <span>
-                                    Cost: ${safeNumber(result.observability?.total_cost_usd)?.toFixed(6) || '0.000000'} |
-                                    Tokens: {safeNumber(result.observability?.total_tokens)?.toLocaleString() || 0}
-                                </span>
+                            {/* Observability & FinOps Panel */}
+                            <div className="bg-slate-800/30 rounded-lg border border-slate-700 overflow-hidden">
+                                {/* Collapsible Header */}
+                                <button
+                                    onClick={() => setShowObservability(!showObservability)}
+                                    className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-700/30 transition-colors"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <BarChart2 className="w-4 h-4 text-cyan-400" />
+                                        <span className="text-sm font-medium text-slate-300">LLM Traces & FinOps</span>
+                                    </div>
+                                    <div className="flex items-center gap-4">
+                                        <div className="flex items-center gap-4 text-xs text-slate-400">
+                                            <span className="flex items-center gap-1">
+                                                <Clock className="w-3 h-3" />
+                                                {safeNumber(result.analysis_duration_seconds)?.toFixed(1) || '--'}s
+                                            </span>
+                                            <span className="flex items-center gap-1">
+                                                <DollarSign className="w-3 h-3" />
+                                                ${safeNumber(result.observability?.total_cost_usd)?.toFixed(6) || '0.000000'}
+                                            </span>
+                                            <span className="flex items-center gap-1">
+                                                <Zap className="w-3 h-3" />
+                                                {safeNumber(result.observability?.total_tokens)?.toLocaleString() || 0} tokens
+                                            </span>
+                                        </div>
+                                        {showObservability ? (
+                                            <ChevronDown className="w-4 h-4 text-slate-400" />
+                                        ) : (
+                                            <ChevronRight className="w-4 h-4 text-slate-400" />
+                                        )}
+                                    </div>
+                                </button>
+
+                                {/* Expanded Details */}
+                                {showObservability && result.observability && (
+                                    <div className="px-4 pb-4 border-t border-slate-700/50">
+                                        {/* Trace Info */}
+                                        <div className="mt-4 grid grid-cols-2 gap-4">
+                                            <div className="bg-slate-900/50 rounded-lg p-3">
+                                                <div className="text-xs text-slate-500 mb-1">Trace ID</div>
+                                                <div className="text-xs font-mono text-cyan-400 break-all">
+                                                    {result.observability.trace_id || 'N/A'}
+                                                </div>
+                                            </div>
+                                            <div className="bg-slate-900/50 rounded-lg p-3">
+                                                <div className="text-xs text-slate-500 mb-1">Model</div>
+                                                <div className="text-xs font-mono text-emerald-400">
+                                                    {result.observability.model || 'gemini-2.0-flash'}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Token Breakdown */}
+                                        <div className="mt-4">
+                                            <div className="text-xs text-slate-500 mb-2 font-medium">Token Usage</div>
+                                            <div className="grid grid-cols-3 gap-3">
+                                                <div className="bg-slate-900/50 rounded-lg p-3 text-center">
+                                                    <div className="text-lg font-bold text-blue-400">
+                                                        {safeNumber(result.observability.total_input_tokens)?.toLocaleString() || 0}
+                                                    </div>
+                                                    <div className="text-xs text-slate-500">Input</div>
+                                                </div>
+                                                <div className="bg-slate-900/50 rounded-lg p-3 text-center">
+                                                    <div className="text-lg font-bold text-amber-400">
+                                                        {safeNumber(result.observability.total_output_tokens)?.toLocaleString() || 0}
+                                                    </div>
+                                                    <div className="text-xs text-slate-500">Output</div>
+                                                </div>
+                                                <div className="bg-slate-900/50 rounded-lg p-3 text-center">
+                                                    <div className="text-lg font-bold text-emerald-400">
+                                                        {safeNumber(result.observability.total_tokens)?.toLocaleString() || 0}
+                                                    </div>
+                                                    <div className="text-xs text-slate-500">Total</div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Execution Stats */}
+                                        <div className="mt-4">
+                                            <div className="text-xs text-slate-500 mb-2 font-medium">Execution Stats</div>
+                                            <div className="grid grid-cols-4 gap-3">
+                                                <div className="bg-slate-900/50 rounded-lg p-3 text-center">
+                                                    <div className="text-lg font-bold text-purple-400">
+                                                        {result.observability.agents_count || AGENTS.length}
+                                                    </div>
+                                                    <div className="text-xs text-slate-500">Agents</div>
+                                                </div>
+                                                <div className="bg-slate-900/50 rounded-lg p-3 text-center">
+                                                    <div className="text-lg font-bold text-cyan-400">
+                                                        {result.observability.spans_count || '--'}
+                                                    </div>
+                                                    <div className="text-xs text-slate-500">Spans</div>
+                                                </div>
+                                                <div className="bg-slate-900/50 rounded-lg p-3 text-center">
+                                                    <div className={`text-lg font-bold ${(result.observability.error_count || 0) > 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+                                                        {result.observability.error_count || 0}
+                                                    </div>
+                                                    <div className="text-xs text-slate-500">Errors</div>
+                                                </div>
+                                                <div className="bg-slate-900/50 rounded-lg p-3 text-center">
+                                                    <div className={`text-lg font-bold ${(result.observability.success_rate_pct || 100) >= 80 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                                                        {result.observability.success_rate_pct?.toFixed(0) || 100}%
+                                                    </div>
+                                                    <div className="text-xs text-slate-500">Success</div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Timestamps */}
+                                        {(result.observability.start_timestamp || result.observability.end_timestamp) && (
+                                            <div className="mt-4">
+                                                <div className="text-xs text-slate-500 mb-2 font-medium">Timeline</div>
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    {result.observability.start_timestamp && (
+                                                        <div className="bg-slate-900/50 rounded-lg p-3">
+                                                            <div className="text-xs text-slate-500 mb-1">Started</div>
+                                                            <div className="text-xs font-mono text-slate-300">
+                                                                {new Date(result.observability.start_timestamp).toLocaleString()}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                    {result.observability.end_timestamp && (
+                                                        <div className="bg-slate-900/50 rounded-lg p-3">
+                                                            <div className="text-xs text-slate-500 mb-1">Completed</div>
+                                                            <div className="text-xs font-mono text-slate-300">
+                                                                {new Date(result.observability.end_timestamp).toLocaleString()}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Errors Log */}
+                                        {result.observability.errors && result.observability.errors.length > 0 && (
+                                            <div className="mt-4">
+                                                <div className="text-xs text-red-400 mb-2 font-medium flex items-center gap-1">
+                                                    <AlertCircle className="w-3 h-3" />
+                                                    Errors ({result.observability.errors.length})
+                                                </div>
+                                                <div className="space-y-2">
+                                                    {result.observability.errors.map((err, idx) => (
+                                                        <div key={idx} className="bg-red-950/30 border border-red-900/50 rounded-lg p-3">
+                                                            <div className="text-xs font-medium text-red-400">
+                                                                {err.agent_name || 'Unknown Agent'}: {err.error_type || 'Error'}
+                                                            </div>
+                                                            <div className="text-xs text-red-300/70 mt-1">
+                                                                {err.error_message || 'No details available'}
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Cost Estimation */}
+                                        <div className="mt-4 pt-3 border-t border-slate-700/50">
+                                            <div className="flex items-center justify-between text-xs">
+                                                <span className="text-slate-500">Cost at current pricing</span>
+                                                <span className="text-emerald-400 font-medium">
+                                                    ${safeNumber(result.observability.total_cost_usd)?.toFixed(6) || '0.000000'} USD
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center justify-between text-xs mt-1">
+                                                <span className="text-slate-500">Estimated analyses per $1</span>
+                                                <span className="text-cyan-400 font-medium">
+                                                    ~{(result.observability.total_cost_usd && result.observability.total_cost_usd > 0)
+                                                        ? Math.floor(1 / result.observability.total_cost_usd).toLocaleString()
+                                                        : '∞'
+                                                    }
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Predictor Analysis */}
