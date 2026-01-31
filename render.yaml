@@ -28,7 +28,7 @@ services:
       - key: GOOGLE_API_KEY
         sync: false  # Must set manually in dashboard
       - key: GEMINI_MODEL
-        value: gemini-2.0-flash-exp
+        value: gemini-2.0-flash
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_KEY  

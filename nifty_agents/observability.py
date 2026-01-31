@@ -74,13 +74,21 @@ if not METRICS_FILE.exists():
 # ============================================================================
 
 GEMINI_PRICING = {
-    # Gemini 2.0 Flash - Fast, efficient, multimodal
+    # Gemini 2.0 Flash - Stable production version
+    "gemini-2.0-flash": {
+        "input_per_1k_tokens": 0.00001875,   # $0.01875 per 1M tokens
+        "output_per_1k_tokens": 0.000075,    # $0.075 per 1M tokens
+        "cached_input_per_1k_tokens": 0.0000046875,
+        "context_window": 1048576,
+        "description": "Fast multimodal model, production ready (stable)"
+    },
+    # Gemini 2.0 Flash Exp - Deprecated (keeping for compatibility)
     "gemini-2.0-flash-exp": {
         "input_per_1k_tokens": 0.00001875,   # $0.01875 per 1M tokens
         "output_per_1k_tokens": 0.000075,    # $0.075 per 1M tokens
         "cached_input_per_1k_tokens": 0.0000046875,
         "context_window": 1048576,
-        "description": "Fast multimodal model, good balance of speed/quality"
+        "description": "DEPRECATED - Use gemini-2.0-flash instead"
     },
     # Gemini 2.0 Flash Thinking - Enhanced reasoning
     "gemini-2.0-flash-thinking-exp": {
@@ -148,7 +156,7 @@ TOTAL_TOKENS_PER_ANALYSIS = {
 
 def get_model_from_env() -> str:
     """Get model name from environment variable."""
-    return os.environ.get("GEMINI_MODEL", "gemini-2.0-flash-exp")
+    return os.environ.get("GEMINI_MODEL", "gemini-2.0-flash")
 
 
 def estimate_analysis_cost(model: str = None) -> Dict[str, Any]:
@@ -164,7 +172,7 @@ def estimate_analysis_cost(model: str = None) -> Dict[str, Any]:
     if model is None:
         model = get_model_from_env()
     
-    pricing = GEMINI_PRICING.get(model, GEMINI_PRICING["gemini-2.0-flash-exp"])
+    pricing = GEMINI_PRICING.get(model, GEMINI_PRICING["gemini-2.0-flash"])
     
     input_tokens = TOTAL_TOKENS_PER_ANALYSIS["input"]
     output_tokens = TOTAL_TOKENS_PER_ANALYSIS["output"]
@@ -411,7 +419,7 @@ class AgentObservability:
     def __init__(self, model: str = None):
         # Get model from env or use default
         self.model = model or get_model_from_env()
-        self.pricing = GEMINI_PRICING.get(self.model, GEMINI_PRICING["gemini-2.0-flash-exp"])
+        self.pricing = GEMINI_PRICING.get(self.model, GEMINI_PRICING["gemini-2.0-flash"])
         self.active_traces: Dict[str, Dict] = {}
         self._load_metrics()
     

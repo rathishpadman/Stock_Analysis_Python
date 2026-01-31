@@ -534,7 +534,7 @@ For successful deployment to Render.com (based on `render.yaml`):
 | `GOOGLE_API_KEY` | ❓ Manual | **Must set in Render dashboard** |
 | `SUPABASE_URL` | ❓ Manual | Must set in Render dashboard |
 | `SUPABASE_KEY` | ❓ Manual | Must set in Render dashboard |
-| `GEMINI_MODEL` | ✅ Set | `gemini-2.0-flash-exp` |
+| `GEMINI_MODEL` | ✅ Set | `gemini-2.0-flash` |
 | Health Check | ✅ Configured | `/health` endpoint |
 | Region | ✅ Configured | Singapore (`singapore`) |
 | Plan | ⚠️ Free | 30s cold start after 15min idle |
@@ -892,9 +892,9 @@ Gemini model pricing (tracked automatically):
 
 | Model | Input (per 1M tokens) | Output (per 1M tokens) |
 |-------|----------------------|------------------------|
-| gemini-2.0-flash-exp | $0.01875 | $0.075 |
-| gemini-2.0-flash | $0.10 | $0.40 |
+| gemini-2.0-flash | $0.01875 | $0.075 |
 | gemini-1.5-flash | $0.075 | $0.30 |
+| gemini-1.5-flash-8b | $0.0375 | $0.15 |
 | gemini-1.5-pro | $1.25 | $5.00 |
 
 ### Estimated Tokens per Analysis
