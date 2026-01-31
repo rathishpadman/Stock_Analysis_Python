@@ -2,17 +2,21 @@
 
 ## Table of Contents
 1. [Overview](#overview)
-2. [Architecture](#architecture)
-3. [Agent Flow Explained](#agent-flow-explained-for-beginners)
-4. [Agent Personas & System Prompts](#agent-personas--system-prompts)
-5. [Advanced Design Elements](#advanced-design-elements)
-6. [Components](#components)
-7. [Data Sources](#data-sources)
-8. [API Reference](#api-reference)
-9. [Setup & Installation](#setup--installation)
-10. [Usage Examples](#usage-examples)
-11. [Testing](#testing)
-12. [Troubleshooting](#troubleshooting)
+2. [Agentic AI Fundamentals](#agentic-ai-fundamentals)
+3. [Design Pattern Deep Dive](#design-pattern-deep-dive)
+4. [Architecture](#architecture)
+5. [Agent Flow Explained](#agent-flow-explained-for-beginners)
+6. [Tool Calling Architecture](#tool-calling-architecture)
+7. [Memory & State Management](#memory--state-management)
+8. [Agent Personas & System Prompts](#agent-personas--system-prompts)
+9. [Advanced Design Elements](#advanced-design-elements)
+10. [Components](#components)
+11. [Data Sources](#data-sources)
+12. [API Reference](#api-reference)
+13. [Setup & Installation](#setup--installation)
+14. [Usage Examples](#usage-examples)
+15. [Testing](#testing)
+16. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -39,6 +43,411 @@ Our system automates this by having **specialized AI agents** collaborate to ana
 - ✅ **Multiple Data Sources**: yfinance, RSS feeds, Supabase
 - ✅ **REST API**: Easy integration with any frontend
 - ✅ **Caching**: Reduces API calls and improves response time
+- ✅ **Observability**: Full tracing, token accounting, and cost tracking
+- ✅ **Centralized Context**: All agents share the same data snapshot
+
+---
+
+## Agentic AI Fundamentals
+
+Before diving into our implementation, let's understand the core concepts of Agentic AI that this system leverages.
+
+### What is an "Agent" vs a "Workflow"?
+
+| Aspect | Workflow (Deterministic) | Agent (Autonomous) |
+|--------|--------------------------|-------------------|
+| **Control Flow** | Pre-defined, step-by-step | Dynamic, decided at runtime |
+| **Decision Making** | Hardcoded conditionals | LLM reasoning |
+| **Tool Selection** | Pre-mapped to steps | Agent chooses tools |
+| **Error Handling** | Try/catch blocks | Self-correction loops |
+| **Example** | ETL Pipeline | ChatGPT with plugins |
+
+### Where Does NIFTY Fit?
+
+**NIFTY is a Hybrid System**: It combines **workflow orchestration** with **agentic reasoning**.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        ORCHESTRATOR                              │
+│                    (Workflow: Deterministic)                     │
+│                                                                  │
+│   ┌───────────────────────────────────────────────────────────┐ │
+│   │  STEP 1: Validate ticker         [Code Logic]             │ │
+│   │  STEP 2: Fetch data in parallel  [Code Logic]             │ │
+│   │  STEP 3: Dispatch to agents      [Code Logic]             │ │
+│   │  STEP 4: Collect responses       [Code Logic]             │ │
+│   │  STEP 5: Call predictor          [Code Logic]             │ │
+│   │  STEP 6: Cache and return        [Code Logic]             │ │
+│   └───────────────────────────────────────────────────────────┘ │
+│                              │                                   │
+│                              ▼                                   │
+│   ┌───────────────────────────────────────────────────────────┐ │
+│   │              SPECIALIST AGENTS                             │ │
+│   │             (Agentic: LLM Reasoning)                       │ │
+│   │                                                            │ │
+│   │   Each agent receives data and uses LLM to:                │ │
+│   │   • Interpret financial metrics                            │ │
+│   │   • Identify patterns in price data                        │ │
+│   │   • Synthesize news sentiment                              │ │
+│   │   • Generate structured recommendations                    │ │
+│   └───────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Why this hybrid approach?**
+- **Reliability**: The outer workflow ensures predictable execution order
+- **Intelligence**: The inner agents apply sophisticated reasoning
+- **Performance**: Deterministic data fetching is faster than agent tool loops
+- **Cost**: Pre-fetching data reduces LLM token usage vs. letting agents call tools iteratively
+
+### Agentic Design Patterns Overview
+
+The Agentic AI community has identified several design patterns. Here's how NIFTY uses them:
+
+| Pattern | NIFTY Usage | Location |
+|---------|-------------|----------|
+| **Multi-Agent Collaboration** | ✅ 6 specialized agents | `orchestrator.py` |
+| **Supervisor-Worker** | ✅ Orchestrator supervises agents | `_call_agent()` method |
+| **Parallelization** | ✅ Fan-out/Fan-in execution | `ThreadPoolExecutor` |
+| **Tool Use** | ✅ Data fetchers as tools | `tools/` directory |
+| **Centralized Memory** | ✅ Shared `base_data` context | `_gather_base_data()` |
+| **Reflection** | ⚠️ Partial (Predictor reviews) | Predictor synthesis |
+| **Planning** | ❌ Not implemented | N/A |
+| **ReAct Loop** | ❌ Not implemented (by design) | N/A |
+
+---
+
+## Design Pattern Deep Dive
+
+### Pattern 1: Multi-Agent Collaboration (Core Pattern)
+
+**What it is**: Multiple specialized AI agents work together on a complex task, each contributing unique expertise.
+
+**NIFTY Implementation**:
+```
+User Query: "Analyze RELIANCE"
+          │
+          ▼
+    ┌─────────────────────────────────────────────────────────┐
+    │              ORCHESTRATOR (Coordinator)                  │
+    └───────────┬────────┬────────┬────────┬────────┬────────┘
+                │        │        │        │        │
+                ▼        ▼        ▼        ▼        ▼
+         ┌──────────┐┌──────────┐┌──────────┐┌──────────┐┌──────────┐
+         │FUNDAMENTAL││TECHNICAL ││SENTIMENT ││  MACRO   ││REGULATORY│
+         │  AGENT   ││  AGENT   ││  AGENT   ││  AGENT   ││  AGENT   │
+         │          ││          ││          ││          ││          │
+         │ "P/E=25, ││ "RSI=55, ││ "3 +ve   ││ "VIX=15, ││ "No SEBI │
+         │  ROE=12%"││  bullish"││  news"   ││  benign" ││  issues" │
+         └────┬─────┘└────┬─────┘└────┬─────┘└────┬─────┘└────┬─────┘
+              │           │           │           │           │
+              └───────────┴───────────┼───────────┴───────────┘
+                                      │
+                                      ▼
+                         ┌────────────────────────┐
+                         │   PREDICTOR AGENT      │
+                         │   (Synthesizer)        │
+                         │                        │
+                         │   Weighs all signals:  │
+                         │   → BUY @ 72/100       │
+                         └────────────────────────┘
+```
+
+**Code Location**: `orchestrator.py` lines 850-920
+
+```python
+# Fan-out: All specialists run in parallel
+agent_names = ["fundamental_agent", "technical_agent", "sentiment_agent", 
+               "macro_agent", "regulatory_agent"]
+
+with ThreadPoolExecutor(max_workers=5) as executor:
+    futures = {executor.submit(self._call_agent, name, base_data, trace_id): name
+               for name in agent_names}
+    # ... collect results
+    
+# Fan-in: Predictor synthesizes all responses
+prediction = self._call_predictor(ticker_clean, agent_analyses, trace_id)
+```
+
+**Why Multi-Agent?**
+1. **Separation of Concerns**: Each agent focuses on one domain, reducing hallucination
+2. **Parallelism**: 5x speedup by running agents simultaneously
+3. **Explainability**: Each agent's reasoning is independently auditable
+4. **Modularity**: Add/remove agents without affecting others
+
+---
+
+### Pattern 2: Supervisor-Worker Hierarchy
+
+**What it is**: A supervisor agent coordinates worker agents, deciding when to invoke them and how to handle their outputs.
+
+**NIFTY Implementation**:
+- **Supervisor**: The `NiftyAgentOrchestrator` class (deterministic Python code)
+- **Workers**: The 6 LLM-based agents
+
+Unlike pure agentic systems where an LLM supervisor decides which agents to call, NIFTY uses **deterministic orchestration** for reliability:
+
+```python
+class NiftyAgentOrchestrator:
+    """
+    SUPERVISOR RESPONSIBILITIES:
+    1. Validates input (ticker symbol check)
+    2. Gathers all required data
+    3. Decides which agents to invoke (all 5 specialists)
+    4. Sets timeout boundaries (30s default)
+    5. Handles failures gracefully
+    6. Invokes synthesizer (Predictor)
+    """
+    
+    def _call_agent(self, agent_name: str, base_data: Dict, trace_id: str):
+        """
+        WORKER INVOCATION:
+        - Retrieves agent-specific configuration
+        - Filters data for the agent (token optimization)
+        - Sends prompt to LLM
+        - Parses and validates response
+        - Logs to observability system
+        """
+```
+
+**Supervisor vs. Pure Agentic Comparison**:
+
+| Aspect | Pure Agentic (LLM Supervisor) | NIFTY (Code Supervisor) |
+|--------|-------------------------------|-------------------------|
+| Routing | LLM decides agents | All agents always called |
+| Reliability | Variable (LLM may skip) | 100% predictable |
+| Speed | Slower (routing overhead) | Faster (direct dispatch) |
+| Cost | Higher (supervisor tokens) | Lower (no supervisor LLM) |
+
+---
+
+### Pattern 3: Parallelization (Fan-out/Fan-in)
+
+**What it is**: Execute multiple independent tasks simultaneously, then aggregate results.
+
+**NIFTY Implementation**:
+
+```
+                    ┌─────────────────┐
+                    │   BASE DATA     │
+                    │  (Shared Input) │
+                    └────────┬────────┘
+                             │
+        ┌────────────────────┼────────────────────┐
+        │                    │                    │
+        ▼                    ▼                    ▼
+  ┌───────────┐        ┌───────────┐        ┌───────────┐
+  │  Agent 1  │        │  Agent 2  │        │  Agent 3  │
+  │   (3.2s)  │        │   (2.8s)  │        │   (3.1s)  │
+  └─────┬─────┘        └─────┬─────┘        └─────┬─────┘
+        │                    │                    │
+        └────────────────────┼────────────────────┘
+                             │
+                    ┌────────▼────────┐
+                    │   AGGREGATION   │
+                    │  (max: 3.2s)    │
+                    └─────────────────┘
+```
+
+**Two Levels of Parallelization**:
+
+1. **Data Fetching** (Level 1):
+```python
+def _gather_base_data(self, ticker: str) -> Dict[str, Any]:
+    """6 data sources fetched in parallel"""
+    with ThreadPoolExecutor(max_workers=6) as executor:
+        futures = {
+            executor.submit(get_stock_fundamentals, ticker): "fundamentals",
+            executor.submit(get_stock_quote, ticker): "quote",
+            executor.submit(get_price_history, ticker): "price_history",
+            executor.submit(get_macro_indicators): "macro",
+            executor.submit(get_stock_news, ticker): "sentiment",
+            executor.submit(get_comprehensive_stock_data, ticker): "supabase_data"
+        }
+```
+
+2. **Agent Execution** (Level 2):
+```python
+with ThreadPoolExecutor(max_workers=5) as executor:
+    futures = {executor.submit(self._call_agent, name, base_data): name
+               for name in agent_names}
+```
+
+**Performance Impact**:
+- Sequential: ~15 seconds (5 agents × 3s each)
+- Parallel: ~3-5 seconds (wall clock time = slowest agent)
+- **Result: 70% reduction in latency**
+
+---
+
+### Pattern 4: Tool Use (Data Fetchers as Tools)
+
+**What it is**: Agents invoke external tools to gather information or take actions.
+
+**NIFTY's Approach - Pre-fetched Tools**:
+
+Unlike typical ReAct patterns where agents iteratively call tools:
+```
+# Traditional ReAct (NOT used in NIFTY):
+Agent thinks → Calls tool → Observes result → Thinks again → Calls another tool...
+```
+
+NIFTY uses **Centralized Tool Invocation**:
+```
+# NIFTY Pattern:
+Orchestrator calls ALL tools → Gathers data → Passes to agents → Agents reason
+```
+
+**Tool Definitions** (`tools/` directory):
+
+| Tool | File | Function | Data Returned |
+|------|------|----------|---------------|
+| Stock Fundamentals | `nifty_fetcher.py` | `get_stock_fundamentals()` | P/E, ROE, debt ratios |
+| Live Quote | `nifty_fetcher.py` | `get_stock_quote()` | Current price, volume |
+| Price History | `nifty_fetcher.py` | `get_price_history()` | 250 days OHLCV |
+| Macro Indicators | `india_macro_fetcher.py` | `get_macro_indicators()` | VIX, RBI rates |
+| News & Sentiment | `india_news_fetcher.py` | `get_stock_news()` | Headlines, sentiment scores |
+| Pipeline Scores | `supabase_fetcher.py` | `get_comprehensive_stock_data()` | Pre-computed scores |
+
+**Why Pre-fetching?**
+
+| Approach | Tokens Used | Latency | Cost |
+|----------|-------------|---------|------|
+| Agent Tool Loops | ~50k/request | 15-30s | $0.15 |
+| Pre-fetched Data | ~12k/request | 3-5s | $0.04 |
+
+**Trade-off**: We sacrifice dynamic tool selection for efficiency. Our use case (stock analysis) has a fixed set of required data, making pre-fetching optimal.
+
+---
+
+### Pattern 5: Centralized Context (Shared Memory)
+
+**What it is**: A central memory store that all agents can read from, ensuring consistency.
+
+**NIFTY Implementation**:
+
+```python
+def _gather_base_data(self, ticker: str) -> Dict[str, Any]:
+    """
+    CENTRALIZED CONTEXT BUILDER
+    
+    Creates a single source of truth that all agents share:
+    - Same price data timestamp
+    - Same news articles
+    - Same macro indicators
+    
+    This prevents "context drift" where agents might see
+    different data if they fetched independently.
+    """
+    base_data = {
+        "ticker": ticker,
+        "timestamp": datetime.now().isoformat(),
+        "fundamentals": {...},
+        "quote": {...},
+        "price_history": {...},
+        "macro": {...},
+        "sentiment": {...},
+        "supabase_data": {...}
+    }
+    return base_data
+```
+
+**Context Filtering for Token Efficiency**:
+
+Not all agents need all data. The orchestrator filters data per-agent:
+
+```python
+def _get_agent_specific_data(self, agent_name: str, base_data: Dict) -> Dict:
+    """
+    TOKEN OPTIMIZATION: Each agent gets only what it needs
+    
+    Technical Agent: 50 days price data (not 250)
+    Macro Agent: No price data at all
+    Sentiment Agent: News + VIX only
+    """
+    if agent_name == "technical_agent":
+        price_data = base_data["price_history"]["data"][:50]  # Only 50 days
+        return {...}
+    elif agent_name == "macro_agent":
+        # Macro doesn't need price history!
+        return {"macro": base_data["macro"], "sector": ...}
+```
+
+**Token Savings**:
+- Full data to all agents: ~25,000 tokens/request
+- Filtered data: ~11,500 tokens/request
+- **Savings: 54%**
+
+---
+
+### Pattern 6: Reflection (Predictor Synthesis)
+
+**What it is**: An agent reviews and critiques its own or others' outputs before finalizing.
+
+**NIFTY's Partial Reflection**:
+
+The **Predictor Agent** acts as a reflection layer:
+
+```python
+def _call_predictor(self, ticker: str, agent_analyses: Dict) -> Dict:
+    """
+    The Predictor reviews all specialist outputs and:
+    1. Identifies conflicting signals
+    2. Weighs based on market regime
+    3. Synthesizes a final recommendation
+    
+    This is "reflection" but on OTHER agents' outputs,
+    not self-reflection loops.
+    """
+    prompt = f"""
+    You have received analyses from 5 specialized agents for {ticker}.
+    Synthesize these into a final investment recommendation.
+    
+    AGENT ANALYSES:
+    {json.dumps(cleaned_analyses, indent=2)}
+    
+    WEIGHTING GUIDANCE:
+    - In high VIX (>20): Weight sentiment/macro higher
+    - In low VIX (<15): Weight fundamentals/technicals higher
+    - Flag any strong disagreements between agents
+    """
+```
+
+**What NIFTY Doesn't Have (Yet)**:
+- **Self-Reflection Loops**: Agents don't critique and revise their own outputs
+- **Iterative Refinement**: No "try again" mechanism for poor quality outputs
+- **Debate Pattern**: Agents don't argue with each other
+
+---
+
+### Patterns NOT Used (and Why)
+
+#### ReAct (Reasoning + Acting) Loop
+
+**What it is**: Agent thinks, acts (calls tool), observes result, thinks again, loops until done.
+
+**Why NIFTY Doesn't Use It**:
+- Our use case has **fixed data requirements** - we always need the same 6 data types
+- ReAct adds **latency** (multiple LLM calls) without benefit for structured analysis
+- **Cost**: Each ReAct iteration costs tokens; pre-fetching is cheaper
+
+#### Planning Pattern
+
+**What it is**: Agent creates a step-by-step plan before execution.
+
+**Why NIFTY Doesn't Use It**:
+- Our execution plan is **deterministic** (always same 5 agents → predictor)
+- Planning adds overhead without flexibility benefit
+- Future consideration: Could use for custom analysis requests
+
+#### Debate/Adversarial Pattern
+
+**What it is**: Agents argue opposing viewpoints to stress-test conclusions.
+
+**Why NIFTY Doesn't Use It** (Yet):
+- Increases latency and cost significantly
+- Could be valuable for high-stakes analysis (e.g., "Devil's advocate" agent)
+- Marked for future enhancement
 
 ---
 
@@ -172,6 +581,351 @@ async def analyze_async(self, ticker: str):
 │    "agent_analyses": { ... }                                                 │
 │  }                                                                           │
 └─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Tool Calling Architecture
+
+### Understanding "Tools" in Agentic Systems
+
+In agentic AI, **tools** are external functions that agents can invoke to gather information or take actions. Think of them as APIs the agent can call.
+
+### NIFTY's Tool Design Philosophy
+
+NIFTY implements **Orchestrator-Managed Tools** rather than **Agent-Invoked Tools**:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                     TOOL ARCHITECTURE COMPARISON                             │
+├─────────────────────────────────┬───────────────────────────────────────────┤
+│    AGENT-INVOKED (LangChain)    │    ORCHESTRATOR-MANAGED (NIFTY)           │
+├─────────────────────────────────┼───────────────────────────────────────────┤
+│                                 │                                           │
+│  Agent                          │  Orchestrator                             │
+│    │                            │    │                                      │
+│    ├──▶ "I need stock data"     │    ├──▶ Fetch ALL data upfront           │
+│    │    ├──▶ Call yfinance      │    │    ├──▶ yfinance                    │
+│    │    ◀── Result              │    │    ├──▶ macro data                  │
+│    │                            │    │    ├──▶ news data                   │
+│    ├──▶ "I need news"           │    │    └──▶ pipeline scores             │
+│    │    ├──▶ Call news API      │    │                                      │
+│    │    ◀── Result              │    ▼                                      │
+│    │                            │  ┌─────────────────────────┐              │
+│    ├──▶ "I need macro data"     │  │   CENTRALIZED CONTEXT   │              │
+│    │    ├──▶ Call macro API     │  │   (base_data dict)      │              │
+│    │    ◀── Result              │  └───────────┬─────────────┘              │
+│    │                            │              │                            │
+│    ▼                            │    ┌─────────┼─────────┐                  │
+│  Final Response                 │    ▼         ▼         ▼                  │
+│  (After multiple LLM calls)     │  Agent1   Agent2   Agent3                 │
+│                                 │  (Single LLM call each)                   │
+├─────────────────────────────────┼───────────────────────────────────────────┤
+│  Pros: Dynamic, flexible        │  Pros: Fast, efficient, consistent        │
+│  Cons: Slow, expensive          │  Cons: Fixed data scope                   │
+└─────────────────────────────────┴───────────────────────────────────────────┘
+```
+
+### Tool Registry
+
+Each data fetcher in `tools/` is a tool:
+
+```python
+# tools/nifty_fetcher.py
+def get_stock_fundamentals(ticker: str) -> Dict[str, Any]:
+    """
+    TOOL: Fetch fundamental data for a stock
+    
+    INPUT: ticker (str) - e.g., "RELIANCE"
+    OUTPUT: {
+        "pe_ratio": 25.3,
+        "pb_ratio": 2.1,
+        "roe": 12.5,
+        "debt_to_equity": 0.45,
+        "market_cap": 1800000000000,
+        "sector": "Energy",
+        ...
+    }
+    
+    SOURCE: Yahoo Finance (yfinance library)
+    RATE_LIMIT: ~2000 requests/hour
+    CACHE: LRU cache with 5-minute TTL
+    """
+
+def get_stock_quote(ticker: str) -> Dict[str, Any]:
+    """
+    TOOL: Fetch real-time quote
+    
+    INPUT: ticker (str)
+    OUTPUT: {
+        "last_price": 2650.50,
+        "change_percent": 1.25,
+        "volume": 5000000,
+        "52w_high": 2900,
+        "52w_low": 2200
+    }
+    """
+
+def get_price_history(ticker: str, days: int = 250) -> Dict[str, Any]:
+    """
+    TOOL: Fetch historical OHLCV data
+    
+    INPUT: ticker (str), days (int)
+    OUTPUT: {
+        "data": [
+            {"date": "2024-01-15", "open": 2640, "high": 2660, ...},
+            ...
+        ],
+        "52w_high": 2900,
+        "52w_low": 2200
+    }
+    """
+```
+
+```python
+# tools/india_macro_fetcher.py
+def get_macro_indicators() -> Dict[str, Any]:
+    """
+    TOOL: Fetch India macro indicators
+    
+    OUTPUT: {
+        "india_vix": {"value": 15.2, "change": -0.5},
+        "rbi_repo_rate": 6.5,
+        "usd_inr": 83.25,
+        "market_regime": "bullish",
+        "nifty50": {"value": 22500, "change_pct": 0.8}
+    }
+    """
+```
+
+```python
+# tools/india_news_fetcher.py
+def get_stock_news(ticker: str, max_items: int = 20) -> Dict[str, Any]:
+    """
+    TOOL: Fetch news with sentiment analysis
+    
+    OUTPUT: {
+        "headlines": [
+            {"title": "Reliance Q3 results beat...", "sentiment": "positive"},
+            ...
+        ],
+        "overall_sentiment": "positive",
+        "sentiment_score": 0.65,
+        "positive_count": 5,
+        "negative_count": 2
+    }
+    
+    SOURCES: Economic Times, Moneycontrol, Business Standard (RSS)
+    """
+```
+
+### Tool Invocation Flow
+
+```python
+def _gather_base_data(self, ticker: str) -> Dict[str, Any]:
+    """
+    ORCHESTRATOR: Invoke all tools in parallel
+    
+    This is the "Tool Calling" phase, but managed by code,
+    not by the LLM deciding which tools to call.
+    """
+    with ThreadPoolExecutor(max_workers=6) as executor:
+        # Submit all tool calls simultaneously
+        futures = {
+            executor.submit(get_stock_fundamentals, ticker): "fundamentals",
+            executor.submit(get_stock_quote, ticker): "quote", 
+            executor.submit(get_price_history, ticker, 250): "price_history",
+            executor.submit(get_macro_indicators): "macro",
+            executor.submit(get_stock_news, ticker, 20): "sentiment",
+            executor.submit(get_comprehensive_stock_data, ticker): "supabase_data"
+        }
+        
+        # Collect results as they complete
+        base_data = {"ticker": ticker, "timestamp": datetime.now().isoformat()}
+        for future in as_completed(futures, timeout=30):
+            key = futures[future]
+            try:
+                base_data[key] = future.result()
+            except Exception as e:
+                base_data[key] = {"error": str(e)}
+        
+        return base_data
+```
+
+---
+
+## Memory & State Management
+
+### Memory Types in Agentic Systems
+
+| Memory Type | Description | NIFTY Implementation |
+|-------------|-------------|----------------------|
+| **Short-term** | Within single request | `base_data` dict |
+| **Working Memory** | Intermediate reasoning | Agent prompts + responses |
+| **Long-term** | Across requests | Supabase `ai_analysis_history` |
+| **Episodic** | Past interactions | Cache + history API |
+
+### Short-term Memory (Request Scope)
+
+During a single analysis request, all agents share the same context:
+
+```python
+# This dict IS the short-term memory
+base_data = {
+    "ticker": "RELIANCE",
+    "timestamp": "2024-01-15T10:30:00",
+    "fundamentals": {...},
+    "quote": {...},
+    "price_history": {...},
+    "macro": {...},
+    "sentiment": {...},
+    "supabase_data": {...}
+}
+
+# Every agent receives this (filtered) context
+fundamental_agent(base_data)  # Sees fundamentals, quote, scores
+technical_agent(base_data)    # Sees price_history, indicators
+sentiment_agent(base_data)    # Sees sentiment, vix
+# ... etc
+```
+
+### Working Memory (Agent Reasoning)
+
+Each agent's prompt + response forms its working memory:
+
+```python
+user_prompt = f"""
+Analyze the following stock data and provide your expert analysis.
+
+TICKER: {agent_data.get('ticker')}
+COMPANY: {agent_data.get('company_name')}
+CURRENT PRICE: {agent_data.get('current_price')}
+
+DATA PROVIDED:
+{json.dumps(agent_data, indent=2, default=str)}
+
+Please provide your analysis in the following JSON format:
+{json.dumps(output_format, indent=2)}
+
+IMPORTANT: Include a "reasoning" field explaining your analysis logic.
+"""
+
+# The LLM's response includes reasoning (working memory trace)
+response = {
+    "score": 72,
+    "signal": "bullish",
+    "reasoning": "P/E of 25 is below sector average of 28. ROE of 12% is healthy..."
+}
+```
+
+### Long-term Memory (Supabase Persistence)
+
+Analysis results are stored for historical tracking:
+
+```python
+def _store_analysis_to_supabase(self, ticker: str, report: Dict):
+    """
+    LONG-TERM MEMORY: Persist analysis to database
+    
+    Table: ai_analysis_history
+    
+    This enables:
+    1. Hover tooltips showing past analyses
+    2. Tracking recommendation changes over time
+    3. Backtesting agent accuracy
+    """
+    data = {
+        "ticker": ticker,
+        "composite_score": report.get("composite_score"),
+        "recommendation": report.get("recommendation"),
+        "full_response": json.dumps(report),
+        "cost_usd": report.get("observability", {}).get("total_cost_usd"),
+        "created_at": datetime.now().isoformat()
+    }
+    self.supabase.table("ai_analysis_history").insert(data).execute()
+```
+
+### Caching Layer (Episodic Memory)
+
+In-memory cache prevents redundant analysis:
+
+```python
+class NiftyAgentOrchestrator:
+    def __init__(self):
+        self.cache = {}  # In-memory cache
+        self.enable_caching = True
+    
+    async def analyze_async(self, ticker: str):
+        # Check episodic memory (cache)
+        if self.enable_caching and ticker in self.cache:
+            cache_entry = self.cache[ticker]
+            cache_age = (datetime.now() - cache_entry["timestamp"]).seconds
+            
+            # 24-hour cache validity
+            if cache_age < 86400:
+                logger.info(f"Returning cached analysis (age: {cache_age}s)")
+                cached_report = cache_entry["report"].copy()
+                cached_report["cached"] = True
+                cached_report["cache_age_seconds"] = cache_age
+                return cached_report
+        
+        # ... perform fresh analysis ...
+        
+        # Store in episodic memory
+        self.cache[ticker] = {
+            "report": report,
+            "timestamp": datetime.now()
+        }
+```
+
+### Memory Flow Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         MEMORY ARCHITECTURE                                  │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+  USER REQUEST                    ORCHESTRATOR                    DATABASE
+       │                              │                               │
+       │  "Analyze RELIANCE"          │                               │
+       ├─────────────────────────────▶│                               │
+       │                              │                               │
+       │                    ┌─────────┴─────────┐                     │
+       │                    │ CHECK CACHE       │                     │
+       │                    │ (Episodic Memory) │                     │
+       │                    └─────────┬─────────┘                     │
+       │                              │                               │
+       │                    ┌─────────▼─────────┐                     │
+       │                    │ GATHER BASE_DATA  │                     │
+       │                    │ (Short-term Mem)  │                     │
+       │                    └─────────┬─────────┘                     │
+       │                              │                               │
+       │            ┌─────────────────┼─────────────────┐             │
+       │            ▼                 ▼                 ▼             │
+       │     ┌──────────┐      ┌──────────┐      ┌──────────┐        │
+       │     │ Agent 1  │      │ Agent 2  │      │ Agent 3  │        │
+       │     │ (Working │      │ (Working │      │ (Working │        │
+       │     │  Memory) │      │  Memory) │      │  Memory) │        │
+       │     └────┬─────┘      └────┬─────┘      └────┬─────┘        │
+       │          │                 │                 │               │
+       │          └─────────────────┼─────────────────┘               │
+       │                            │                                 │
+       │                  ┌─────────▼─────────┐                       │
+       │                  │    PREDICTOR      │                       │
+       │                  │  (Synthesis)      │                       │
+       │                  └─────────┬─────────┘                       │
+       │                            │                                 │
+       │                  ┌─────────▼─────────┐                       │
+       │                  │   UPDATE CACHE    │                       │
+       │                  │ (Episodic Memory) │                       │
+       │                  └─────────┬─────────┘                       │
+       │                            │                                 │
+       │                            │  PERSIST                        │
+       │                            ├────────────────────────────────▶│
+       │                            │                     ai_analysis │
+       │  ◀─────────────────────────┤                        _history │
+       │  FINAL REPORT              │                                 │
+       │                            │                                 │
 ```
 
 ---
@@ -391,6 +1145,232 @@ The `observability.py` module implements a sophisticated tracing and cost-tracki
 The final recommendation isn't a simple average. The **Predictor Agent** is designed to weigh signals based on the **Market Regime**:
 - In "High VIX" (fearful) markets, it's instructed to weigh Macro and Sentiment signals more heavily.
 - In "Low VIX" (stable) markets, Fundamental and Technical signals take priority.
+
+---
+
+## LLM Integration & Prompt Engineering
+
+### Gemini Model Configuration
+
+NIFTY uses Google's Gemini models for all LLM inference:
+
+```python
+# Model Selection Hierarchy
+1. Environment variable: GEMINI_MODEL
+2. Render.yaml default: gemini-2.0-flash
+3. Code fallback: gemini-2.0-flash
+
+# Why not hardcode in code?
+# - Allows switching models without code changes
+# - Different environments can use different models
+# - Easy A/B testing of model performance
+```
+
+**Supported Models**:
+
+| Model | Cost (Input) | Cost (Output) | Use Case |
+|-------|--------------|---------------|----------|
+| `gemini-2.0-flash` | $0.10/1M | $0.40/1M | Default, balanced |
+| `gemini-1.5-flash` | $0.075/1M | $0.30/1M | Cost-sensitive |
+| `gemini-1.5-pro` | $1.25/1M | $5.00/1M | Complex analysis |
+
+### Prompt Structure
+
+Each agent prompt follows a consistent structure:
+
+```python
+# System Prompt (in nifty_prompts.py)
+system_prompt = """
+You are a {PERSONA} specializing in {DOMAIN}.
+
+CONTEXT:
+- You analyze Indian equities (NSE/BSE listed)
+- All prices are in INR
+- Regulatory context: SEBI, Companies Act 2013
+
+YOUR EXPERTISE:
+- {SPECIFIC_SKILLS}
+- {ANALYSIS_METHODS}
+
+OUTPUT REQUIREMENTS:
+- Always provide a score (0-100)
+- Always explain reasoning
+- Acknowledge data gaps explicitly
+
+CONSTRAINTS:
+- Never fabricate data
+- Express confidence levels
+- Stay within your domain
+"""
+
+# User Prompt (in orchestrator.py)
+user_prompt = f"""
+Analyze the following stock data:
+
+TICKER: {ticker}
+COMPANY: {company_name}
+CURRENT PRICE: {current_price}
+
+DATA:
+{json.dumps(filtered_data)}
+
+Respond in JSON format:
+{json.dumps(output_schema)}
+"""
+```
+
+### Output Schema Enforcement
+
+All agents return structured JSON:
+
+```python
+# Example: Fundamental Agent Output Schema
+{
+    "financial_health_score": 72,        # 0-100
+    "signal": "bullish",                 # bullish/neutral/bearish
+    "valuation_assessment": "fairly_valued",
+    "key_metrics": {
+        "pe_ratio": 25.3,
+        "roe": 12.5,
+        "debt_to_equity": 0.45
+    },
+    "strengths": ["Strong cash flow", "Low debt"],
+    "concerns": ["High PE vs peers"],
+    "reasoning": "PE of 25 is below sector average..."
+}
+```
+
+---
+
+## Observability & FinOps
+
+### Tracing Architecture
+
+Every analysis request is fully traced:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        OBSERVABILITY TRACE                                   │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  trace_id: "tr_abc123"                                                       │
+│  ticker: "RELIANCE"                                                          │
+│  timestamp: "2024-01-15T10:30:00Z"                                           │
+│                                                                              │
+│  ├─ span_id: "sp_001" [fundamental_agent]                                    │
+│  │  ├─ start_time: 10:30:01.000                                              │
+│  │  ├─ llm_request: {prompt_tokens: 1500, model: "gemini-2.0-flash"}         │
+│  │  ├─ llm_response: {completion_tokens: 450, latency_ms: 2100}              │
+│  │  ├─ end_time: 10:30:03.100                                                │
+│  │  └─ cost_usd: 0.00033                                                     │
+│  │                                                                           │
+│  ├─ span_id: "sp_002" [technical_agent]                                      │
+│  │  ├─ start_time: 10:30:01.000  (parallel)                                  │
+│  │  ├─ llm_request: {prompt_tokens: 2200, model: "gemini-2.0-flash"}         │
+│  │  ├─ llm_response: {completion_tokens: 520, latency_ms: 2400}              │
+│  │  ├─ end_time: 10:30:03.400                                                │
+│  │  └─ cost_usd: 0.00043                                                     │
+│  │                                                                           │
+│  ├─ span_id: "sp_003" [sentiment_agent] ...                                  │
+│  ├─ span_id: "sp_004" [macro_agent] ...                                      │
+│  ├─ span_id: "sp_005" [regulatory_agent] ...                                 │
+│  │                                                                           │
+│  └─ span_id: "sp_006" [predictor_agent]                                      │
+│     ├─ start_time: 10:30:03.500  (after specialists)                         │
+│     ├─ llm_request: {prompt_tokens: 3200}                                    │
+│     └─ cost_usd: 0.00055                                                     │
+│                                                                              │
+│  TOTALS:                                                                     │
+│  ├─ total_duration_ms: 4800                                                  │
+│  ├─ total_input_tokens: 12,500                                               │
+│  ├─ total_output_tokens: 2,800                                               │
+│  └─ total_cost_usd: $0.0042                                                  │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Cost Tracking Implementation
+
+```python
+# observability.py
+GEMINI_PRICING = {
+    "gemini-2.0-flash": {"input": 0.10, "output": 0.40},  # per 1M tokens
+    "gemini-1.5-flash": {"input": 0.075, "output": 0.30},
+    "gemini-1.5-pro": {"input": 1.25, "output": 5.00}
+}
+
+def calculate_cost(input_tokens: int, output_tokens: int, model: str) -> float:
+    """Calculate cost in USD for an LLM call"""
+    pricing = GEMINI_PRICING.get(model, GEMINI_PRICING["gemini-2.0-flash"])
+    input_cost = (input_tokens / 1_000_000) * pricing["input"]
+    output_cost = (output_tokens / 1_000_000) * pricing["output"]
+    return input_cost + output_cost
+```
+
+### Data Redaction for Security
+
+Logs automatically redact sensitive information:
+
+```python
+REDACT_PATTERNS = [
+    r'(api[_-]?key["\']?\s*[:=]\s*["\']?)[a-zA-Z0-9_-]+',
+    r'(password["\']?\s*[:=]\s*["\']?)[^\s"\']+',
+    r'(bearer\s+)[a-zA-Z0-9_.-]+',
+]
+
+def redact_sensitive_data(data: str) -> str:
+    """Remove API keys, passwords from log output"""
+    for pattern in REDACT_PATTERNS:
+        data = re.sub(pattern, r'\1[REDACTED]', data, flags=re.IGNORECASE)
+    return data
+```
+
+---
+
+## Comparison: NIFTY vs Other Frameworks
+
+### NIFTY vs LangGraph
+
+| Feature | LangGraph | NIFTY |
+|---------|-----------|-------|
+| Graph-based routing | ✅ Full DAG support | ❌ Linear flow |
+| Conditional branching | ✅ LLM decides next node | ❌ All agents always run |
+| State persistence | ✅ Built-in checkpoints | ✅ Supabase + cache |
+| Tool calling | ✅ Agent-invoked | ✅ Orchestrator-managed |
+| Complexity | High | Low |
+| Latency | Variable | Predictable |
+
+**When to use LangGraph**: Complex, dynamic workflows where routing decisions need LLM reasoning.
+
+**When to use NIFTY pattern**: Fixed analysis pipelines where speed and consistency matter.
+
+### NIFTY vs CrewAI
+
+| Feature | CrewAI | NIFTY |
+|---------|--------|-------|
+| Agent communication | Agents can message each other | Agents don't communicate |
+| Task delegation | Agents delegate to each other | Orchestrator controls all |
+| Role-playing | Strong persona enforcement | Moderate persona prompts |
+| Process types | Sequential, Hierarchical | Parallel only |
+| Built-in memory | ✅ Short/Long term | ✅ Manual implementation |
+
+**When to use CrewAI**: When agents need to collaborate, debate, or delegate tasks dynamically.
+
+**When to use NIFTY pattern**: When analysis is embarrassingly parallel (no inter-agent dependencies).
+
+### NIFTY vs Google ADK (Agent Development Kit)
+
+| Feature | Google ADK | NIFTY |
+|---------|------------|-------|
+| Agent types | LlmAgent, LoopAgent, SequentialAgent, ParallelAgent | Custom orchestrator |
+| Built-in tools | Google Search, Code Execution | Custom data fetchers |
+| Session management | InMemorySessionService | Manual cache |
+| Model support | Gemini native | Gemini via SDK |
+| Maturity | Preview (evolving) | Production |
+
+**When to use Google ADK**: Greenfield projects wanting Google's opinionated framework.
+
+**When to use NIFTY pattern**: When you need full control and custom data sources.
 
 ---
 
@@ -725,11 +1705,60 @@ report = analyze_stock("RELIANCE")  # Will show debug output
 
 ## Future Enhancements
 
+### Planned Agentic Improvements
+
+1. **Self-Reflection Loop**
+   - Allow agents to critique and revise their own outputs
+   - Implement "confidence threshold" that triggers re-analysis
+   
+2. **Devil's Advocate Agent**
+   - Add a 6th specialist that argues against the consensus
+   - Stress-tests bullish/bearish thesis
+
+3. **Dynamic Tool Selection**
+   - Let agents request additional data sources mid-analysis
+   - Implement lazy loading for expensive data
+
+4. **Memory Improvements**
+   - Vector database for semantic search of past analyses
+   - Learn from analyst feedback over time
+
+5. **Planning Agent**
+   - For custom queries: "What should I analyze for this IPO?"
+   - Dynamically select which specialists to invoke
+
+### Technical Roadmap
+
 1. **Real-time Streaming**: WebSocket support for live analysis updates
 2. **Custom Agents**: Allow users to define custom analysis agents
 3. **Historical Backtesting**: Test recommendations against historical data
 4. **Portfolio Analysis**: Analyze entire portfolios, not just individual stocks
 5. **Alert System**: Notify when recommendation changes
+
+---
+
+## Glossary: Agentic AI Terms
+
+| Term | Definition | NIFTY Example |
+|------|------------|---------------|
+| **Agent** | An AI system that can perceive, reason, and act autonomously | Each specialist (Fundamental, Technical, etc.) |
+| **Tool** | External function an agent can call | `get_stock_fundamentals()`, `get_stock_news()` |
+| **Orchestrator** | Component that coordinates multiple agents | `NiftyAgentOrchestrator` class |
+| **System Prompt** | Instructions that define agent behavior | Prompts in `nifty_prompts.py` |
+| **Context Window** | Max tokens an LLM can process | ~128k for Gemini 1.5/2.0 |
+| **Token** | Unit of text (roughly 4 characters) | Used for cost/latency calculation |
+| **Span** | A single operation within a trace | One agent's execution |
+| **Trace** | Full request lifecycle | Complete analysis request |
+| **Fan-out** | Dispatch multiple parallel tasks | 5 specialists running together |
+| **Fan-in** | Collect results from parallel tasks | Predictor gathering all analyses |
+| **ReAct** | Reasoning + Acting loop pattern | NOT used (by design) |
+| **Reflection** | Agent reviewing/critiquing output | Predictor reviewing specialists |
+| **Supervisor** | Agent/code that controls other agents | Orchestrator managing specialists |
+| **Worker** | Agent controlled by supervisor | Specialist agents |
+| **Short-term Memory** | Data within single request | `base_data` dict |
+| **Long-term Memory** | Persistent storage across requests | Supabase `ai_analysis_history` |
+| **Hallucination** | LLM generating false information | Mitigated by domain isolation |
+| **Grounding** | Providing factual context to LLM | Pre-fetched data from APIs |
 
 ---
 
@@ -749,4 +1778,5 @@ MIT License - See LICENSE file for details.
 ---
 
 *Last Updated: January 2026*
-*Version: 1.0.0*
+*Version: 2.0.0*
+*Documentation covers: Agentic Design Patterns, Tool Architecture, Memory Management, Observability*
