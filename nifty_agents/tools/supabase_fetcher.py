@@ -593,9 +593,9 @@ def get_sector_performance(
         return {"error": "Supabase not configured"}
     
     try:
-        # Get latest data grouped by sector
+        # Get latest data grouped by sector - using correct column names from schema
         response = client.table("daily_stocks") \
-            .select("sector, return_1w, return_1m, technical_score, composite_score") \
+            .select("sector, return_1w, return_1m, score_technical, overall_score") \
             .order("date", desc=True) \
             .limit(500) \
             .execute()
@@ -626,8 +626,8 @@ def get_sector_performance(
                 sector_data[sector]["return_1w"].append(row["return_1w"])
             if row.get("return_1m") is not None:
                 sector_data[sector]["return_1m"].append(row["return_1m"])
-            if row.get("composite_score") is not None:
-                sector_data[sector]["avg_score"].append(row["composite_score"])
+            if row.get("overall_score") is not None:
+                sector_data[sector]["avg_score"].append(row["overall_score"])
         
         # Compute averages
         result = {}
@@ -635,7 +635,7 @@ def get_sector_performance(
             result[sector] = {
                 "avg_return_1w": sum(data["return_1w"]) / len(data["return_1w"]) if data["return_1w"] else 0,
                 "avg_return_1m": sum(data["return_1m"]) / len(data["return_1m"]) if data["return_1m"] else 0,
-                "avg_composite_score": sum(data["avg_score"]) / len(data["avg_score"]) if data["avg_score"] else 0,
+                "avg_overall_score": sum(data["avg_score"]) / len(data["avg_score"]) if data["avg_score"] else 0,
                 "stock_count": len(data["return_1w"])
             }
         
@@ -666,9 +666,9 @@ def get_market_breadth() -> Dict[str, Any]:
         return {"error": "Supabase not configured"}
     
     try:
-        # Get latest day's data
+        # Get latest day's data - using correct column names from schema
         response = client.table("daily_stocks") \
-            .select("ticker, return_1d, close, sma_200, rsi_14") \
+            .select("ticker, return_1d, price_last, sma200, rsi14") \
             .order("date", desc=True) \
             .limit(500) \
             .execute()
@@ -689,9 +689,9 @@ def get_market_breadth() -> Dict[str, Any]:
         
         for row in latest_data:
             ret = row.get("return_1d", 0) or 0
-            close = row.get("close", 0) or 0
-            sma_200 = row.get("sma_200", 0) or 0
-            rsi = row.get("rsi_14", 50) or 50
+            price = row.get("price_last", 0) or 0
+            sma_200 = row.get("sma200", 0) or 0
+            rsi = row.get("rsi14", 50) or 50
             
             # A/D count
             if ret > 0.1:
@@ -702,7 +702,7 @@ def get_market_breadth() -> Dict[str, Any]:
                 unchanged += 1
             
             # Above 200 DMA
-            if close > 0 and sma_200 > 0 and close > sma_200:
+            if price > 0 and sma_200 > 0 and price > sma_200:
                 above_200dma += 1
             
             # RSI extremes
@@ -750,32 +750,31 @@ def get_index_summary(
     
     try:
         response = client.table("daily_stocks") \
-            .select("ticker, composite_score, technical_score, fundamental_score, return_1d, return_1w, return_1m") \
-            .eq("index", index) \
+            .select("ticker, overall_score, score_technical, score_fundamental, return_1d, return_1w, return_1m") \
             .order("date", desc=True) \
             .limit(500) \
             .execute()
         
         if not response.data:
-            return {"error": f"No data for {index}"}
+            return {"error": f"No data available"}
         
         # Get latest date
         latest_date = response.data[0].get("date")
         latest_data = [d for d in response.data if d.get("date") == latest_date]
         
         # Compute stats
-        composite_scores = [d.get("composite_score", 0) or 0 for d in latest_data]
+        overall_scores = [d.get("overall_score", 0) or 0 for d in latest_data]
         returns_1d = [d.get("return_1d", 0) or 0 for d in latest_data]
         returns_1w = [d.get("return_1w", 0) or 0 for d in latest_data]
         
         return {
             "index": index,
             "stock_count": len(latest_data),
-            "avg_composite_score": round(sum(composite_scores) / len(composite_scores), 1) if composite_scores else 0,
+            "avg_overall_score": round(sum(overall_scores) / len(overall_scores), 1) if overall_scores else 0,
             "avg_return_1d": round(sum(returns_1d) / len(returns_1d), 2) if returns_1d else 0,
             "avg_return_1w": round(sum(returns_1w) / len(returns_1w), 2) if returns_1w else 0,
-            "high_score_count": len([s for s in composite_scores if s >= 70]),
-            "low_score_count": len([s for s in composite_scores if s <= 30])
+            "high_score_count": len([s for s in overall_scores if s >= 70]),
+            "low_score_count": len([s for s in overall_scores if s <= 30])
         }
         
     except Exception as e:
