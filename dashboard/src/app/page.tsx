@@ -16,6 +16,7 @@ import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import StockTable from '@/components/StockTable';
 import AIAnalysisModal from '@/components/AIAnalysisModal';
+import AIMarketOutlook from '@/components/AIMarketOutlook';
 import DateRangeSelector, { rangeToDays } from '@/components/DateRangeSelector';
 
 type ReportView = 'daily' | 'weekly' | 'monthly' | 'seasonality';
@@ -645,20 +646,29 @@ export default function DashboardPage() {
                   </div>
                 </div>
               ) : reportView === 'weekly' ? (
-                <WeeklyReportTableV2
-                  data={getFilteredData}
-                  onSelectStock={(t) => handleStockSelect(t, 'weekly')}
-                />
+                <div className="space-y-6">
+                  <AIMarketOutlook type="weekly" />
+                  <WeeklyReportTableV2
+                    data={getFilteredData}
+                    onSelectStock={(t) => handleStockSelect(t, 'weekly')}
+                  />
+                </div>
               ) : reportView === 'monthly' ? (
-                <MonthlyReportTableV2
-                  data={getFilteredData}
-                  onSelectStock={(t) => handleStockSelect(t, 'monthly')}
-                />
+                <div className="space-y-6">
+                  <AIMarketOutlook type="monthly" />
+                  <MonthlyReportTableV2
+                    data={getFilteredData}
+                    onSelectStock={(t) => handleStockSelect(t, 'monthly')}
+                  />
+                </div>
               ) : (
-                <SeasonalityHeatmapV2
-                  data={getFilteredData}
-                  onSelectStock={(t) => handleStockSelect(t, 'seasonality')}
-                />
+                <div className="space-y-6">
+                  <AIMarketOutlook type="seasonality" />
+                  <SeasonalityHeatmapV2
+                    data={getFilteredData}
+                    onSelectStock={(t) => handleStockSelect(t, 'seasonality')}
+                  />
+                </div>
               )}
             </div>
           ) : (
