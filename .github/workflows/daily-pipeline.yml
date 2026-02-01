@@ -2,7 +2,7 @@ name: Daily Stock Enrichment
 
 on:
   schedule:
-    - cron: '30 10 * * 1-5' # 4:00 PM IST (Mon-Fri)
+    - cron: '0 12 * * 1-5' # 5:30 PM IST (Mon-Fri) - gives yfinance 2 hours after market close
   workflow_dispatch:
 
 jobs:

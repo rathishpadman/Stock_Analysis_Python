@@ -16,7 +16,7 @@ export async function GET(
     // Fetch historical data for the specific ticker
     const { data, error } = await supabase
         .from('daily_stocks')
-        .select('date, price:price_last, rsi:rsi14, sma20, sma50, sma200, macd_line, macd_signal, macd_hist, volume, return_1d')
+        .select('date, price:price_last, rsi:rsi14, sma20, sma50, sma200, macd_line, macd_signal, macd_hist, return_1d')
         .eq('ticker', ticker)
         .order('date', { ascending: true })
         .limit(days);
