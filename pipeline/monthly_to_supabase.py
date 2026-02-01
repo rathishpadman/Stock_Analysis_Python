@@ -86,7 +86,7 @@ def run_monthly_pipeline():
     monthly_df = build_monthly_analysis_sheet(symbols, company_names, settings.monthly_history_months, settings.yahoo_suffix)
     if not monthly_df.empty:
         payload = prepare_monthly_payload(monthly_df)
-        supabase.table("monthly_analysis").upsert(payload).execute()
+        supabase.table("monthly_analysis").upsert(payload, on_conflict="ticker,month").execute()
         print(f"Uploaded {len(payload)} monthly rows")
 
     # 2. Seasonality
@@ -94,7 +94,7 @@ def run_monthly_pipeline():
     seasonality_df = build_seasonality_sheet(symbols, company_names, settings.seasonality_years, settings.yahoo_suffix)
     if not seasonality_df.empty:
         payload = prepare_seasonality_payload(seasonality_df)
-        supabase.table("seasonality").upsert(payload).execute()
+        supabase.table("seasonality").upsert(payload, on_conflict="ticker").execute()
         print(f"Uploaded {len(payload)} seasonality rows")
 
 if __name__ == "__main__":
