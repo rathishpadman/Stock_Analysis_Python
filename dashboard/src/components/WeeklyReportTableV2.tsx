@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { ArrowUpDown, ArrowUp, ArrowDown, Filter, X, Trophy } from 'lucide-react';
+import { ArrowUpDown, ArrowUp, ArrowDown, Filter, X, Trophy, Search } from 'lucide-react';
 
 interface WeeklyData {
     ticker: string;
@@ -97,6 +97,7 @@ export default function WeeklyReportTable({ data, onSelectStock }: WeeklyReportT
     const [minReturn, setMinReturn] = useState<string>('');
     const [maxReturn, setMaxReturn] = useState<string>('');
     const [rsiFilter, setRsiFilter] = useState<'ALL' | 'OVERSOLD' | 'NEUTRAL' | 'OVERBOUGHT'>('ALL');
+    const [searchQuery, setSearchQuery] = useState<string>('');
     
     // Pagination state
     const [currentPage, setCurrentPage] = useState(1);
@@ -108,6 +109,15 @@ export default function WeeklyReportTable({ data, onSelectStock }: WeeklyReportT
     // Apply filters and sorting
     const filteredAndSortedData = useMemo(() => {
         let result = [...rankedData];
+
+        // Apply search filter
+        if (searchQuery.trim() !== '') {
+            const query = searchQuery.toLowerCase();
+            result = result.filter(r => 
+                r.ticker?.toLowerCase().includes(query) ||
+                r.company_name?.toLowerCase().includes(query)
+            );
+        }
 
         // Apply trend filter
         if (trendFilter !== 'ALL') {
@@ -182,7 +192,7 @@ export default function WeeklyReportTable({ data, onSelectStock }: WeeklyReportT
         });
 
         return result;
-    }, [rankedData, sortField, sortDirection, trendFilter, minReturn, maxReturn, rsiFilter]);
+    }, [rankedData, sortField, sortDirection, trendFilter, minReturn, maxReturn, rsiFilter, searchQuery]);
 
     // Pagination calculations
     const totalPages = Math.ceil(filteredAndSortedData.length / rowsPerPage);
@@ -229,8 +239,19 @@ export default function WeeklyReportTable({ data, onSelectStock }: WeeklyReportT
     return (
         <div className="space-y-4">
             {/* Filter Controls */}
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-2">
+                    {/* Search Bar */}
+                    <div className="relative">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-500" />
+                        <input
+                            type="text"
+                            placeholder="Search ticker or company..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="bg-slate-800 border border-slate-700 rounded pl-8 pr-3 py-1.5 text-xs text-white placeholder-slate-500 w-48 focus:outline-none focus:border-blue-500"
+                        />
+                    </div>
                     <button
                         onClick={() => setShowFilters(!showFilters)}
                         className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs font-medium transition-all ${

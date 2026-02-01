@@ -49,6 +49,7 @@ export default function DashboardPage() {
   const [view, setView] = useState<'table' | 'detail'>('table');
   const [availableDates, setAvailableDates] = useState<string[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>('');
+  const [dataUpdatedAt, setDataUpdatedAt] = useState<string | null>(null);
   const [reportView, setReportView] = useState<ReportView>('daily');
   const [detailSource, setDetailSource] = useState<DetailSource>('daily');
 
@@ -228,6 +229,10 @@ export default function DashboardPage() {
       const res = await fetch(url);
       const data = await res.json();
       setStocks(Array.isArray(data) ? data : []);
+      // Extract data freshness timestamp from first record
+      if (Array.isArray(data) && data.length > 0 && data[0].created_at) {
+        setDataUpdatedAt(data[0].created_at);
+      }
     } catch (error) {
       console.error('Failed to fetch stocks:', error);
     } finally {
@@ -417,6 +422,23 @@ export default function DashboardPage() {
                   <option key={date} value={date} className="bg-slate-900">{date}</option>
                 ))}
               </select>
+            </div>
+          )}
+
+          {/* Data freshness indicator */}
+          {dataUpdatedAt && reportView === 'daily' && (
+            <div className="flex items-center gap-1.5 text-[10px] text-slate-500 bg-[#0f172a] border border-white/5 rounded px-2.5 py-1.5">
+              <Activity className="h-3 w-3 text-emerald-500" />
+              <span>Updated:</span>
+              <span className="text-slate-400 font-mono">
+                {new Date(dataUpdatedAt).toLocaleString('en-IN', {
+                  timeZone: 'Asia/Kolkata',
+                  day: '2-digit',
+                  month: 'short',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })} IST
+              </span>
             </div>
           )}
 
