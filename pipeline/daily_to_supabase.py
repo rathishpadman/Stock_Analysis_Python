@@ -156,10 +156,20 @@ def prepare_daily_payload(df: pd.DataFrame, snapshot_date: date) -> list:
     return payload
 
 def upload_to_supabase(payload: list):
+    if not payload:
+        return
+    
     supabase = get_supabase_client()
     try:
-        # Upsert by (ticker, date) unique constraint
-        supabase.table("daily_stocks").upsert(payload, on_conflict="ticker,date").execute()
+        # Extract snapshot date from first item to clear old records for the same day
+        # This ensures 'created_at' timestamp reflects the latest successful run
+        snapshot_date = payload[0].get("date")
+        if snapshot_date:
+            print(f"Clearing existing records for {snapshot_date}...")
+            supabase.table("daily_stocks").delete().eq("date", snapshot_date).execute()
+            
+        # Insert fresh records
+        supabase.table("daily_stocks").insert(payload).execute()
         print(f"Successfully uploaded {len(payload)} rows to Supabase")
     except Exception as e:
         print(f"Error uploading to Supabase: {e}")
