@@ -404,7 +404,8 @@ def merge_constituents_with_metadata(df_const: pd.DataFrame, yahoo_suffix: str =
 def fetch_history_yf(ticker: str, years: int = 5) -> pd.DataFrame:
     # Use explicit start/end dates to avoid invalid 'period' strings for fractional years
     try:
-        end = pd.Timestamp.today()
+        # Use tomorrow's date as end because yfinance end date is exclusive
+        end = pd.Timestamp.today() + pd.Timedelta(days=1)
         days = max(5, int(round(float(years) * 365)))
         start = end - pd.Timedelta(days=days)
         # yfinance accepts start/end as date-like
