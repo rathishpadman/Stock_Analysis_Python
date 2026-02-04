@@ -27,7 +27,7 @@ export default function AnalyzeButton({ ticker, onAnalyze, apiBaseUrl = '' }: An
         if (cachedInfo !== null) return; // Already fetched
         setLoading(true);
         try {
-            const backendUrl = process.env.NEXT_PUBLIC_AGENT_API_URL || 'https://nifty-agent-api.onrender.com';
+            const backendUrl = process.env.NEXT_PUBLIC_AGENT_API_URL || 'https://nifty-agents-api.onrender.com';
             const res = await fetch(`${backendUrl}/api/agent/history/${ticker}`);
             if (res.ok) {
                 const data = await res.json();
@@ -67,8 +67,8 @@ export default function AnalyzeButton({ ticker, onAnalyze, apiBaseUrl = '' }: An
                 onMouseEnter={handleMouseEnter}
                 onMouseLeave={handleMouseLeave}
                 className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-white transition-all shadow-lg ${cachedInfo?.has_cached
-                        ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 shadow-emerald-500/20 hover:shadow-emerald-500/40'
-                        : 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 shadow-blue-500/20 hover:shadow-blue-500/40'
+                    ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 shadow-emerald-500/20 hover:shadow-emerald-500/40'
+                    : 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 shadow-blue-500/20 hover:shadow-blue-500/40'
                     }`}
             >
                 {cachedInfo?.has_cached ? (
@@ -98,7 +98,7 @@ export default function AnalyzeButton({ ticker, onAnalyze, apiBaseUrl = '' }: An
                                     <div className="flex justify-between">
                                         <span className="text-slate-400">Score:</span>
                                         <span className={`font-bold ${(cachedInfo.composite_score || 0) >= 60 ? 'text-emerald-400' :
-                                                (cachedInfo.composite_score || 0) >= 40 ? 'text-amber-400' : 'text-rose-400'
+                                            (cachedInfo.composite_score || 0) >= 40 ? 'text-amber-400' : 'text-rose-400'
                                             }`}>
                                             {cachedInfo.composite_score?.toFixed(1)}
                                         </span>
@@ -108,7 +108,7 @@ export default function AnalyzeButton({ ticker, onAnalyze, apiBaseUrl = '' }: An
                                     <div className="flex justify-between">
                                         <span className="text-slate-400">Signal:</span>
                                         <span className={`font-bold uppercase ${cachedInfo.recommendation?.toLowerCase().includes('buy') ? 'text-emerald-400' :
-                                                cachedInfo.recommendation?.toLowerCase().includes('sell') ? 'text-rose-400' : 'text-amber-400'
+                                            cachedInfo.recommendation?.toLowerCase().includes('sell') ? 'text-rose-400' : 'text-amber-400'
                                             }`}>
                                             {cachedInfo.recommendation}
                                         </span>

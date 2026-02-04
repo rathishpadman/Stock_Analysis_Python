@@ -463,7 +463,7 @@ When a user clicks the **"Analyze"** button on the dashboard, the following sequ
 
 #### 2. API Request Preparation (`AIAnalysisModal.tsx`)
 - **Action**: The modal initializes and immediately hits the analysis endpoint.
-- **URL**: `GET https://nifty-agent-api.onrender.com/api/agent/analyze/{ticker}`
+- **URL**: `GET https://nifty-agents-api.onrender.com/api/agent/analyze/{ticker}`
 - **UI**: Shows real-time progress steps: *"Gathering data..."*, *"Agents analyzing..."*, *"Synthesizing results..."*.
 
 #### 3. Orchestration Logic (`orchestrator.py`)
