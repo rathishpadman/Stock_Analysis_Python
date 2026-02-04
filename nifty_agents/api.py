@@ -82,15 +82,13 @@ app = FastAPI(
 )
 
 # CORS middleware for frontend integration
+# Note: FastAPI's CORSMiddleware doesn't support wildcard patterns in domains
+# Using ["*"] to allow all origins (for API that's publicly accessible)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",  # Next.js dev
-        "https://*.vercel.app",    # Vercel deployments
-        "*"  # Allow all for development
-    ],
-    allow_credentials=True,
-    allow_methods=["*"],
+    allow_origins=["*"],  # Allow all origins for public API
+    allow_credentials=False,  # Must be False when using allow_origins=["*"]
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
