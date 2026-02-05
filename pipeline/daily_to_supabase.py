@@ -1,6 +1,8 @@
 import os
 import pandas as pd
 import numpy as np
+import time
+import logging
 from datetime import datetime, date
 from supabase import create_client, Client
 from equity_engine.pipeline import build_universe, enrich_stock
@@ -10,6 +12,10 @@ from tqdm import tqdm
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
+logger = logging.getLogger(__name__)
 
 def get_supabase_client() -> Client:
     url = os.getenv("SUPABASE_URL", "").strip()
@@ -165,14 +171,14 @@ def upload_to_supabase(payload: list):
         # This ensures 'created_at' timestamp reflects the latest successful run
         snapshot_date = payload[0].get("date")
         if snapshot_date:
-            print(f"Clearing existing records for {snapshot_date}...")
+            logger.info(f"Clearing existing records for {snapshot_date}...")
             supabase.table("daily_stocks").delete().eq("date", snapshot_date).execute()
             
         # Insert fresh records
         supabase.table("daily_stocks").insert(payload).execute()
-        print(f"Successfully uploaded {len(payload)} rows to Supabase")
+        logger.info(f"Successfully uploaded {len(payload)} rows to Supabase")
     except Exception as e:
-        print(f"Error uploading to Supabase: {e}")
+        logger.error(f"Error uploading to Supabase: {e}")
         raise
 
 def run_daily_pipeline(limit: int = None, dry_run: bool = False):
@@ -180,27 +186,64 @@ def run_daily_pipeline(limit: int = None, dry_run: bool = False):
     uni = build_universe(settings.indexes)
     
     if limit:
-        print(f"Limiting to first {limit} stocks for testing...")
+        logger.info(f"Limiting to first {limit} stocks for testing...")
         uni = uni.head(limit)
         
     rows = []
+    failed_stocks = []  # Track failed stocks for retry
     batch_size = 20
     uni_list = list(uni.iterrows())
     
-    print(f"Enriching {len(uni_list)} stocks...")
+    def process_stock(row, retry_count=0):
+        """Process a single stock with retry tracking"""
+        try:
+            res = enrich_stock(row["symbol"], settings)
+            if res:
+                res["symbol"] = row.get("symbol")
+                return res, None
+            else:
+                return None, f"Empty result for {row.get('symbol')}"
+        except Exception as e:
+            return None, f"Error processing {row.get('symbol')}: {e}"
+    
+    logger.info(f"Enriching {len(uni_list)} stocks (Pass 1)...")
     for i in range(0, len(uni_list), batch_size):
         batch = uni_list[i:i + batch_size]
         with ThreadPoolExecutor(max_workers=min(settings.max_workers, len(batch))) as executor:
-            futures = {executor.submit(enrich_stock, row["symbol"], settings): row for _, row in batch}
+            futures = {executor.submit(process_stock, row): row for _, row in batch}
             for future in as_completed(futures):
                 original_row = futures[future]
-                try:
-                    res = future.result()
-                    if res:
-                        res["symbol"] = original_row.get("symbol")
-                        rows.append(res)
-                except Exception as e:
-                    print(f"Error processing {original_row.get('symbol')}: {e}")
+                result, error = future.result()
+                if result:
+                    rows.append(result)
+                elif error:
+                    logger.warning(error)
+                    failed_stocks.append(original_row)
+    
+    # Retry failed stocks with delay between each (reduces rate limiting)
+    if failed_stocks:
+        logger.info(f"Retrying {len(failed_stocks)} failed stocks (Pass 2)...")
+        time.sleep(5)  # Wait before retry pass
+        
+        retry_success = 0
+        for row in failed_stocks:
+            try:
+                time.sleep(1)  # Rate limit: 1 second between retries
+                res = enrich_stock(row["symbol"], settings)
+                if res:
+                    res["symbol"] = row.get("symbol")
+                    rows.append(res)
+                    retry_success += 1
+                    logger.info(f"Retry successful: {row.get('symbol')}")
+                else:
+                    logger.error(f"Retry failed (empty result): {row.get('symbol')}")
+            except Exception as e:
+                logger.error(f"Retry failed: {row.get('symbol')} - {e}")
+        
+        logger.info(f"Retry pass complete: {retry_success}/{len(failed_stocks)} recovered")
+    
+    final_failed = len(failed_stocks) - sum(1 for r in rows if r.get("symbol") in [f.get("symbol") for f in failed_stocks])
+    logger.info(f"Total stocks processed: {len(rows)}/{len(uni_list)} (failed: {final_failed})")
 
     if rows:
         stocks = pd.DataFrame(rows)
@@ -212,35 +255,36 @@ def run_daily_pipeline(limit: int = None, dry_run: bool = False):
         # 2. Compute scores
         try:
             from equity_engine.scoring import compute_subscores, overall_score
-            print("Computing scores...")
+            logger.info("Computing scores...")
             subs = compute_subscores(merged_final)
             merged_final = pd.concat([merged_final, subs], axis=1)
             merged_final["Overall Score (0-100)"] = overall_score(subs, settings.weights).clip(0, 100)
         except Exception as e:
-            print(f"Warning: Could not compute scores: {e}")
+            logger.warning(f"Could not compute scores: {e}")
             
         # 3. Use the engine's prepare_output_df to get the 110-field structure
         from equity_engine.pipeline import prepare_output_df
-        print("Preparing 110-field output structure...")
+        logger.info("Preparing 110-field output structure...")
         output_df = prepare_output_df(merged_final)
         
         # 4. Map to Supabase payload
         payload = prepare_daily_payload(output_df, date.today())
         
         if dry_run:
-            print("\n--- DRY RUN: Payload Summary ---")
-            print(f"Total records gathered: {len(payload)}")
+            logger.info("\n--- DRY RUN: Payload Summary ---")
+            logger.info(f"Total records gathered: {len(payload)}")
             if payload:
                 sample = payload[0]
-                print(f"Sample Ticker: {sample['ticker']}")
-                print(f"Sample Price: {sample['price_last']}")
-                print(f"Sample Overall Score: {sample['overall_score']}")
-                # Check a few newly added fields
-                print(f"Sample Sector: {sample['sector']}")
-                print(f"Sample CAGR 3Y: {sample.get('cagr_3y_pct')}")
-            print("--- Dry run complete, skipping upload ---")
+                logger.info(f"Sample Ticker: {sample['ticker']}")
+                logger.info(f"Sample Price: {sample['price_last']}")
+                logger.info(f"Sample Overall Score: {sample['overall_score']}")
+                logger.info(f"Sample Sector: {sample['sector']}")
+                logger.info(f"Sample CAGR 3Y: {sample.get('cagr_3y_pct')}")
+            logger.info("--- Dry run complete, skipping upload ---")
         else:
             upload_to_supabase(payload)
+    else:
+        logger.error("No stocks processed successfully!")
 
 if __name__ == "__main__":
     import argparse
