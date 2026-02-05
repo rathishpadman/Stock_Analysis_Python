@@ -11,7 +11,7 @@ import { MonthlyPriceChart, MonthlyReturnsChart, RollingReturnsChart, MonthlyVol
 import { SeasonalityBarChart, SeasonalityRadarChart, QuarterlyBreakdown, SeasonalityStats } from '@/components/SeasonalityCharts';
 import { ScoreBarChart, PriceChart, RSIChart, MACDChart } from '@/components/Charts';
 import { ALL_FIELDS, DEFAULT_COLUMNS, WEEKLY_FIELDS, DEFAULT_WEEKLY_COLUMNS, MONTHLY_FIELDS, DEFAULT_MONTHLY_COLUMNS, SEASONALITY_FIELDS, DEFAULT_SEASONALITY_COLUMNS } from '@/lib/constants';
-import { Settings2, Search, Filter, LogOut, Loader2, BarChart3, TrendingUp, ShieldCheck, Info, Calendar, Flame, AlertTriangle, Activity, ChevronLeft, HelpCircle } from 'lucide-react';
+import { Settings2, Search, Filter, LogOut, Loader2, BarChart3, TrendingUp, ShieldCheck, Info, Calendar, Flame, AlertTriangle, Activity, ChevronLeft, ChevronDown, ChevronUp, HelpCircle } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import StockTable from '@/components/StockTable';
@@ -60,6 +60,7 @@ export default function DashboardPage() {
   // Collapsible sections state (default collapsed for table-first focus)
   const [showMarketMovers, setShowMarketMovers] = useState(false);
   const [showTechnicalSignals, setShowTechnicalSignals] = useState(false);
+  const [showMissingStocks, setShowMissingStocks] = useState(false);
 
   // Chart date range state (for detail view)
   const [chartRange, setChartRange] = useState('3m');
@@ -355,6 +356,12 @@ export default function DashboardPage() {
     return sidebarData.filter(s => !s.company_name || s.company_name.trim() === '').length;
   }, [sidebarData]);
 
+  // Expected universe size and missing stocks calculation
+  const expectedUniverseSize = 200; // NIFTY 200
+  const missingStocksCount = useMemo(() => {
+    return Math.max(0, expectedUniverseSize - sidebarData.length);
+  }, [sidebarData.length]);
+
   const handleStockSelect = (ticker: string, source: DetailSource = 'daily') => {
     setSelectedStock(ticker);
     setDetailSource(source);
@@ -499,21 +506,38 @@ export default function DashboardPage() {
             </div>
             <div className="flex items-center gap-3 text-[10px]">
               <span className="text-slate-400">
-                Total: <span className="text-blue-400 font-bold">{sidebarData.length}</span>
+                Total: <span className="text-blue-400 font-bold">{sidebarData.length}</span>/<span className="text-slate-500">{expectedUniverseSize}</span>
               </span>
               <span className="text-slate-600">|</span>
               <span className="text-slate-400">
                 Showing: <span className="text-slate-300 font-medium">{filteredSidebar.length}</span>
               </span>
-              {missingNameCount > 0 && (
-                <>
-                  <span className="text-slate-600">|</span>
-                  <span className="text-amber-500" title="Stocks with missing company name">
-                    ⚠ {missingNameCount} missing names
-                  </span>
-                </>
+              {missingStocksCount > 0 && (
+                <button 
+                  onClick={() => setShowMissingStocks(!showMissingStocks)}
+                  className="flex items-center gap-1 text-amber-500 hover:text-amber-400 transition-colors"
+                  title="Click to see details about missing stocks"
+                >
+                  <AlertTriangle className="h-3 w-3" />
+                  <span>{missingStocksCount} failed</span>
+                  {showMissingStocks ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                </button>
               )}
             </div>
+            
+            {/* Collapsible missing stocks panel */}
+            {showMissingStocks && missingStocksCount > 0 && (
+              <div className="mt-2 p-2 bg-amber-950/30 border border-amber-800/30 rounded text-[10px]">
+                <div className="text-amber-400 font-bold mb-1">⚠ {missingStocksCount} stocks failed to load</div>
+                <div className="text-amber-300/70 mb-2">
+                  <span className="font-medium">Reason:</span> yfinance rate limiting on GitHub Actions IP
+                </div>
+                <div className="text-slate-400 text-[9px]">
+                  Data source (Yahoo Finance) blocks requests from cloud servers. 
+                  These stocks will be retried in the next pipeline run.
+                </div>
+              </div>
+            )}
           </div>
 
           {loading ? (
