@@ -238,12 +238,20 @@ def run_daily_pipeline(limit: int = None, dry_run: bool = False):
                 else:
                     logger.error(f"Retry failed (empty result): {row.get('symbol')}")
             except Exception as e:
-                logger.error(f"Retry failed: {row.get('symbol')} - {e}")
+                logger.error(f"Retry failed: {row.get('symbol')} - {type(e).__name__}: {e}")
         
         logger.info(f"Retry pass complete: {retry_success}/{len(failed_stocks)} recovered")
     
-    final_failed = len(failed_stocks) - sum(1 for r in rows if r.get("symbol") in [f.get("symbol") for f in failed_stocks])
-    logger.info(f"Total stocks processed: {len(rows)}/{len(uni_list)} (failed: {final_failed})")
+    # Calculate final failed stocks
+    recovered_symbols = {r.get("symbol") for r in rows if r.get("symbol") in [f.get("symbol") for f in failed_stocks]}
+    final_failed_list = [f.get("symbol") for f in failed_stocks if f.get("symbol") not in recovered_symbols]
+    
+    logger.info(f"Total stocks processed: {len(rows)}/{len(uni_list)} (failed: {len(final_failed_list)})")
+    
+    if final_failed_list:
+        logger.warning(f"=== MISSING STOCKS ({len(final_failed_list)}) ===")
+        logger.warning(f"Failed tickers: {', '.join(sorted(final_failed_list))}")
+        logger.warning("Reason: yfinance returned empty data (likely rate limiting on GitHub Actions IP)")
 
     if rows:
         stocks = pd.DataFrame(rows)

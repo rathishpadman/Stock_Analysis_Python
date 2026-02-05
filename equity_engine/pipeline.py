@@ -169,9 +169,14 @@ def prepare_output_df(df: pd.DataFrame) -> pd.DataFrame:
     return out.fillna("")
 
 def enrich_stock(symbol: str, settings: Settings) -> Dict[str, float]:
+    logger = logging.getLogger(__name__)
     ticker = to_yahoo(symbol, settings.yahoo_suffix)
     h = fetch_history_yf(ticker, years=settings.history_years)
-    if h.empty or "Close" not in h.columns:
+    if h.empty:
+        logger.warning(f"{symbol} ({ticker}): No historical data returned from yfinance")
+        return {}
+    if "Close" not in h.columns:
+        logger.warning(f"{symbol} ({ticker}): Data returned but missing 'Close' column. Columns: {list(h.columns)}")
         return {}
 
     h = add_technicals(h, sma_windows=settings.sma_windows, rsi_window=settings.rsi_window, macd=settings.macd)

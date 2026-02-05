@@ -402,6 +402,7 @@ def merge_constituents_with_metadata(df_const: pd.DataFrame, yahoo_suffix: str =
     
 
 def fetch_history_yf(ticker: str, years: int = 5) -> pd.DataFrame:
+    logger = logging.getLogger(__name__)
     # Use explicit start/end dates to avoid invalid 'period' strings for fractional years
     try:
         # Use tomorrow's date as end because yfinance end date is exclusive
@@ -418,20 +419,29 @@ def fetch_history_yf(ticker: str, years: int = 5) -> pd.DataFrame:
                 break
             except Exception as e:
                 last_exc = e
+                logger.debug(f"{ticker}: Attempt {attempt + 1}/3 failed: {type(e).__name__}: {e}")
                 time.sleep(0.5 * (attempt + 1))
         else:
             # Last attempt failed
+            logger.warning(f"{ticker}: All 3 attempts failed - {type(last_exc).__name__}: {last_exc}")
             raise last_exc
 
         # Ensure title-cased columns Close/High/Low/Volume for downstream code
-        if hist is None:
+        if hist is None or hist.empty:
+            logger.warning(f"{ticker}: yfinance returned empty/None (no data available)")
             return pd.DataFrame()
+        logger.debug(f"{ticker}: Got {len(hist)} rows from yfinance")
         return hist.rename(columns=str.title)
-    except Exception:
+    except Exception as e:
         # As a fallback, try the simple period-based call with integer years
+        logger.debug(f"{ticker}: Primary fetch failed ({type(e).__name__}), trying fallback...")
         try:
             yrs = int(float(years))
             hist = yf.Ticker(ticker).history(period=f"{yrs}y", interval="1d", auto_adjust=True)
+            if hist is None or hist.empty:
+                logger.warning(f"{ticker}: Fallback also returned empty data")
+                return pd.DataFrame()
             return hist.rename(columns=str.title)
-        except Exception:
+        except Exception as fallback_e:
+            logger.warning(f"{ticker}: Both primary and fallback failed - {type(fallback_e).__name__}: {fallback_e}")
             return pd.DataFrame()
