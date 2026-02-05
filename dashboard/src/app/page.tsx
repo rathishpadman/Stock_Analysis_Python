@@ -350,6 +350,11 @@ export default function DashboardPage() {
     s.company_name?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Count stocks with missing company_name
+  const missingNameCount = useMemo(() => {
+    return sidebarData.filter(s => !s.company_name || s.company_name.trim() === '').length;
+  }, [sidebarData]);
+
   const handleStockSelect = (ticker: string, source: DetailSource = 'daily') => {
     setSelectedStock(ticker);
     setDetailSource(source);
@@ -481,14 +486,33 @@ export default function DashboardPage() {
       <div className="flex-1 flex overflow-hidden">
         {/* Left Sidebar: Market List */}
         <aside className="w-[400px] border-r border-white/5 overflow-y-auto flex flex-col bg-[#070b14]">
-          <div className="p-4 border-b border-white/5 flex items-center justify-between sticky top-0 bg-[#070b14] z-10">
-            <h2 className="text-xs font-bold text-slate-500 flex items-center gap-2">
-              <BarChart3 className="h-3 w-3" />
-              {reportView.toUpperCase()} UNIVERSE ({filteredSidebar.length})
-            </h2>
-            <div className="flex gap-1">
-              <button onClick={() => setView('table')} className={`p-1.5 rounded text-[10px] font-bold ${view === 'table' ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-800'}`}>GRID</button>
-              <button onClick={() => setView('detail')} className={`p-1.5 rounded text-[10px] font-bold ${view === 'detail' ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-800'}`}>DETAIL</button>
+          <div className="p-4 border-b border-white/5 flex flex-col gap-2 sticky top-0 bg-[#070b14] z-10">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xs font-bold text-slate-500 flex items-center gap-2">
+                <BarChart3 className="h-3 w-3" />
+                {reportView.toUpperCase()} UNIVERSE
+              </h2>
+              <div className="flex gap-1">
+                <button onClick={() => setView('table')} className={`p-1.5 rounded text-[10px] font-bold ${view === 'table' ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-800'}`}>GRID</button>
+                <button onClick={() => setView('detail')} className={`p-1.5 rounded text-[10px] font-bold ${view === 'detail' ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-800'}`}>DETAIL</button>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 text-[10px]">
+              <span className="text-slate-400">
+                Total: <span className="text-blue-400 font-bold">{sidebarData.length}</span>
+              </span>
+              <span className="text-slate-600">|</span>
+              <span className="text-slate-400">
+                Showing: <span className="text-slate-300 font-medium">{filteredSidebar.length}</span>
+              </span>
+              {missingNameCount > 0 && (
+                <>
+                  <span className="text-slate-600">|</span>
+                  <span className="text-amber-500" title="Stocks with missing company name">
+                    ⚠ {missingNameCount} missing names
+                  </span>
+                </>
+              )}
             </div>
           </div>
 
