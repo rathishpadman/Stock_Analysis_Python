@@ -1,5 +1,6 @@
 import json
 import os
+import logging
 from dataclasses import dataclass
 from typing import Dict, List, Tuple
 
@@ -67,7 +68,14 @@ def load_settings() -> Settings:
     sma_windows = _parse_int_list(os.getenv("SMA_WINDOWS", "20,50,200"), [20, 50, 200])
     rsi_window = int(os.getenv("RSI_WINDOW", "14"))
     macd = _parse_int_tuple(os.getenv("MACD_PARAMS", "12,26,9"), (12, 26, 9))
-    max_workers = int(os.getenv("MAX_WORKERS", "10"))
+    
+    # Detect CI environment (GitHub Actions) and reduce concurrency to avoid rate limiting
+    is_ci = os.getenv("CI", "false").lower() == "true" or os.getenv("GITHUB_ACTIONS", "false").lower() == "true"
+    default_workers = 3 if is_ci else 10  # Much lower concurrency in CI
+    max_workers = int(os.getenv("MAX_WORKERS", str(default_workers)))
+    
+    if is_ci:
+        logging.getLogger(__name__).info(f"CI environment detected - using reduced concurrency: {max_workers} workers")
     
     # Weekly/Monthly analysis parameters
     weekly_history_weeks = int(os.getenv("WEEKLY_HISTORY_WEEKS", "52"))

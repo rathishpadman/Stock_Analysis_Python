@@ -188,10 +188,19 @@ def run_daily_pipeline(limit: int = None, dry_run: bool = False):
     if limit:
         logger.info(f"Limiting to first {limit} stocks for testing...")
         uni = uni.head(limit)
+    
+    # Detect CI environment for rate limit handling
+    is_ci = os.environ.get("CI", "false").lower() == "true" or os.environ.get("GITHUB_ACTIONS", "false").lower() == "true"
+    
+    # Use smaller batches and delays in CI to avoid yfinance rate limiting
+    batch_size = 10 if is_ci else 20
+    inter_batch_delay = 3.0 if is_ci else 0.5  # Longer delay between batches in CI
+    
+    if is_ci:
+        logger.info(f"CI environment detected - using batch_size={batch_size}, delay={inter_batch_delay}s, workers={settings.max_workers}")
         
     rows = []
     failed_stocks = []  # Track failed stocks for retry
-    batch_size = 20
     uni_list = list(uni.iterrows())
     
     def process_stock(row, retry_count=0):
@@ -206,9 +215,12 @@ def run_daily_pipeline(limit: int = None, dry_run: bool = False):
         except Exception as e:
             return None, f"Error processing {row.get('symbol')}: {e}"
     
-    logger.info(f"Enriching {len(uni_list)} stocks (Pass 1)...")
-    for i in range(0, len(uni_list), batch_size):
+    logger.info(f"Enriching {len(uni_list)} stocks (Pass 1) with batch_size={batch_size}...")
+    total_batches = (len(uni_list) + batch_size - 1) // batch_size
+    for batch_num, i in enumerate(range(0, len(uni_list), batch_size), 1):
         batch = uni_list[i:i + batch_size]
+        logger.info(f"Processing batch {batch_num}/{total_batches} ({len(batch)} stocks)...")
+        
         with ThreadPoolExecutor(max_workers=min(settings.max_workers, len(batch))) as executor:
             futures = {executor.submit(process_stock, row): row for _, row in batch}
             for future in as_completed(futures):
@@ -219,16 +231,22 @@ def run_daily_pipeline(limit: int = None, dry_run: bool = False):
                 elif error:
                     logger.warning(error)
                     failed_stocks.append(original_row)
+        
+        # Add delay between batches to avoid rate limiting (especially in CI)
+        if i + batch_size < len(uni_list):
+            time.sleep(inter_batch_delay)
+    
+    logger.info(f"Pass 1 complete: {len(rows)}/{len(uni_list)} successful, {len(failed_stocks)} failed")
     
     # Retry failed stocks with delay between each (reduces rate limiting)
     if failed_stocks:
-        logger.info(f"Retrying {len(failed_stocks)} failed stocks (Pass 2)...")
+        logger.info(f"Retrying {len(failed_stocks)} failed stocks (Pass 2) with 2s delay each...")
         time.sleep(5)  # Wait before retry pass
         
         retry_success = 0
         for row in failed_stocks:
             try:
-                time.sleep(1)  # Rate limit: 1 second between retries
+                time.sleep(2)  # Increased to 2 seconds between retries
                 res = enrich_stock(row["symbol"], settings)
                 if res:
                     res["symbol"] = row.get("symbol")
@@ -240,10 +258,34 @@ def run_daily_pipeline(limit: int = None, dry_run: bool = False):
             except Exception as e:
                 logger.error(f"Retry failed: {row.get('symbol')} - {type(e).__name__}: {e}")
         
-        logger.info(f"Retry pass complete: {retry_success}/{len(failed_stocks)} recovered")
+        logger.info(f"Pass 2 complete: {retry_success}/{len(failed_stocks)} recovered")
+    
+    # Calculate stocks still failing after Pass 2
+    processed_symbols = {r.get("symbol") for r in rows}
+    still_failed = [f for f in failed_stocks if f.get("symbol") not in processed_symbols]
+    
+    # Pass 3: Final attempt with very long delays for remaining failures
+    if still_failed and is_ci:
+        logger.info(f"Pass 3: Final attempt for {len(still_failed)} remaining stocks with 5s delays...")
+        time.sleep(10)  # Long wait before final pass
+        
+        pass3_success = 0
+        for row in still_failed:
+            try:
+                time.sleep(5)  # 5 second delay between each request
+                res = enrich_stock(row["symbol"], settings)
+                if res:
+                    res["symbol"] = row.get("symbol")
+                    rows.append(res)
+                    pass3_success += 1
+                    logger.info(f"Pass 3 successful: {row.get('symbol')}")
+            except Exception as e:
+                logger.error(f"Pass 3 failed: {row.get('symbol')} - {type(e).__name__}: {e}")
+        
+        logger.info(f"Pass 3 complete: {pass3_success}/{len(still_failed)} recovered")
     
     # Calculate final failed stocks
-    recovered_symbols = {r.get("symbol") for r in rows if r.get("symbol") in [f.get("symbol") for f in failed_stocks]}
+    recovered_symbols = {r.get("symbol") for r in rows}
     final_failed_list = [f.get("symbol") for f in failed_stocks if f.get("symbol") not in recovered_symbols]
     
     logger.info(f"Total stocks processed: {len(rows)}/{len(uni_list)} (failed: {len(final_failed_list)})")
