@@ -1,12 +1,12 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
-import { 
-    RefreshCw, 
-    ChevronDown, 
-    ChevronRight, 
-    TrendingUp, 
-    TrendingDown, 
+import React, { useState, useCallback, useEffect } from 'react';
+import {
+    RefreshCw,
+    ChevronDown,
+    ChevronRight,
+    TrendingUp,
+    TrendingDown,
     AlertTriangle,
     Loader2,
     Sparkles,
@@ -195,7 +195,7 @@ interface AIMarketOutlookProps {
 // Stance badge component
 function StanceBadge({ stance }: { stance?: string }) {
     if (!stance) return null;
-    
+
     const stanceConfig: Record<string, { bg: string; text: string; icon: React.ReactNode }> = {
         bullish: { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-700 dark:text-green-400', icon: <TrendingUp className="w-4 h-4" /> },
         bearish: { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-700 dark:text-red-400', icon: <TrendingDown className="w-4 h-4" /> },
@@ -206,9 +206,9 @@ function StanceBadge({ stance }: { stance?: string }) {
         overweight_equity: { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-700 dark:text-green-400', icon: <TrendingUp className="w-4 h-4" /> },
         underweight_equity: { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-700 dark:text-red-400', icon: <TrendingDown className="w-4 h-4" /> },
     };
-    
+
     const config = stanceConfig[stance.toLowerCase()] || stanceConfig.neutral;
-    
+
     return (
         <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium ${config.bg} ${config.text}`}>
             {config.icon}
@@ -220,14 +220,14 @@ function StanceBadge({ stance }: { stance?: string }) {
 // Confidence meter component
 function ConfidenceMeter({ value }: { value?: number }) {
     if (value === undefined || value === null) return null;
-    
+
     const percentage = Math.round(value * 100);
     const color = percentage >= 70 ? 'bg-green-500' : percentage >= 50 ? 'bg-yellow-500' : 'bg-red-500';
-    
+
     return (
         <div className="flex items-center gap-2">
             <div className="w-24 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                <div 
+                <div
                     className={`h-full ${color} transition-all duration-500`}
                     style={{ width: `${percentage}%` }}
                 />
@@ -238,19 +238,19 @@ function ConfidenceMeter({ value }: { value?: number }) {
 }
 
 // Agent card component
-function AgentCard({ 
-    title, 
-    icon, 
-    children, 
-    confidence 
-}: { 
-    title: string; 
-    icon: React.ReactNode; 
+function AgentCard({
+    title,
+    icon,
+    children,
+    confidence
+}: {
+    title: string;
+    icon: React.ReactNode;
     children: React.ReactNode;
     confidence?: number;
 }) {
     const [isExpanded, setIsExpanded] = useState(true);
-    
+
     return (
         <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
             <button
@@ -292,12 +292,12 @@ function formatPriceRange(zone: unknown): string {
 function formatObject(obj: Record<string, unknown>, indent = 0): React.ReactNode {
     const entries = Object.entries(obj).filter(([, v]) => v != null);
     if (entries.length === 0) return null;
-    
+
     return (
         <div className={indent > 0 ? 'ml-4 border-l-2 border-gray-200 dark:border-gray-700 pl-3' : ''}>
             {entries.map(([key, value]) => {
                 const label = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-                
+
                 if (typeof value === 'object' && !Array.isArray(value) && value !== null) {
                     return (
                         <div key={key} className="mb-2">
@@ -306,7 +306,7 @@ function formatObject(obj: Record<string, unknown>, indent = 0): React.ReactNode
                         </div>
                     );
                 }
-                
+
                 return (
                     <div key={key} className="flex flex-wrap gap-1 py-0.5">
                         <span className="font-medium text-gray-600 dark:text-gray-400">{label}:</span>
@@ -354,7 +354,7 @@ function renderValue(value: unknown): React.ReactNode {
 // Generic key-value renderer for dynamic data
 function DataSection({ title, data, icon }: { title: string; data: Record<string, unknown>; icon?: React.ReactNode }) {
     if (!data || Object.keys(data).length === 0) return null;
-    
+
     return (
         <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
             <div className="flex items-center gap-2 p-3 bg-gray-50 dark:bg-gray-800">
@@ -384,7 +384,7 @@ function WeeklyAnalysisView({ data }: { data: WeeklyAnalysis }) {
     const syn = synthesis as Record<string, any> || {};
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const agents = agent_analyses as Record<string, any> || {};
-    
+
     return (
         <div className="space-y-4">
             {/* Executive Summary / Headline */}
@@ -448,11 +448,10 @@ function WeeklyAnalysisView({ data }: { data: WeeklyAnalysis }) {
                     </h4>
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                         {syn.sector_allocation.map((sec: Record<string, unknown>, i: number) => (
-                            <div key={i} className={`p-2 rounded border ${
-                                sec.stance === 'overweight' ? 'bg-green-50 dark:bg-green-900/20 border-green-200' :
-                                sec.stance === 'underweight' ? 'bg-red-50 dark:bg-red-900/20 border-red-200' :
-                                'bg-gray-50 dark:bg-gray-800 border-gray-200'
-                            }`}>
+                            <div key={i} className={`p-2 rounded border ${sec.stance === 'overweight' ? 'bg-green-50 dark:bg-green-900/20 border-green-200' :
+                                    sec.stance === 'underweight' ? 'bg-red-50 dark:bg-red-900/20 border-red-200' :
+                                        'bg-gray-50 dark:bg-gray-800 border-gray-200'
+                                }`}>
                                 <div className="font-medium text-sm">{String(sec.sector || '')}</div>
                                 <div className="text-xs text-gray-500">{String(sec.stance || '')} ({String(sec.weight_pct || 0)}%)</div>
                             </div>
@@ -491,11 +490,10 @@ function WeeklyAnalysisView({ data }: { data: WeeklyAnalysis }) {
                     </h4>
                     <div className="flex flex-wrap gap-2">
                         {syn.events_calendar.map((event: Record<string, unknown>, i: number) => (
-                            <span key={i} className={`px-2 py-1 text-sm rounded ${
-                                event.expected_impact === 'bullish' ? 'bg-green-100 text-green-800' :
-                                event.expected_impact === 'bearish' ? 'bg-red-100 text-red-800' :
-                                'bg-gray-100 text-gray-800'
-                            }`}>
+                            <span key={i} className={`px-2 py-1 text-sm rounded ${event.expected_impact === 'bullish' ? 'bg-green-100 text-green-800' :
+                                    event.expected_impact === 'bearish' ? 'bg-red-100 text-red-800' :
+                                        'bg-gray-100 text-gray-800'
+                                }`}>
                                 {String(event.date || '')} - {String(event.event || '')}
                             </span>
                         ))}
@@ -524,28 +522,28 @@ function WeeklyAnalysisView({ data }: { data: WeeklyAnalysis }) {
             {/* Agent Details - Dynamic rendering */}
             <div className="space-y-3 mt-4">
                 <h4 className="font-medium text-gray-900 dark:text-gray-100">Agent Analyses</h4>
-                
+
                 {agents.trend && (
-                    <DataSection 
-                        title="Trend Analysis" 
+                    <DataSection
+                        title="Trend Analysis"
                         data={agents.trend}
                         icon={<TrendingUp className="w-4 h-4 text-blue-500" />}
                     />
                 )}
-                
+
                 {agents.sector_rotation && (
-                    <DataSection 
-                        title="Sector Rotation" 
-                        data={typeof agents.sector_rotation === 'object' && !agents.sector_rotation.raw_response 
-                            ? agents.sector_rotation 
+                    <DataSection
+                        title="Sector Rotation"
+                        data={typeof agents.sector_rotation === 'object' && !agents.sector_rotation.raw_response
+                            ? agents.sector_rotation
                             : { summary: 'See detailed sector data above' }}
                         icon={<BarChart2 className="w-4 h-4 text-purple-500" />}
                     />
                 )}
-                
+
                 {agents.risk_regime && (
-                    <DataSection 
-                        title="Risk Assessment" 
+                    <DataSection
+                        title="Risk Assessment"
                         data={agents.risk_regime}
                         icon={<Shield className="w-4 h-4 text-orange-500" />}
                     />
@@ -580,7 +578,7 @@ function MonthlyAnalysisView({ data }: { data: MonthlyAnalysis }) {
     const syn = synthesis as Record<string, any> || {};
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const agents = agent_analyses as Record<string, any> || {};
-    
+
     return (
         <div className="space-y-4">
             {/* Monthly Thesis - new format */}
@@ -600,7 +598,7 @@ function MonthlyAnalysisView({ data }: { data: MonthlyAnalysis }) {
                     )}
                 </div>
             )}
-            
+
             {/* Asset Allocation - new format */}
             {syn.asset_allocation && (
                 <div className="space-y-2">
@@ -663,11 +661,10 @@ function MonthlyAnalysisView({ data }: { data: MonthlyAnalysis }) {
                                         <td className="px-3 py-2 font-medium">{String(sec.sector || '')}</td>
                                         <td className="px-3 py-2 text-center">{String(sec.weight_pct || 0)}%</td>
                                         <td className="px-3 py-2 text-center">
-                                            <span className={`px-2 py-0.5 rounded text-xs ${
-                                                sec.vs_benchmark === 'overweight' ? 'bg-green-100 text-green-700' :
-                                                sec.vs_benchmark === 'underweight' ? 'bg-red-100 text-red-700' :
-                                                'bg-gray-100 text-gray-700'
-                                            }`}>
+                                            <span className={`px-2 py-0.5 rounded text-xs ${sec.vs_benchmark === 'overweight' ? 'bg-green-100 text-green-700' :
+                                                    sec.vs_benchmark === 'underweight' ? 'bg-red-100 text-red-700' :
+                                                        'bg-gray-100 text-gray-700'
+                                                }`}>
                                                 {String(sec.vs_benchmark || 'neutral')}
                                             </span>
                                         </td>
@@ -773,26 +770,26 @@ function MonthlyAnalysisView({ data }: { data: MonthlyAnalysis }) {
             {/* Agent Details - Dynamic rendering */}
             <div className="space-y-3 mt-4">
                 <h4 className="font-medium text-gray-900 dark:text-gray-100">Agent Analyses</h4>
-                
+
                 {agents.macro_cycle && (
-                    <DataSection 
-                        title="Macro Cycle" 
+                    <DataSection
+                        title="Macro Cycle"
                         data={agents.macro_cycle}
                         icon={<BarChart2 className="w-4 h-4 text-blue-500" />}
                     />
                 )}
-                
+
                 {agents.fund_flows && (
-                    <DataSection 
-                        title="Fund Flows" 
+                    <DataSection
+                        title="Fund Flows"
                         data={agents.fund_flows}
                         icon={<DollarSign className="w-4 h-4 text-green-500" />}
                     />
                 )}
-                
+
                 {agents.valuations && (
-                    <DataSection 
-                        title="Valuations" 
+                    <DataSection
+                        title="Valuations"
                         data={agents.valuations}
                         icon={<Target className="w-4 h-4 text-purple-500" />}
                     />
@@ -823,7 +820,7 @@ function SeasonalityAnalysisView({ data }: { data: SeasonalityAnalysis }) {
     const syn = synthesis as Record<string, any> || {};
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const agents = agent_analyses as Record<string, any> || {};
-    
+
     return (
         <div className="space-y-4">
             {/* Seasonality Thesis - new format */}
@@ -879,7 +876,7 @@ function SeasonalityAnalysisView({ data }: { data: SeasonalityAnalysis }) {
                         <Zap className="w-4 h-4 text-yellow-500" />
                         Current Month Playbook
                     </h4>
-                    
+
                     {syn.current_month_playbook.primary_strategy && (
                         <p className="text-sm bg-gray-50 dark:bg-gray-800 p-3 rounded">{syn.current_month_playbook.primary_strategy}</p>
                     )}
@@ -908,10 +905,9 @@ function SeasonalityAnalysisView({ data }: { data: SeasonalityAnalysis }) {
                             <h5 className="text-sm font-medium">Sector Tilts</h5>
                             <div className="grid gap-1">
                                 {syn.current_month_playbook.sector_tilts.map((tilt: Record<string, unknown>, i: number) => (
-                                    <div key={i} className={`p-2 rounded text-sm flex justify-between ${
-                                        tilt.action === 'overweight' ? 'bg-green-50' :
-                                        tilt.action === 'underweight' ? 'bg-red-50' : 'bg-gray-50'
-                                    }`}>
+                                    <div key={i} className={`p-2 rounded text-sm flex justify-between ${tilt.action === 'overweight' ? 'bg-green-50' :
+                                            tilt.action === 'underweight' ? 'bg-red-50' : 'bg-gray-50'
+                                        }`}>
                                         <span className="font-medium">{String(tilt.sector)}</span>
                                         <span>{String(tilt.action)} ({String(tilt.size_pct)}%)</span>
                                     </div>
@@ -961,11 +957,10 @@ function SeasonalityAnalysisView({ data }: { data: SeasonalityAnalysis }) {
                                     <tr key={i} className="border-b dark:border-gray-700">
                                         <td className="px-2 py-1 font-medium">{String(month.month || '')}</td>
                                         <td className="px-2 py-1 text-center">
-                                            <span className={`px-1 rounded ${
-                                                month.seasonal_bias === 'bullish' ? 'bg-green-100 text-green-700' :
-                                                month.seasonal_bias === 'bearish' ? 'bg-red-100 text-red-700' :
-                                                'bg-gray-100 text-gray-700'
-                                            }`}>
+                                            <span className={`px-1 rounded ${month.seasonal_bias === 'bullish' ? 'bg-green-100 text-green-700' :
+                                                    month.seasonal_bias === 'bearish' ? 'bg-red-100 text-red-700' :
+                                                        'bg-gray-100 text-gray-700'
+                                                }`}>
                                                 {String(month.seasonal_bias || '')}
                                             </span>
                                         </td>
@@ -1024,30 +1019,30 @@ function SeasonalityAnalysisView({ data }: { data: SeasonalityAnalysis }) {
             {/* Agent Details - Dynamic rendering */}
             <div className="space-y-3 mt-4">
                 <h4 className="font-medium text-gray-900 dark:text-gray-100">Agent Analyses</h4>
-                
+
                 {agents.historical_patterns && (
-                    <DataSection 
-                        title="Historical Patterns" 
+                    <DataSection
+                        title="Historical Patterns"
                         data={agents.historical_patterns}
                         icon={<BarChart2 className="w-4 h-4 text-blue-500" />}
                     />
                 )}
-                
+
                 {agents.event_calendar && (
-                    <DataSection 
-                        title="Event Calendar" 
-                        data={typeof agents.event_calendar === 'object' && !agents.event_calendar.raw_response 
-                            ? agents.event_calendar 
+                    <DataSection
+                        title="Event Calendar"
+                        data={typeof agents.event_calendar === 'object' && !agents.event_calendar.raw_response
+                            ? agents.event_calendar
                             : { summary: 'See event details above' }}
                         icon={<Calendar className="w-4 h-4 text-purple-500" />}
                     />
                 )}
-                
+
                 {agents.sector_seasonality && (
-                    <DataSection 
-                        title="Sector Seasonality" 
-                        data={typeof agents.sector_seasonality === 'object' && !agents.sector_seasonality.raw_response 
-                            ? agents.sector_seasonality 
+                    <DataSection
+                        title="Sector Seasonality"
+                        data={typeof agents.sector_seasonality === 'object' && !agents.sector_seasonality.raw_response
+                            ? agents.sector_seasonality
                             : { summary: 'See sector details above' }}
                         icon={<TrendingUp className="w-4 h-4 text-green-500" />}
                     />
@@ -1098,11 +1093,21 @@ export default function AIMarketOutlook({ type, ticker, sector }: AIMarketOutloo
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [isExpanded, setIsExpanded] = useState(false);
+    const [lastFetchType, setLastFetchType] = useState<string | null>(null);
+
+    // Reset data when type/context changes
+    useEffect(() => {
+        if (type !== lastFetchType || !data) {
+            setData(null);
+            setIsExpanded(false);
+            setLastFetchType(null); // Reset until next fetch
+        }
+    }, [type, ticker, sector]);
 
     const fetchAnalysis = useCallback(async () => {
         setLoading(true);
         setError(null);
-        
+
         try {
             // Map type to Render API endpoint (same pattern as AIAnalysisModal)
             let endpoint: string;
@@ -1119,7 +1124,7 @@ export default function AIMarketOutlook({ type, ticker, sector }: AIMarketOutloo
                 default:
                     throw new Error(`Unknown analysis type: ${type}`);
             }
-            
+
             // Build URL with query params for seasonality
             let url = `${API_BASE}${endpoint}`;
             if (type === 'seasonality' && (ticker || sector)) {
@@ -1128,22 +1133,23 @@ export default function AIMarketOutlook({ type, ticker, sector }: AIMarketOutloo
                 if (sector) params.set('sector', sector);
                 url += `?${params.toString()}`;
             }
-            
+
             console.log(`[AIMarketOutlook] Fetching from: ${url}`);
-            
+
             const response = await fetch(url, {
                 headers: { 'Accept': 'application/json' }
             });
-            
+
             if (!response.ok) {
                 const errText = await response.text();
                 throw new Error(`API error ${response.status}: ${errText}`);
             }
-            
+
             const result = await response.json();
             setData(result);
+            setLastFetchType(type);
             setIsExpanded(true);
-            
+
         } catch (err) {
             console.error('[AIMarketOutlook] Error:', err);
             setError(err instanceof Error ? err.message : 'Failed to fetch analysis');
@@ -1153,31 +1159,31 @@ export default function AIMarketOutlook({ type, ticker, sector }: AIMarketOutloo
     }, [type, ticker, sector]);
 
     const typeLabels: Record<string, { title: string; icon: React.ReactNode; color: string }> = {
-        weekly: { 
-            title: 'Weekly AI Outlook', 
+        weekly: {
+            title: 'Weekly AI Outlook',
             icon: <Calendar className="w-5 h-5" />,
             color: 'blue'
         },
-        monthly: { 
-            title: 'Monthly AI Thesis', 
+        monthly: {
+            title: 'Monthly AI Thesis',
             icon: <BarChart2 className="w-5 h-5" />,
             color: 'purple'
         },
-        seasonality: { 
-            title: 'Seasonality AI Insights', 
+        seasonality: {
+            title: 'Seasonality AI Insights',
             icon: <Sparkles className="w-5 h-5" />,
             color: 'indigo'
         },
     };
 
     const config = typeLabels[type];
-    const stance = data?.analysis_type === 'weekly' 
+    const stance = data?.analysis_type === 'weekly'
         ? (data as WeeklyAnalysis).synthesis?.weekly_stance
         : data?.analysis_type === 'monthly'
-        ? (data as MonthlyAnalysis).synthesis?.market_stance
-        : data?.analysis_type === 'seasonality'
-        ? (data as SeasonalityAnalysis).synthesis?.seasonality_verdict
-        : undefined;
+            ? (data as MonthlyAnalysis).synthesis?.market_stance
+            : data?.analysis_type === 'seasonality'
+                ? (data as SeasonalityAnalysis).synthesis?.seasonality_verdict
+                : undefined;
 
     return (
         <div className={`border border-${config.color}-200 dark:border-${config.color}-800 rounded-lg overflow-hidden bg-white dark:bg-gray-900`}>
@@ -1205,10 +1211,10 @@ export default function AIMarketOutlook({ type, ticker, sector }: AIMarketOutloo
                         )}
                     </div>
                 </div>
-                
+
                 <div className="flex items-center gap-3">
                     {stance && <StanceBadge stance={stance} />}
-                    
+
                     <button
                         onClick={fetchAnalysis}
                         disabled={loading}
@@ -1226,7 +1232,7 @@ export default function AIMarketOutlook({ type, ticker, sector }: AIMarketOutloo
                             </>
                         )}
                     </button>
-                    
+
                     {data && (
                         <button
                             onClick={() => setIsExpanded(!isExpanded)}
@@ -1237,7 +1243,7 @@ export default function AIMarketOutlook({ type, ticker, sector }: AIMarketOutloo
                     )}
                 </div>
             </div>
-            
+
             {/* Error state */}
             {error && (
                 <div className="p-4 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300">
@@ -1247,7 +1253,7 @@ export default function AIMarketOutlook({ type, ticker, sector }: AIMarketOutloo
                     </div>
                 </div>
             )}
-            
+
             {/* Content */}
             {isExpanded && data && (
                 <div className="p-4">
@@ -1256,7 +1262,7 @@ export default function AIMarketOutlook({ type, ticker, sector }: AIMarketOutloo
                     {data.analysis_type === 'seasonality' && <SeasonalityAnalysisView data={data as SeasonalityAnalysis} />}
                 </div>
             )}
-            
+
             {/* Loading state */}
             {loading && !data && (
                 <div className="p-8 flex flex-col items-center justify-center text-gray-500">
@@ -1265,7 +1271,7 @@ export default function AIMarketOutlook({ type, ticker, sector }: AIMarketOutloo
                     <p className="text-xs text-gray-400 mt-1">This may take 30-60 seconds</p>
                 </div>
             )}
-            
+
             {/* Empty state */}
             {!loading && !data && !error && (
                 <div className="p-8 text-center text-gray-500">

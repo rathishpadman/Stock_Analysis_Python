@@ -118,6 +118,73 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
+def extract_json_from_response(raw_response: str) -> Dict[str, Any]:
+    """
+    Extract and parse JSON from LLM response, handling markdown code blocks
+    and common malformation like trailing commas.
+    """
+    import re
+    cleaned = raw_response.strip()
+    
+    # Robust markdown code block removal
+    if cleaned.startswith("```"):
+        first_newline = cleaned.find('\n')
+        if first_newline > 0:
+            lang_line = cleaned[3:first_newline].strip().lower()
+            if lang_line in ['json', 'vbs', 'python', 'javascript', '']:
+                cleaned = cleaned[first_newline + 1:]
+        else:
+            cleaned = cleaned[3:]
+            if cleaned.lower().startswith('json'):
+                cleaned = cleaned[4:]
+        
+        if cleaned.rstrip().endswith('```'):
+            cleaned = cleaned.rstrip()[:-3]
+    
+    if cleaned.lower().startswith('json'):
+        cleaned = cleaned[4:]
+    
+    cleaned = cleaned.strip()
+    
+    # Try to find JSON object/array boundaries
+    if not (cleaned.startswith('{') or cleaned.startswith('[')):
+        json_start = -1
+        for i, char in enumerate(cleaned):
+            if char in '{[':
+                json_start = i
+                break
+        if json_start != -1:
+            cleaned = cleaned[json_start:]
+    
+    # Final cleanup of trailing text
+    if cleaned.startswith('{'):
+        last_brace = cleaned.rfind('}')
+        if last_brace != -1:
+            cleaned = cleaned[:last_brace+1]
+    elif cleaned.startswith('['):
+        last_bracket = cleaned.rfind(']')
+        if last_bracket != -1:
+            cleaned = cleaned[:last_bracket+1]
+
+    # Handle trailing commas (very common with LLMs)
+    cleaned = re.sub(r',\s*([\]}])', r'\1', cleaned)
+    
+    try:
+        return json.loads(cleaned)
+    except Exception as e:
+        logger.warning(f"JSON parse error: {e}. Response length: {len(raw_response)}")
+        # If it's still failing, try one last ditch effort: strip all non-json stuff around it
+        try:
+            # Look for the first { and last }
+            start = cleaned.find('{')
+            end = cleaned.rfind('}')
+            if start != -1 and end != -1:
+                return json.loads(cleaned[start:end+1])
+        except:
+            pass
+        return {"raw_response": raw_response, "parse_error": True}
+
+
 # =============================================================================
 # PROMPTS FOR TEMPORAL AGENTS - INSTITUTIONAL GRADE
 # =============================================================================
@@ -577,7 +644,9 @@ OUTPUT (JSON):
 
     "monthly_strategist": """You are CIO at a ₹50,000 Cr AUM asset management company.
 
-TASK: Synthesize into institutional monthly investment thesis with specific allocations.
+TASK: Synthesize into institutional MONTHLY investment thesis.
+IMPORTANT: This is a MONTHLY outlook (30-60 day horizon). Focus on structural shifts, macro cycles, and valuation regimes. 
+DO NOT focus on short-term daily or weekly volatility unless it signals a major turning point.
 
 ANALYST INPUTS:
 - Macro Analysis: {macro_analysis}
@@ -1183,19 +1252,8 @@ class BaseTemporalCrew:
             raw_response = response.text
             duration_ms = (time.time() - start_time) * 1000
             
-            # Parse JSON response
-            try:
-                # Clean response (remove markdown if present)
-                cleaned = raw_response.strip()
-                if cleaned.startswith("```"):
-                    cleaned = cleaned.split("```")[1]
-                    if cleaned.startswith("json"):
-                        cleaned = cleaned[4:]
-                cleaned = cleaned.strip()
-                
-                parsed = json.loads(cleaned)
-            except json.JSONDecodeError:
-                parsed = {"raw_response": raw_response, "parse_error": True}
+            # Parse JSON response using helper
+            parsed = extract_json_from_response(raw_response)
             
             # Log response
             self.observability.log_llm_response(
@@ -1265,17 +1323,8 @@ class BaseTemporalCrew:
             raw_response = response.text
             duration_ms = (time.time() - start_time) * 1000
             
-            # Parse JSON
-            try:
-                cleaned = raw_response.strip()
-                if cleaned.startswith("```"):
-                    cleaned = cleaned.split("```")[1]
-                    if cleaned.startswith("json"):
-                        cleaned = cleaned[4:]
-                cleaned = cleaned.strip()
-                parsed = json.loads(cleaned)
-            except json.JSONDecodeError:
-                parsed = {"raw_response": raw_response, "parse_error": True}
+            # Parse JSON using helper
+            parsed = extract_json_from_response(raw_response)
             
             self.observability.log_agent_complete(
                 trace_id=trace_id,
@@ -1426,8 +1475,10 @@ class WeeklyAnalysisCrew(BaseTemporalCrew):
                     "risk_regime": risk_result
                 },
                 "synthesis": synthesis,
-                "weekly_stance": synthesis.get("weekly_stance", "neutral"),
-                "headline": synthesis.get("headline", "Weekly analysis complete"),
+                "weekly_outlook": synthesis.get("executive_summary", {}).get("headline") or synthesis.get("weekly_thesis", {}).get("primary_thesis"),
+                "weekly_stance": synthesis.get("executive_summary", {}).get("stance") or synthesis.get("weekly_stance"),
+                "market_stance": synthesis.get("executive_summary", {}).get("stance") or synthesis.get("weekly_stance"),
+                "headline": synthesis.get("executive_summary", {}).get("headline") or "Weekly analysis complete",
                 "observability": trace_summary
             }
             
@@ -1593,8 +1644,8 @@ class MonthlyAnalysisCrew(BaseTemporalCrew):
                     "valuations": valuation_result
                 },
                 "synthesis": synthesis,
-                "monthly_thesis": synthesis.get("monthly_thesis", ""),
-                "market_stance": synthesis.get("market_stance", "neutral"),
+                "monthly_thesis": synthesis.get("monthly_thesis", {}).get("headline") if isinstance(synthesis.get("monthly_thesis"), dict) else (synthesis.get("monthly_thesis") or ""),
+                "market_stance": synthesis.get("monthly_thesis", {}).get("thesis_type") or synthesis.get("current_month_verdict") or synthesis.get("market_stance") or "neutral",
                 "observability": trace_summary
             }
             
@@ -1754,8 +1805,8 @@ class SeasonalityAnalysisCrew(BaseTemporalCrew):
                     "sector_seasonality": sector_result
                 },
                 "synthesis": synthesis,
-                "seasonality_verdict": synthesis.get("seasonality_verdict", "neutral"),
-                "probability_positive": synthesis.get("probability_of_positive_month", "N/A"),
+                "seasonality_verdict": synthesis.get("seasonality_thesis", {}).get("current_month_verdict") or synthesis.get("seasonality_verdict") or "neutral",
+                "probability_positive": synthesis.get("seasonality_thesis", {}).get("probability_of_positive_month_pct") or synthesis.get("probability_positive") or "N/A",
                 "observability": trace_summary
             }
             
