@@ -25,6 +25,7 @@ import os
 # Import shared dependencies
 from ..tools.supabase_fetcher import (
     get_weekly_analysis,
+    get_weekly_analysis_enhanced,
     get_monthly_analysis,
     get_seasonality_data,
     get_sector_performance,
@@ -1299,7 +1300,7 @@ class WeeklyAnalysisCrew(BaseTemporalCrew):
             
             # Fetch data in parallel
             data_tasks = {
-                "nifty50_weekly": get_weekly_analysis("NIFTY50", weeks=4),
+                "nifty50_weekly": get_weekly_analysis_enhanced("NIFTY50", weeks=4),
                 "market_breadth": self._get_market_breadth_data(),
                 "sector_data": self._get_sector_data(include_sectors),
                 "vix_data": get_india_vix(),

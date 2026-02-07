@@ -29,6 +29,8 @@ from .supabase_fetcher import (
     get_weekly_analysis,
     get_monthly_analysis,
     get_seasonality_data,
+    get_index_weekly_data,
+    get_weekly_analysis_enhanced,
 )
 
 __all__ = [
@@ -46,4 +48,6 @@ __all__ = [
     "get_weekly_analysis",
     "get_monthly_analysis",
     "get_seasonality_data",
+    "get_index_weekly_data",
+    "get_weekly_analysis_enhanced",
 ]

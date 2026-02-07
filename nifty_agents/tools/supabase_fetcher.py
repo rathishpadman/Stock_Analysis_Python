@@ -15,6 +15,14 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 import os
 import logging
+import pandas as pd
+
+# Try to import yfinance for index data fallback
+try:
+    import yfinance as yf
+    YFINANCE_AVAILABLE = True
+except ImportError:
+    YFINANCE_AVAILABLE = False
 
 # Try to import supabase
 try:
@@ -568,6 +576,183 @@ def search_stocks(
     except Exception as e:
         logger.error(f"Error searching stocks: {e}")
         return [{"error": str(e)}]
+
+
+# =============================================================================
+# INDEX DATA FALLBACK (for NIFTY50, BANKNIFTY, etc.)
+# =============================================================================
+
+# Yahoo Finance symbols for Indian indices
+INDEX_SYMBOLS = {
+    "NIFTY50": "^NSEI",
+    "NIFTY_50": "^NSEI",
+    "NIFTY": "^NSEI",
+    "BANKNIFTY": "^NSEBANK",
+    "BANK_NIFTY": "^NSEBANK",
+    "NIFTY_BANK": "^NSEBANK",
+    "NIFTY_IT": "^CNXIT",
+    "NIFTY_MIDCAP": "^NSEMDCP50",
+}
+
+
+def get_index_weekly_data(
+    index_name: str,
+    weeks: int = 4
+) -> Dict[str, Any]:
+    """
+    Fetch index data directly from yfinance when not available in Supabase.
+    
+    This is a fallback for indices like NIFTY50 that may not be in the
+    weekly_analysis table.
+    
+    Args:
+        index_name: Index name (e.g., "NIFTY50", "BANKNIFTY")
+        weeks: Number of weeks of data to fetch
+        
+    Returns:
+        Dict with index weekly data including OHLCV and basic technicals
+    """
+    if not YFINANCE_AVAILABLE:
+        logger.warning("yfinance not available for index data fallback")
+        return {"error": "yfinance not installed", "index": index_name}
+    
+    # Map index name to Yahoo symbol
+    index_clean = index_name.upper().replace(" ", "_").replace("-", "_")
+    yahoo_symbol = INDEX_SYMBOLS.get(index_clean)
+    
+    if not yahoo_symbol:
+        # Try common patterns
+        if "NIFTY" in index_clean and "50" in index_clean:
+            yahoo_symbol = "^NSEI"
+        elif "BANK" in index_clean:
+            yahoo_symbol = "^NSEBANK"
+        else:
+            return {"error": f"Unknown index: {index_name}", "index": index_name}
+    
+    try:
+        logger.info(f"Fetching index data for {index_name} ({yahoo_symbol}) from yfinance")
+        
+        # Fetch daily data for enough history
+        days_needed = weeks * 7 + 14  # Extra buffer for weekends/holidays
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=days_needed)
+        
+        ticker = yf.Ticker(yahoo_symbol)
+        df = ticker.history(start=start_date, end=end_date)
+        
+        if df.empty:
+            return {"error": f"No data returned for {yahoo_symbol}", "index": index_name}
+        
+        # Resample to weekly
+        df_weekly = df.resample('W-FRI').agg({
+            'Open': 'first',
+            'High': 'max',
+            'Low': 'min',
+            'Close': 'last',
+            'Volume': 'sum'
+        }).dropna()
+        
+        if df_weekly.empty:
+            return {"error": "No weekly data after resampling", "index": index_name}
+        
+        # Calculate basic technicals
+        df_weekly['Weekly_Return_Pct'] = df_weekly['Close'].pct_change() * 100
+        
+        # RSI calculation (14 periods)
+        delta = df_weekly['Close'].diff()
+        gain = delta.where(delta > 0, 0).rolling(window=14).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+        rs = gain / loss
+        df_weekly['RSI_14'] = 100 - (100 / (1 + rs))
+        
+        # SMAs
+        df_weekly['SMA_10'] = df_weekly['Close'].rolling(window=10).mean()
+        df_weekly['SMA_20'] = df_weekly['Close'].rolling(window=20).mean()
+        
+        # Get last N weeks
+        df_weekly = df_weekly.tail(weeks)
+        
+        # Convert to list of dicts
+        weeks_data = []
+        for idx, row in df_weekly.iterrows():
+            weeks_data.append({
+                "week_ending": idx.strftime('%Y-%m-%d'),
+                "weekly_open": round(row['Open'], 2),
+                "weekly_high": round(row['High'], 2),
+                "weekly_low": round(row['Low'], 2),
+                "weekly_close": round(row['Close'], 2),
+                "weekly_volume": int(row['Volume']),
+                "weekly_return_pct": round(row['Weekly_Return_Pct'], 2) if pd.notna(row['Weekly_Return_Pct']) else None,
+                "rsi_14": round(row['RSI_14'], 2) if pd.notna(row['RSI_14']) else None,
+                "sma_10": round(row['SMA_10'], 2) if pd.notna(row['SMA_10']) else None,
+                "sma_20": round(row['SMA_20'], 2) if pd.notna(row['SMA_20']) else None,
+            })
+        
+        # Latest week data
+        latest = df_weekly.iloc[-1] if len(df_weekly) > 0 else None
+        prev = df_weekly.iloc[-2] if len(df_weekly) > 1 else None
+        
+        weekly_change = None
+        if latest is not None and prev is not None:
+            weekly_change = round((latest['Close'] - prev['Close']) / prev['Close'] * 100, 2)
+        
+        return {
+            "index": index_name,
+            "yahoo_symbol": yahoo_symbol,
+            "weeks_data": weeks_data,
+            "weekly_change_pct": weekly_change,
+            "latest_close": round(latest['Close'], 2) if latest is not None else None,
+            "latest_rsi": round(latest['RSI_14'], 2) if latest is not None and pd.notna(latest['RSI_14']) else None,
+            "source": "yfinance_index",
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Error fetching index data for {index_name}: {e}")
+        return {"error": str(e), "index": index_name}
+
+
+def get_weekly_analysis_enhanced(
+    ticker: str,
+    weeks: int = 4
+) -> Dict[str, Any]:
+    """
+    Enhanced weekly analysis that handles both stocks and indices.
+    
+    For stocks: Uses Supabase data
+    For indices (NIFTY50, etc.): Uses yfinance fallback
+    
+    Args:
+        ticker: Stock ticker or index name
+        weeks: Number of weeks to fetch
+        
+    Returns:
+        Dict with weekly analysis data
+    """
+    ticker_clean = ticker.replace(".NS", "").upper()
+    
+    # Check if this is an index
+    is_index = any(idx in ticker_clean for idx in ["NIFTY", "BANKNIFTY", "INDEX", "SENSEX"])
+    
+    if is_index:
+        # Use yfinance fallback for indices
+        index_data = get_index_weekly_data(ticker_clean, weeks)
+        if "error" not in index_data:
+            return {
+                "ticker": ticker_clean,
+                "is_index": True,
+                "weeks_data": index_data.get("weeks_data", []),
+                "weekly_change_pct": index_data.get("weekly_change_pct"),
+                "latest_close": index_data.get("latest_close"),
+                "latest_rsi": index_data.get("latest_rsi"),
+                "source": "yfinance_index",
+                "timestamp": datetime.now().isoformat()
+            }
+        else:
+            logger.warning(f"Index fallback failed for {ticker_clean}: {index_data.get('error')}")
+    
+    # Default: Try Supabase for regular stocks
+    return get_weekly_analysis(ticker_clean, weeks)
 
 
 # =============================================================================
