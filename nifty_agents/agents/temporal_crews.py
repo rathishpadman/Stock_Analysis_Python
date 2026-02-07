@@ -1245,7 +1245,7 @@ class BaseTemporalCrew:
                 formatted_prompt,
                 generation_config=genai.types.GenerationConfig(
                     temperature=0.3,
-                    max_output_tokens=2000
+                    max_output_tokens=4000
                 )
             )
             
@@ -1316,7 +1316,7 @@ class BaseTemporalCrew:
                 formatted_prompt,
                 generation_config=genai.types.GenerationConfig(
                     temperature=0.3,
-                    max_output_tokens=2000
+                    max_output_tokens=4000
                 )
             )
             
