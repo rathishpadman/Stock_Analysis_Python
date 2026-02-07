@@ -29,13 +29,26 @@ from ..tools.supabase_fetcher import (
     get_monthly_analysis,
     get_seasonality_data,
     get_sector_performance,
-    get_market_breadth as get_market_breadth_supabase
+    get_market_breadth as get_market_breadth_supabase,
+    # NEW: NIFTY 200 aggregate functions (Phase 3)
+    get_nifty200_weekly_summary,
+    get_nifty200_monthly_summary,
+    get_nifty200_seasonality_summary,
+    get_sector_weekly_performance
 )
 from ..tools.india_macro_fetcher import (
     get_macro_indicators,
     get_india_vix,
     determine_market_regime,
     get_market_breadth as get_market_breadth_nse
+)
+# NEW: Live NSE data fetcher (Phase 3)
+from ..tools.nse_live_fetcher import (
+    get_live_fii_dii,
+    get_live_vix,
+    get_live_market_data,
+    get_upcoming_events,
+    NSEPYTHON_AVAILABLE
 )
 from ..observability import AgentObservability, get_observability, get_model_from_env
 
@@ -59,19 +72,39 @@ def get_market_breadth():
 
 def get_fii_dii_data():
     """
-    Get FII/DII flow data.
-    This is a placeholder - actual implementation would fetch from NSE/BSE APIs.
+    Get FII/DII flow data from nsepython.
+    
+    This now uses real data from NSE via nsepython library.
+    Falls back to placeholder if nsepython is not available.
     """
-    # Placeholder data - in production, this would fetch from:
-    # - NSE FII/DII data API
-    # - NSDL/CDSL reports
+    # NEW: Use real FII/DII data from nsepython (Phase 3)
+    try:
+        if NSEPYTHON_AVAILABLE:
+            live_data = get_live_fii_dii()
+            if live_data.get("source") == "nsepython":
+                return {
+                    "fii_net": live_data.get("fii_net", 0),
+                    "dii_net": live_data.get("dii_net", 0),
+                    "fii_buy": live_data.get("fii_buy", 0),
+                    "fii_sell": live_data.get("fii_sell", 0),
+                    "dii_buy": live_data.get("dii_buy", 0),
+                    "dii_sell": live_data.get("dii_sell", 0),
+                    "net_flow": live_data.get("net_flow", 0),
+                    "flow_signal": live_data.get("flow_signal", "neutral"),
+                    "date": live_data.get("date", ""),
+                    "source": "nsepython"
+                }
+    except Exception as e:
+        logger.warning(f"Failed to get live FII/DII data: {e}")
+    
+    # Fallback to placeholder (OLD CODE - kept for rollback)
     return {
         "fii_net": -1500,  # Crores
         "dii_net": 2000,
         "fii_mtd": -5000,
         "dii_mtd": 8000,
         "source": "placeholder",
-        "note": "FII/DII API integration pending"
+        "note": "FII/DII fallback - nsepython unavailable"
     }
 
 
@@ -1298,30 +1331,42 @@ class WeeklyAnalysisCrew(BaseTemporalCrew):
             # Gather data for agents
             logger.info("Fetching weekly analysis data...")
             
-            # Fetch data in parallel
+            # NEW: Fetch NIFTY 200 aggregated data (Phase 3)
+            nifty200_weekly = get_nifty200_weekly_summary()
+            sector_weekly = get_sector_weekly_performance()
+            live_market = get_live_market_data()
+            
+            # Fetch data in parallel (OLD + NEW combined)
             data_tasks = {
                 "nifty50_weekly": get_weekly_analysis_enhanced("NIFTY50", weeks=4),
+                "nifty200_weekly": nifty200_weekly,  # NEW: 200-stock summary
                 "market_breadth": self._get_market_breadth_data(),
-                "sector_data": self._get_sector_data(include_sectors),
-                "vix_data": get_india_vix(),
-                "fii_dii": self._get_fii_dii_weekly()
+                "sector_data": sector_weekly if "error" not in sector_weekly else self._get_sector_data(include_sectors),  # NEW: real sector data
+                "vix_data": live_market.get("vix", get_india_vix()),  # NEW: live VIX
+                "fii_dii": live_market.get("fii_dii", self._get_fii_dii_weekly()),  # NEW: live FII/DII
+                "upcoming_events": live_market.get("upcoming_events", {})  # NEW: events
             }
             
-            # Compile data for agents
+            # Compile data for agents - ENHANCED with NIFTY 200 data
             trend_data = {
                 "nifty_weekly": data_tasks["nifty50_weekly"],
-                "market_breadth": data_tasks["market_breadth"]
+                "nifty200_summary": data_tasks["nifty200_weekly"],  # NEW
+                "market_breadth": data_tasks["market_breadth"],
+                "top_gainers": nifty200_weekly.get("top_gainers", []),  # NEW
+                "top_losers": nifty200_weekly.get("top_losers", [])  # NEW
             }
             
             sector_data = {
                 "sector_performance": data_tasks["sector_data"],
-                "fii_dii_flows": data_tasks["fii_dii"]
+                "fii_dii_flows": data_tasks["fii_dii"],
+                "nifty200_sector_breakdown": nifty200_weekly.get("sector_performance", [])  # NEW
             }
             
             risk_data = {
                 "vix": data_tasks["vix_data"],
                 "market_breadth": data_tasks["market_breadth"],
-                "fii_dii": data_tasks["fii_dii"]
+                "fii_dii": data_tasks["fii_dii"],
+                "trend_distribution": nifty200_weekly.get("trend_distribution", {})  # NEW
             }
             
             # Run agents in parallel
@@ -1467,21 +1512,29 @@ class MonthlyAnalysisCrew(BaseTemporalCrew):
             # Gather macro data
             logger.info("Fetching monthly analysis data...")
             
+            # NEW: Fetch NIFTY 200 monthly data (Phase 3)
+            nifty200_monthly = get_nifty200_monthly_summary()
+            live_market = get_live_market_data()
+            
             # Get macro indicators first, then derive regime
             macro_indicators = get_macro_indicators()
             market_regime = determine_market_regime(macro_indicators)
             
             macro_data = {
                 "macro_indicators": macro_indicators,
-                "market_regime": market_regime
+                "market_regime": market_regime,
+                "nifty200_monthly": nifty200_monthly  # NEW: 200-stock monthly aggregates
             }
             
+            # ENHANCED: Use live FII/DII data
             flow_data = {
-                "fii_dii": self._get_monthly_flows(),
-                "sip_data": self._get_sip_trends()
+                "fii_dii": live_market.get("fii_dii", self._get_monthly_flows()),  # NEW: live data
+                "sip_data": self._get_sip_trends(),
+                "nifty200_trend": nifty200_monthly.get("trend_distribution", {})  # NEW
             }
             
             valuation_data = self._get_valuation_metrics()
+            valuation_data["nifty200_returns"] = nifty200_monthly.get("market_summary", {})  # NEW
             
             # Run agents in parallel
             logger.info("Running monthly analysis agents...")
@@ -1627,10 +1680,24 @@ class SeasonalityAnalysisCrew(BaseTemporalCrew):
         try:
             logger.info(f"Analyzing seasonality for {current_month}...")
             
-            # Gather seasonality data
+            # NEW: Fetch NIFTY 200 seasonality data (Phase 3)
+            nifty200_seasonality = get_nifty200_seasonality_summary()  # Uses current month
+            live_events = get_upcoming_events(limit=20)
+            
+            # Gather seasonality data - ENHANCED with NIFTY 200 data
             pattern_data = self._get_historical_patterns(ticker, sector)
+            pattern_data["nifty200_seasonality"] = nifty200_seasonality  # NEW: aggregate seasonality
+            pattern_data["historical_bias"] = nifty200_seasonality.get("historical_bias", "neutral")  # NEW
+            
+            # ENHANCED: Use live events from NSE
             event_data = self._get_event_calendar()
+            if live_events.get("source") == "nsepython":
+                event_data["nse_events"] = live_events.get("events", [])  # NEW: real events
+                event_data["total_nse_events"] = live_events.get("total", 0)  # NEW
+            
+            # ENHANCED: Use NIFTY 200 sector seasonality
             sector_seasonal_data = self._get_sector_seasonality()
+            sector_seasonal_data["nifty200_sector_seasonality"] = nifty200_seasonality.get("sector_seasonality", [])  # NEW
             
             # Run agents in parallel
             pattern_task = self._call_agent(

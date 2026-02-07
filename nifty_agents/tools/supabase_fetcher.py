@@ -965,3 +965,442 @@ def get_index_summary(
     except Exception as e:
         logger.error(f"Error fetching index summary: {e}")
         return {"error": str(e)}
+
+
+# =============================================================================
+# NIFTY 200 AGGREGATE FUNCTIONS (for AI Outlook)
+# =============================================================================
+
+def get_nifty200_weekly_summary() -> Dict[str, Any]:
+    """
+    Get aggregated weekly summary for all NIFTY 200 stocks.
+    
+    Uses weekly_analysis table to compute:
+    - Market-level returns and breadth
+    - Sector performance breakdown
+    - Technical distribution (RSI, trends)
+    - Top gainers and losers
+    
+    Returns:
+        Dict with comprehensive NIFTY 200 weekly summary
+        
+    Example:
+        >>> summary = get_nifty200_weekly_summary()
+        >>> print(f"Avg Weekly Return: {summary['market_summary']['avg_weekly_return']}%")
+        >>> print(f"Advances: {summary['market_summary']['advances']}")
+    """
+    client = _get_supabase_client()
+    if not client:
+        return {"error": "Supabase not configured"}
+    
+    try:
+        # Get latest week data
+        response = client.table("weekly_analysis") \
+            .select("*") \
+            .order("week_ending", desc=True) \
+            .limit(200) \
+            .execute()
+        
+        if not response.data:
+            return {"error": "No weekly data available"}
+        
+        # Get latest week_ending date
+        latest_week = response.data[0].get("week_ending")
+        week_data = [d for d in response.data if d.get("week_ending") == latest_week]
+        
+        # Get sector mapping from daily_stocks
+        sector_response = client.table("daily_stocks") \
+            .select("ticker, sector") \
+            .order("date", desc=True) \
+            .limit(500) \
+            .execute()
+        
+        # Build sector map
+        sector_map = {}
+        if sector_response.data:
+            for row in sector_response.data:
+                if row.get("ticker") and row.get("sector"):
+                    sector_map[row["ticker"]] = row["sector"]
+        
+        # Compute market summary
+        returns = [float(d.get("weekly_return_pct", 0) or 0) for d in week_data]
+        rsi_values = [float(d.get("weekly_rsi14", 50) or 50) for d in week_data]
+        
+        advances = sum(1 for r in returns if r > 0)
+        declines = sum(1 for r in returns if r < 0)
+        unchanged = len(returns) - advances - declines
+        
+        overbought = sum(1 for r in rsi_values if r > 70)
+        oversold = sum(1 for r in rsi_values if r < 30)
+        
+        trend_up = sum(1 for d in week_data if d.get("weekly_trend") == "UP")
+        trend_down = sum(1 for d in week_data if d.get("weekly_trend") == "DOWN")
+        trend_sideways = len(week_data) - trend_up - trend_down
+        
+        # Sector performance
+        sector_returns = {}
+        for d in week_data:
+            ticker = d.get("ticker", "")
+            sector = sector_map.get(ticker, "Other")
+            ret = float(d.get("weekly_return_pct", 0) or 0)
+            
+            if sector not in sector_returns:
+                sector_returns[sector] = {"returns": [], "advances": 0, "declines": 0}
+            
+            sector_returns[sector]["returns"].append(ret)
+            if ret > 0:
+                sector_returns[sector]["advances"] += 1
+            elif ret < 0:
+                sector_returns[sector]["declines"] += 1
+        
+        sector_perf = []
+        for sector, data in sector_returns.items():
+            if data["returns"]:
+                avg_ret = sum(data["returns"]) / len(data["returns"])
+                sector_perf.append({
+                    "sector": sector,
+                    "avg_return": round(avg_ret, 2),
+                    "stocks": len(data["returns"]),
+                    "advances": data["advances"],
+                    "declines": data["declines"]
+                })
+        
+        sector_perf.sort(key=lambda x: x["avg_return"], reverse=True)
+        
+        # Top gainers and losers
+        sorted_stocks = sorted(week_data, key=lambda x: float(x.get("weekly_return_pct", 0) or 0), reverse=True)
+        
+        top_gainers = [{
+            "ticker": d.get("ticker"),
+            "return_pct": round(float(d.get("weekly_return_pct", 0) or 0), 2),
+            "weekly_close": d.get("weekly_close"),
+            "sector": sector_map.get(d.get("ticker", ""), "Other")
+        } for d in sorted_stocks[:10]]
+        
+        top_losers = [{
+            "ticker": d.get("ticker"),
+            "return_pct": round(float(d.get("weekly_return_pct", 0) or 0), 2),
+            "weekly_close": d.get("weekly_close"),
+            "sector": sector_map.get(d.get("ticker", ""), "Other")
+        } for d in sorted_stocks[-10:]]
+        
+        # 4-week and 13-week returns
+        return_4w = [float(d.get("return_4w", 0) or 0) for d in week_data]
+        return_13w = [float(d.get("return_13w", 0) or 0) for d in week_data]
+        
+        return {
+            "week_ending": latest_week,
+            "total_stocks": len(week_data),
+            "market_summary": {
+                "avg_weekly_return": round(sum(returns) / len(returns), 2) if returns else 0,
+                "median_return": round(sorted(returns)[len(returns)//2], 2) if returns else 0,
+                "advances": advances,
+                "declines": declines,
+                "unchanged": unchanged,
+                "ad_ratio": round(advances / max(declines, 1), 2),
+                "avg_rsi": round(sum(rsi_values) / len(rsi_values), 1) if rsi_values else 50,
+                "overbought_count": overbought,
+                "oversold_count": oversold,
+                "avg_4w_return": round(sum(return_4w) / len(return_4w), 2) if return_4w else 0,
+                "avg_13w_return": round(sum(return_13w) / len(return_13w), 2) if return_13w else 0
+            },
+            "trend_distribution": {
+                "up": trend_up,
+                "down": trend_down,
+                "sideways": trend_sideways
+            },
+            "sector_performance": sector_perf,
+            "top_gainers": top_gainers,
+            "top_losers": top_losers,
+            "source": "weekly_analysis"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error fetching NIFTY 200 weekly summary: {e}")
+        return {"error": str(e)}
+
+
+def get_nifty200_monthly_summary() -> Dict[str, Any]:
+    """
+    Get aggregated monthly summary for all NIFTY 200 stocks.
+    
+    Uses monthly_analysis table to compute:
+    - Monthly returns and YTD
+    - 3M/6M/12M performance
+    - Trend distribution
+    
+    Returns:
+        Dict with comprehensive NIFTY 200 monthly summary
+    """
+    client = _get_supabase_client()
+    if not client:
+        return {"error": "Supabase not configured"}
+    
+    try:
+        # Get latest month data
+        response = client.table("monthly_analysis") \
+            .select("*") \
+            .order("month", desc=True) \
+            .limit(200) \
+            .execute()
+        
+        if not response.data:
+            return {"error": "No monthly data available"}
+        
+        # Get latest month
+        latest_month = response.data[0].get("month")
+        month_data = [d for d in response.data if d.get("month") == latest_month]
+        
+        # Compute aggregates
+        monthly_returns = [float(d.get("monthly_return_pct", 0) or 0) for d in month_data]
+        ytd_returns = [float(d.get("ytd_return_pct", 0) or 0) for d in month_data]
+        return_3m = [float(d.get("return_3m", 0) or 0) for d in month_data]
+        return_6m = [float(d.get("return_6m", 0) or 0) for d in month_data]
+        return_12m = [float(d.get("return_12m", 0) or 0) for d in month_data]
+        
+        trend_up = sum(1 for d in month_data if d.get("monthly_trend") == "UP")
+        trend_down = sum(1 for d in month_data if d.get("monthly_trend") == "DOWN")
+        trend_sideways = len(month_data) - trend_up - trend_down
+        
+        advances = sum(1 for r in monthly_returns if r > 0)
+        declines = sum(1 for r in monthly_returns if r < 0)
+        
+        return {
+            "month": latest_month,
+            "total_stocks": len(month_data),
+            "market_summary": {
+                "avg_monthly_return": round(sum(monthly_returns) / len(monthly_returns), 2) if monthly_returns else 0,
+                "avg_ytd_return": round(sum(ytd_returns) / len(ytd_returns), 2) if ytd_returns else 0,
+                "avg_3m_return": round(sum(return_3m) / len(return_3m), 2) if return_3m else 0,
+                "avg_6m_return": round(sum(return_6m) / len(return_6m), 2) if return_6m else 0,
+                "avg_12m_return": round(sum(return_12m) / len(return_12m), 2) if return_12m else 0,
+                "advances": advances,
+                "declines": declines,
+                "ad_ratio": round(advances / max(declines, 1), 2)
+            },
+            "trend_distribution": {
+                "up": trend_up,
+                "down": trend_down,
+                "sideways": trend_sideways
+            },
+            "source": "monthly_analysis"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error fetching NIFTY 200 monthly summary: {e}")
+        return {"error": str(e)}
+
+
+def get_nifty200_seasonality_summary(target_month: Optional[int] = None) -> Dict[str, Any]:
+    """
+    Get seasonality summary for NIFTY 200 stocks.
+    
+    Uses seasonality table to compute:
+    - Average return for target month across all stocks
+    - Stocks where this is best/worst month
+    - Sector-level seasonality
+    
+    Args:
+        target_month: Month to analyze (1-12). Defaults to current month.
+        
+    Returns:
+        Dict with seasonality analysis
+    """
+    client = _get_supabase_client()
+    if not client:
+        return {"error": "Supabase not configured"}
+    
+    # Default to current month
+    if target_month is None:
+        target_month = datetime.now().month
+    
+    # Month column mapping
+    month_cols = {
+        1: "jan_avg", 2: "feb_avg", 3: "mar_avg", 4: "apr_avg",
+        5: "may_avg", 6: "jun_avg", 7: "jul_avg", 8: "aug_avg",
+        9: "sep_avg", 10: "oct_avg", 11: "nov_avg", 12: "dec_avg"
+    }
+    month_names = {
+        1: "Jan", 2: "Feb", 3: "Mar", 4: "Apr", 5: "May", 6: "Jun",
+        7: "Jul", 8: "Aug", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dec"
+    }
+    
+    target_col = month_cols.get(target_month, "jan_avg")
+    target_name = month_names.get(target_month, "Jan")
+    
+    try:
+        # Get all seasonality data
+        response = client.table("seasonality") \
+            .select("*") \
+            .execute()
+        
+        if not response.data:
+            return {"error": "No seasonality data available"}
+        
+        data = response.data
+        
+        # Get sector mapping
+        sector_response = client.table("daily_stocks") \
+            .select("ticker, sector") \
+            .order("date", desc=True) \
+            .limit(500) \
+            .execute()
+        
+        sector_map = {}
+        if sector_response.data:
+            for row in sector_response.data:
+                if row.get("ticker") and row.get("sector"):
+                    sector_map[row["ticker"]] = row["sector"]
+        
+        # Compute monthly returns
+        month_returns = []
+        for d in data:
+            val = d.get(target_col)
+            if val is not None:
+                month_returns.append(float(val))
+        
+        # Count best/worst
+        best_this_month = sum(1 for d in data if d.get("best_month") == target_name)
+        worst_this_month = sum(1 for d in data if d.get("worst_month") == target_name)
+        
+        positive_stocks = sum(1 for r in month_returns if r > 0)
+        negative_stocks = sum(1 for r in month_returns if r < 0)
+        
+        # Get all months for comparison
+        all_months_avg = {}
+        for m, col in month_cols.items():
+            vals = [float(d.get(col, 0) or 0) for d in data if d.get(col) is not None]
+            if vals:
+                all_months_avg[month_names[m]] = round(sum(vals) / len(vals), 2)
+        
+        # Sector-level seasonality
+        sector_seasonality = {}
+        for d in data:
+            ticker = d.get("ticker", "")
+            sector = sector_map.get(ticker, "Other")
+            val = d.get(target_col)
+            
+            if val is not None:
+                if sector not in sector_seasonality:
+                    sector_seasonality[sector] = []
+                sector_seasonality[sector].append(float(val))
+        
+        sector_summary = []
+        for sector, returns in sector_seasonality.items():
+            if returns:
+                sector_summary.append({
+                    "sector": sector,
+                    "avg_return": round(sum(returns) / len(returns), 2),
+                    "stocks": len(returns),
+                    "positive_pct": round(100 * sum(1 for r in returns if r > 0) / len(returns), 1)
+                })
+        
+        sector_summary.sort(key=lambda x: x["avg_return"], reverse=True)
+        
+        return {
+            "target_month": target_name,
+            "target_month_num": target_month,
+            "total_stocks": len(data),
+            "stocks_with_data": len(month_returns),
+            "month_summary": {
+                "avg_return": round(sum(month_returns) / len(month_returns), 2) if month_returns else 0,
+                "median_return": round(sorted(month_returns)[len(month_returns)//2], 2) if month_returns else 0,
+                "positive_stocks": positive_stocks,
+                "negative_stocks": negative_stocks,
+                "positive_pct": round(100 * positive_stocks / len(month_returns), 1) if month_returns else 0,
+                "best_month_count": best_this_month,
+                "worst_month_count": worst_this_month
+            },
+            "all_months_comparison": all_months_avg,
+            "sector_seasonality": sector_summary,
+            "historical_bias": "bullish" if positive_stocks > negative_stocks * 1.2 else ("bearish" if negative_stocks > positive_stocks * 1.2 else "neutral"),
+            "source": "seasonality"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error fetching NIFTY 200 seasonality summary: {e}")
+        return {"error": str(e)}
+
+
+def get_sector_weekly_performance() -> Dict[str, Any]:
+    """
+    Get sector-wise weekly performance for NIFTY 200.
+    
+    Returns:
+        Dict with sector breakdown including returns and breadth
+    """
+    client = _get_supabase_client()
+    if not client:
+        return {"error": "Supabase not configured"}
+    
+    try:
+        # Get latest weekly data with sector join
+        weekly_response = client.table("weekly_analysis") \
+            .select("ticker, weekly_return_pct, weekly_trend, weekly_rsi14") \
+            .order("week_ending", desc=True) \
+            .limit(200) \
+            .execute()
+        
+        sector_response = client.table("daily_stocks") \
+            .select("ticker, sector") \
+            .order("date", desc=True) \
+            .limit(500) \
+            .execute()
+        
+        if not weekly_response.data or not sector_response.data:
+            return {"error": "No data available"}
+        
+        # Get latest week
+        # Build sector map
+        sector_map = {}
+        for row in sector_response.data:
+            if row.get("ticker") and row.get("sector"):
+                sector_map[row["ticker"]] = row["sector"]
+        
+        # Aggregate by sector
+        sector_data = {}
+        for d in weekly_response.data:
+            ticker = d.get("ticker", "")
+            sector = sector_map.get(ticker, "Other")
+            ret = float(d.get("weekly_return_pct", 0) or 0)
+            trend = d.get("weekly_trend", "SIDEWAYS")
+            
+            if sector not in sector_data:
+                sector_data[sector] = {
+                    "returns": [],
+                    "trends": {"UP": 0, "DOWN": 0, "SIDEWAYS": 0}
+                }
+            
+            sector_data[sector]["returns"].append(ret)
+            sector_data[sector]["trends"][trend] = sector_data[sector]["trends"].get(trend, 0) + 1
+        
+        # Build output
+        sectors = []
+        for sector, data in sector_data.items():
+            returns = data["returns"]
+            advances = sum(1 for r in returns if r > 0)
+            declines = sum(1 for r in returns if r < 0)
+            
+            sectors.append({
+                "sector": sector,
+                "avg_return": round(sum(returns) / len(returns), 2) if returns else 0,
+                "stocks": len(returns),
+                "advances": advances,
+                "declines": declines,
+                "ad_ratio": round(advances / max(declines, 1), 2),
+                "uptrend_count": data["trends"].get("UP", 0),
+                "downtrend_count": data["trends"].get("DOWN", 0)
+            })
+        
+        sectors.sort(key=lambda x: x["avg_return"], reverse=True)
+        
+        return {
+            "sectors": sectors,
+            "top_sector": sectors[0]["sector"] if sectors else None,
+            "bottom_sector": sectors[-1]["sector"] if sectors else None,
+            "source": "weekly_analysis + daily_stocks"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error fetching sector performance: {e}")
+        return {"error": str(e)}
