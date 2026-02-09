@@ -46,6 +46,13 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import os
+import tenacity
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential,
+    retry_if_exception_type
+)
 
 # Import agent tools
 from ..tools.nifty_fetcher import (
@@ -525,6 +532,16 @@ class NiftyAgentOrchestrator:
         
         return cleaned
     
+    @retry(
+        stop=stop_after_attempt(5),
+        wait=wait_exponential(multiplier=1, min=4, max=60),
+        retry=retry_if_exception_type(Exception),
+        reraise=True,
+        before_sleep=lambda retry_state: logger.warning(
+            f"Retrying agent call due to error: {retry_state.outcome.exception()}. "
+            f"Attempt {retry_state.attempt_number}"
+        )
+    )
     def _call_agent(
         self,
         agent_name: str,
@@ -705,6 +722,10 @@ Respond ONLY with valid JSON. No explanatory text outside the JSON.
                     span_id=span_id
                 )
             
+            # If it's a 429/Resource Exhausted error, we want to retry
+            if "429" in str(e) or "Resource exhausted" in str(e):
+                raise e
+                
             return {
                 "_agent": agent_name,
                 "error": str(e)

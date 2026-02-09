@@ -33,4 +33,5 @@ requests>=2.31.0
 beautifulsoup4>=4.12.0
 nsepython>=2.0
 
-
+# Resilience & Retries
+tenacity>=9.0.0

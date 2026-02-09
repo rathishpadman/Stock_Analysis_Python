@@ -21,6 +21,13 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor
 import os
+import tenacity
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential,
+    retry_if_exception_type
+)
 
 # Import shared dependencies
 from ..tools.supabase_fetcher import (
@@ -1211,6 +1218,16 @@ class BaseTemporalCrew:
             self.model = None
             logger.warning("Google GenAI not available for temporal crew")
     
+    @retry(
+        stop=stop_after_attempt(5),
+        wait=wait_exponential(multiplier=1, min=4, max=60),
+        retry=retry_if_exception_type(Exception),
+        reraise=True,
+        before_sleep=lambda retry_state: logger.warning(
+            f"Retrying agent call due to error: {retry_state.outcome.exception()}. "
+            f"Attempt {retry_state.attempt_number}"
+        )
+    )
     async def _call_agent(
         self,
         agent_name: str,
@@ -1290,9 +1307,22 @@ class BaseTemporalCrew:
                 error=e,
                 context={"prompt_length": len(prompt)}
             )
-            
+            # If it's a 429/Resource Exhausted error, we want to retry
+            if "429" in str(e) or "Resource exhausted" in str(e):
+                raise e
+                
             return {"error": error_msg, "agent": agent_name}
     
+    @retry(
+        stop=stop_after_attempt(5),
+        wait=wait_exponential(multiplier=1, min=4, max=60),
+        retry=retry_if_exception_type(Exception),
+        reraise=True,
+        before_sleep=lambda retry_state: logger.warning(
+            f"Retrying synthesizer call due to error: {retry_state.outcome.exception()}. "
+            f"Attempt {retry_state.attempt_number}"
+        )
+    )
     async def _call_synthesizer(
         self,
         synthesizer_prompt: str,
@@ -1337,7 +1367,6 @@ class BaseTemporalCrew:
             )
             
             return parsed
-            
         except Exception as e:
             self.observability.log_error(
                 trace_id=trace_id,
@@ -1345,6 +1374,9 @@ class BaseTemporalCrew:
                 agent_name=synthesizer_name,
                 error=e
             )
+            # If it's a 429/Resource Exhausted error, we want to retry
+            if "429" in str(e) or "Resource exhausted" in str(e):
+                raise e
             return {"error": str(e)}
 
 
