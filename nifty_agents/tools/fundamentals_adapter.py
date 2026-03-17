@@ -106,19 +106,60 @@ class SupabaseAdapter(FundamentalsAdapter):
                 "industry": d.get("industry", "Unknown"),
 
                 # Valuation
-                "market_cap": d.get("market_cap"),
+                "market_cap": d.get("market_cap_cr") or d.get("market_cap"),
+                "enterprise_value": d.get("enterprise_value_cr"),
                 "pe_ratio": d.get("pe_ttm"),
+                "forward_pe": d.get("forward_pe"),
                 "pb_ratio": d.get("pb"),
+                "ps_ratio": d.get("ps_ratio"),
+                "peg_ratio": d.get("peg_ratio"),
+                "ev_ebitda": d.get("ev_ebitda_ttm"),
 
                 # Profitability
                 "roe": d.get("roe_ttm"),
+                "roa": d.get("roa_pct"),
+                "gross_margin": d.get("gross_profit_margin_pct"),
+                "operating_margin": d.get("operating_profit_margin_pct"),
+                "profit_margin": d.get("net_profit_margin_pct"),
+
+                # Financial Health
+                "debt_to_equity": d.get("debt_equity"),
+                "current_ratio": d.get("current_ratio"),
+                "interest_coverage": d.get("interest_coverage"),
+
+                # Dividends
+                "dividend_yield": d.get("dividend_yield_pct"),
+
+                # Growth
+                "eps_growth_yoy": d.get("eps_growth_yoy_pct"),
+                "revenue_growth_yoy": d.get("revenue_growth_yoy_pct"),
 
                 # Price
                 "current_price": d.get("price_last"),
                 "previous_close": d.get("prev_close"),
                 "52w_high": d.get("high_52w"),
                 "52w_low": d.get("low_52w"),
+                "50d_avg": d.get("sma50"),
                 "200d_avg": d.get("sma200"),
+
+                # Volume
+                "avg_volume": d.get("avg_volume_1w"),
+
+                # Other
+                "beta": d.get("beta_1y"),
+                "shares_outstanding": d.get("shares_outstanding"),
+                "eps_ttm": d.get("eps_ttm"),
+
+                # Revenue/Earnings (TTM)
+                "revenue_ttm": d.get("revenue_ttm_cr"),
+                "ebitda_ttm": d.get("ebitda_ttm_cr"),
+                "net_income_ttm": d.get("net_income_ttm_cr"),
+                "fcf_ttm": d.get("fcf_ttm_cr"),
+                "fcf_yield": d.get("fcf_yield_pct"),
+
+                # Quality Metrics
+                "altman_z": d.get("altman_z"),
+                "piotroski_f": d.get("piotroski_f"),
 
                 # Scores (unique to Supabase)
                 "fundamental_score": d.get("score_fundamental"),
@@ -192,6 +233,9 @@ class NSEPythonAdapter(FundamentalsAdapter):
                 "shares_outstanding": issued_size,
             })
 
+            # Enrich with financial results (margins, debt, revenue growth)
+            self._enrich_from_results(ticker, result)
+
             if result.get("current_price"):
                 logger.info(f"[{self.name}] Fetched fundamentals for {ticker}")
                 return result
@@ -199,6 +243,62 @@ class NSEPythonAdapter(FundamentalsAdapter):
 
         except Exception as e:
             logger.debug(f"[{self.name}] Failed for {ticker}: {e}")
+            return None
+
+    def _enrich_from_results(self, ticker: str, result: Dict[str, Any]) -> None:
+        """Enrich result with financial statement data from nse_past_results()."""
+        try:
+            from nsepython import nse_past_results
+            data = nse_past_results(ticker)
+            if not data or not isinstance(data, dict):
+                return
+
+            results_list = data.get("resCmpData", [])
+            if not results_list:
+                return
+
+            latest = results_list[0]
+
+            # Revenue and profit
+            revenue = self._to_float(latest.get("re_net_sale"))
+            net_profit = self._to_float(latest.get("re_net_profit"))
+            pbt = self._to_float(latest.get("re_pro_loss_bef_tax"))
+
+            # Profit margin
+            if revenue and revenue > 0 and net_profit is not None:
+                result.setdefault("profit_margin", round(net_profit / revenue, 4))
+
+            # Operating margin estimate (PBT + other income adjustments)
+            other_income = self._to_float(latest.get("re_oth_inc_new")) or 0
+            if revenue and revenue > 0 and pbt is not None:
+                operating_profit = pbt - other_income
+                result.setdefault("operating_margin", round(operating_profit / revenue, 4))
+
+            # Debt to equity (directly available)
+            de_ratio = self._to_float(latest.get("re_debt_eqt_rat"))
+            if de_ratio is not None:
+                result.setdefault("debt_to_equity", de_ratio)
+
+            # Revenue growth YoY (compare latest vs previous period)
+            if len(results_list) > 1:
+                prev_revenue = self._to_float(results_list[1].get("re_net_sale"))
+                if revenue and prev_revenue and prev_revenue > 0:
+                    growth = round((revenue - prev_revenue) / prev_revenue * 100, 2)
+                    result.setdefault("revenue_growth_yoy", growth)
+
+        except ImportError:
+            pass
+        except Exception as e:
+            logger.debug(f"[{self.name}] nse_past_results failed for {ticker}: {e}")
+
+    @staticmethod
+    def _to_float(val) -> Optional[float]:
+        """Safely convert a value to float."""
+        if val is None or val == "" or val == "-":
+            return None
+        try:
+            return float(val)
+        except (ValueError, TypeError):
             return None
 
 
@@ -212,81 +312,91 @@ class YFinanceAdapter(FundamentalsAdapter):
     def fetch(self, ticker: str) -> Optional[Dict[str, Any]]:
         try:
             import yfinance as yf
-            from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
         except ImportError:
             logger.debug(f"[{self.name}] yfinance not installed")
             return None
 
         yf_ticker = f"{ticker}.NS" if not ticker.endswith(".NS") else ticker
 
-        try:
-            stock = yf.Ticker(yf_ticker)
-            info = stock.info
+        # Retry up to 3 times with backoff for rate limits
+        last_err = None
+        for attempt in range(3):
+            try:
+                stock = yf.Ticker(yf_ticker)
+                info = stock.info
 
-            if not info or not info.get("symbol"):
-                return None
+                if not info or not info.get("symbol"):
+                    return None
 
-            result = self._base_result(ticker)
-            result.update({
-                "company_name": info.get("longName") or info.get("shortName", ticker),
-                "sector": info.get("sector", "Unknown"),
-                "industry": info.get("industry", "Unknown"),
+                result = self._base_result(ticker)
+                result.update({
+                    "company_name": info.get("longName") or info.get("shortName", ticker),
+                    "sector": info.get("sector", "Unknown"),
+                    "industry": info.get("industry", "Unknown"),
 
-                # Valuation
-                "market_cap": info.get("marketCap"),
-                "enterprise_value": info.get("enterpriseValue"),
-                "pe_ratio": info.get("trailingPE"),
-                "forward_pe": info.get("forwardPE"),
-                "pb_ratio": info.get("priceToBook"),
-                "ps_ratio": info.get("priceToSalesTrailing12Months"),
-                "peg_ratio": info.get("pegRatio"),
-                "ev_ebitda": info.get("enterpriseToEbitda"),
+                    # Valuation
+                    "market_cap": info.get("marketCap"),
+                    "enterprise_value": info.get("enterpriseValue"),
+                    "pe_ratio": info.get("trailingPE"),
+                    "forward_pe": info.get("forwardPE"),
+                    "pb_ratio": info.get("priceToBook"),
+                    "ps_ratio": info.get("priceToSalesTrailing12Months"),
+                    "peg_ratio": info.get("pegRatio"),
+                    "ev_ebitda": info.get("enterpriseToEbitda"),
 
-                # Profitability
-                "roe": info.get("returnOnEquity"),
-                "roa": info.get("returnOnAssets"),
-                "gross_margin": info.get("grossMargins"),
-                "operating_margin": info.get("operatingMargins"),
-                "profit_margin": info.get("profitMargins"),
+                    # Profitability
+                    "roe": info.get("returnOnEquity"),
+                    "roa": info.get("returnOnAssets"),
+                    "gross_margin": info.get("grossMargins"),
+                    "operating_margin": info.get("operatingMargins"),
+                    "profit_margin": info.get("profitMargins"),
 
-                # Financial Health
-                "debt_to_equity": info.get("debtToEquity"),
-                "current_ratio": info.get("currentRatio"),
-                "quick_ratio": info.get("quickRatio"),
+                    # Financial Health
+                    "debt_to_equity": info.get("debtToEquity"),
+                    "current_ratio": info.get("currentRatio"),
+                    "quick_ratio": info.get("quickRatio"),
 
-                # Dividends
-                "dividend_yield": info.get("dividendYield"),
-                "dividend_rate": info.get("dividendRate"),
-                "payout_ratio": info.get("payoutRatio"),
+                    # Dividends
+                    "dividend_yield": info.get("dividendYield"),
+                    "dividend_rate": info.get("dividendRate"),
+                    "payout_ratio": info.get("payoutRatio"),
 
-                # Price
-                "current_price": info.get("currentPrice") or info.get("regularMarketPrice"),
-                "previous_close": info.get("previousClose"),
-                "52w_high": info.get("fiftyTwoWeekHigh"),
-                "52w_low": info.get("fiftyTwoWeekLow"),
-                "50d_avg": info.get("fiftyDayAverage"),
-                "200d_avg": info.get("twoHundredDayAverage"),
+                    # Price
+                    "current_price": info.get("currentPrice") or info.get("regularMarketPrice"),
+                    "previous_close": info.get("previousClose"),
+                    "52w_high": info.get("fiftyTwoWeekHigh"),
+                    "52w_low": info.get("fiftyTwoWeekLow"),
+                    "50d_avg": info.get("fiftyDayAverage"),
+                    "200d_avg": info.get("twoHundredDayAverage"),
 
-                # Volume
-                "avg_volume": info.get("averageVolume"),
-                "avg_volume_10d": info.get("averageVolume10days"),
+                    # Volume
+                    "avg_volume": info.get("averageVolume"),
+                    "avg_volume_10d": info.get("averageVolume10days"),
 
-                # Other
-                "beta": info.get("beta"),
-                "shares_outstanding": info.get("sharesOutstanding"),
-                "float_shares": info.get("floatShares"),
-            })
+                    # Other
+                    "beta": info.get("beta"),
+                    "shares_outstanding": info.get("sharesOutstanding"),
+                    "float_shares": info.get("floatShares"),
+                })
 
-            logger.info(f"[{self.name}] Fetched fundamentals for {ticker}")
-            return result
+                logger.info(f"[{self.name}] Fetched fundamentals for {ticker}")
+                return result
 
-        except Exception as e:
-            err_str = str(e).lower()
-            if "too many requests" in err_str or "rate limit" in err_str or "429" in err_str:
-                logger.warning(f"[{self.name}] Rate limited for {ticker}")
-            else:
-                logger.debug(f"[{self.name}] Failed for {ticker}: {e}")
-            return None
+            except Exception as e:
+                err_str = str(e).lower()
+                if "too many requests" in err_str or "rate limit" in err_str or "429" in err_str:
+                    last_err = e
+                    wait = 5 * (2 ** attempt)  # 5s, 10s, 20s
+                    logger.warning(f"[{self.name}] Rate limited for {ticker}, retry {attempt+1}/3 in {wait}s")
+                    import time
+                    time.sleep(wait)
+                    continue
+                else:
+                    logger.debug(f"[{self.name}] Failed for {ticker}: {e}")
+                    return None
+
+        logger.warning(f"[{self.name}] All retries exhausted for {ticker}: {last_err}")
+        return None
 
 
 # =============================================================================
@@ -431,23 +541,34 @@ def get_fundamentals(ticker: str) -> Dict[str, Any]:
             continue
 
         if not data:
+            logger.debug(f"[{adapter.name}] No data for {ticker_clean}")
             continue
+
+        # Count non-None fields this adapter provides
+        filled_fields = [k for k, v in data.items()
+                         if k not in ("data_source", "timestamp", "ticker") and v is not None]
 
         if base_result is None:
             # First successful source becomes the base
             base_result = data
             sources_used.append(adapter.name)
+            logger.info(f"[{adapter.name}] Base for {ticker_clean}: {len(filled_fields)} fields")
         else:
             # Merge: fill in any None fields from this source
-            merged = False
+            merged_fields = []
             for key, val in data.items():
                 if key in ("data_source", "timestamp"):
                     continue
                 if base_result.get(key) is None and val is not None:
                     base_result[key] = val
-                    merged = True
-            if merged:
+                    merged_fields.append(key)
+            if merged_fields:
                 sources_used.append(adapter.name)
+                logger.info(
+                    f"[{adapter.name}] Merged {len(merged_fields)} fields for {ticker_clean}: "
+                    f"{', '.join(merged_fields[:10])}"
+                    f"{'...' if len(merged_fields) > 10 else ''}"
+                )
 
         # NOTE: We intentionally do NOT stop early. Even if basic fields
         # (price, PE, sector) are filled by Supabase/nsepython, we continue
@@ -457,6 +578,15 @@ def get_fundamentals(ticker: str) -> Dict[str, Any]:
     if base_result:
         base_result["data_source"] = ",".join(sources_used)
         base_result["timestamp"] = datetime.now().isoformat()
+        # Log final coverage summary
+        key_fields = ["pe_ratio", "roe", "profit_margin", "operating_margin",
+                       "debt_to_equity", "dividend_yield", "revenue_growth_yoy", "beta"]
+        coverage = {f: (base_result.get(f) is not None) for f in key_fields}
+        missing = [f for f, v in coverage.items() if not v]
+        logger.info(
+            f"Fundamentals for {ticker_clean} from [{base_result['data_source']}] — "
+            f"missing: {missing if missing else 'none'}"
+        )
         return base_result
 
     # All adapters failed
