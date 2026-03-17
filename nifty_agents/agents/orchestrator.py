@@ -51,6 +51,8 @@ from tenacity import (
     retry,
     stop_after_attempt,
     wait_exponential,
+    wait_random,
+    wait_combine,
     retry_if_exception_type
 )
 
@@ -534,7 +536,12 @@ class NiftyAgentOrchestrator:
     
     @retry(
         stop=stop_after_attempt(5),
-        wait=wait_exponential(multiplier=1, min=4, max=60),
+        # Exponential backoff (4-60s) + random jitter (0-3s) to prevent
+        # multiple agents retrying simultaneously after a Gemini 429 burst
+        wait=wait_combine(
+            wait_exponential(multiplier=1, min=4, max=60),
+            wait_random(min=0, max=3),
+        ),
         retry=retry_if_exception_type(Exception),
         reraise=True,
         before_sleep=lambda retry_state: logger.warning(
