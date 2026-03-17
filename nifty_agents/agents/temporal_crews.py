@@ -1458,33 +1458,18 @@ class WeeklyAnalysisCrew(BaseTemporalCrew):
                 "trend_distribution": nifty200_weekly.get("trend_distribution", {})  # NEW
             }
             
-            # Run agents in parallel
+            # Run agents with staggered starts to avoid Gemini burst-rate 429s
             logger.info("Running weekly analysis agents...")
-            
-            trend_task = self._call_agent(
-                "trend_agent",
-                WEEKLY_AGENT_PROMPTS["trend_agent"],
-                trend_data,
-                trace_id
-            )
-            
-            sector_task = self._call_agent(
-                "sector_rotation_agent",
-                WEEKLY_AGENT_PROMPTS["sector_rotation_agent"],
-                sector_data,
-                trace_id
-            )
-            
-            risk_task = self._call_agent(
-                "risk_regime_agent",
-                WEEKLY_AGENT_PROMPTS["risk_regime_agent"],
-                risk_data,
-                trace_id
-            )
-            
-            # Await all agents
+
+            async def _staggered_agent(delay, name, prompt, data, tid):
+                if delay > 0:
+                    await asyncio.sleep(delay)
+                return await self._call_agent(name, prompt, data, tid)
+
             trend_result, sector_result, risk_result = await asyncio.gather(
-                trend_task, sector_task, risk_task
+                _staggered_agent(0, "trend_agent", WEEKLY_AGENT_PROMPTS["trend_agent"], trend_data, trace_id),
+                _staggered_agent(1, "sector_rotation_agent", WEEKLY_AGENT_PROMPTS["sector_rotation_agent"], sector_data, trace_id),
+                _staggered_agent(2, "risk_regime_agent", WEEKLY_AGENT_PROMPTS["risk_regime_agent"], risk_data, trace_id),
             )
             
             # Run synthesizer
@@ -1627,32 +1612,18 @@ class MonthlyAnalysisCrew(BaseTemporalCrew):
             valuation_data = self._get_valuation_metrics()
             valuation_data["nifty200_returns"] = nifty200_monthly.get("market_summary", {})  # NEW
             
-            # Run agents in parallel
+            # Run agents with staggered starts to avoid Gemini burst-rate 429s
             logger.info("Running monthly analysis agents...")
-            
-            macro_task = self._call_agent(
-                "macro_cycle_agent",
-                MONTHLY_AGENT_PROMPTS["macro_cycle_agent"],
-                macro_data,
-                trace_id
-            )
-            
-            flow_task = self._call_agent(
-                "fund_flow_agent",
-                MONTHLY_AGENT_PROMPTS["fund_flow_agent"],
-                flow_data,
-                trace_id
-            )
-            
-            valuation_task = self._call_agent(
-                "valuation_regime_agent",
-                MONTHLY_AGENT_PROMPTS["valuation_regime_agent"],
-                valuation_data,
-                trace_id
-            )
-            
+
+            async def _staggered_agent(delay, name, prompt, data, tid):
+                if delay > 0:
+                    await asyncio.sleep(delay)
+                return await self._call_agent(name, prompt, data, tid)
+
             macro_result, flow_result, valuation_result = await asyncio.gather(
-                macro_task, flow_task, valuation_task
+                _staggered_agent(0, "macro_cycle_agent", MONTHLY_AGENT_PROMPTS["macro_cycle_agent"], macro_data, trace_id),
+                _staggered_agent(1, "fund_flow_agent", MONTHLY_AGENT_PROMPTS["fund_flow_agent"], flow_data, trace_id),
+                _staggered_agent(2, "valuation_regime_agent", MONTHLY_AGENT_PROMPTS["valuation_regime_agent"], valuation_data, trace_id),
             )
             
             # Run strategist synthesizer
@@ -1790,30 +1761,16 @@ class SeasonalityAnalysisCrew(BaseTemporalCrew):
             sector_seasonal_data = self._get_sector_seasonality()
             sector_seasonal_data["nifty200_sector_seasonality"] = nifty200_seasonality.get("sector_seasonality", [])  # NEW
             
-            # Run agents in parallel
-            pattern_task = self._call_agent(
-                "historical_pattern_agent",
-                SEASONALITY_AGENT_PROMPTS["historical_pattern_agent"],
-                pattern_data,
-                trace_id
-            )
-            
-            event_task = self._call_agent(
-                "event_calendar_agent",
-                SEASONALITY_AGENT_PROMPTS["event_calendar_agent"],
-                event_data,
-                trace_id
-            )
-            
-            sector_task = self._call_agent(
-                "sector_seasonality_agent",
-                SEASONALITY_AGENT_PROMPTS["sector_seasonality_agent"],
-                sector_seasonal_data,
-                trace_id
-            )
-            
+            # Run agents with staggered starts to avoid Gemini burst-rate 429s
+            async def _staggered_agent(delay, name, prompt, data, tid):
+                if delay > 0:
+                    await asyncio.sleep(delay)
+                return await self._call_agent(name, prompt, data, tid)
+
             pattern_result, event_result, sector_result = await asyncio.gather(
-                pattern_task, event_task, sector_task
+                _staggered_agent(0, "historical_pattern_agent", SEASONALITY_AGENT_PROMPTS["historical_pattern_agent"], pattern_data, trace_id),
+                _staggered_agent(1, "event_calendar_agent", SEASONALITY_AGENT_PROMPTS["event_calendar_agent"], event_data, trace_id),
+                _staggered_agent(2, "sector_seasonality_agent", SEASONALITY_AGENT_PROMPTS["sector_seasonality_agent"], sector_seasonal_data, trace_id),
             )
             
             # Synthesize

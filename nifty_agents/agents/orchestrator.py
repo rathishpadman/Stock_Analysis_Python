@@ -942,11 +942,13 @@ Respond ONLY with valid JSON.
         ]
         
         agent_analyses = {}
-        with ThreadPoolExecutor(max_workers=5) as executor:
-            futures = {
-                executor.submit(self._call_agent, name, base_data, trace_id): name
-                for name in agent_names
-            }
+        # max_workers=3 to avoid Gemini burst-rate 429s when 5 fire simultaneously
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            futures = {}
+            for i, name in enumerate(agent_names):
+                futures[executor.submit(self._call_agent, name, base_data, trace_id)] = name
+                if i < len(agent_names) - 1:
+                    time.sleep(1)  # 1s stagger between submissions
             
             for future in as_completed(futures, timeout=self.timeout):
                 name = futures[future]
