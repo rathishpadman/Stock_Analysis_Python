@@ -481,8 +481,17 @@ class FinnhubAdapter(FundamentalsAdapter):
 # Adapter Registry & Cascade Logic
 # =============================================================================
 
-# Default cascade order — can be overridden via FUNDAMENTALS_SOURCES env var
+# Default cascade: Supabase + nsepython only.
+# yfinance is excluded by default because it is permanently rate-limited on
+# Render's shared IP, adding 35s of failed retries that cause analysis timeouts.
+# To re-enable, set FUNDAMENTALS_SOURCES=supabase,nsepython,yfinance,finnhub
 DEFAULT_ADAPTERS: List[FundamentalsAdapter] = [
+    SupabaseAdapter(),
+    NSEPythonAdapter(),
+]
+
+# All available adapters (used when FUNDAMENTALS_SOURCES env var is set)
+ALL_ADAPTERS: List[FundamentalsAdapter] = [
     SupabaseAdapter(),
     NSEPythonAdapter(),
     YFinanceAdapter(),
@@ -501,7 +510,7 @@ def _get_adapter_chain() -> List[FundamentalsAdapter]:
     if not sources_env:
         return DEFAULT_ADAPTERS
 
-    name_map = {a.name: a for a in DEFAULT_ADAPTERS}
+    name_map = {a.name: a for a in ALL_ADAPTERS}
     chain = []
     for name in sources_env.split(","):
         name = name.strip().lower()
