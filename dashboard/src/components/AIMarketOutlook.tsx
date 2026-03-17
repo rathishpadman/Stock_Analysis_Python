@@ -24,6 +24,24 @@ import {
 // Use same pattern as AIAnalysisModal - direct call to Render
 const API_BASE = process.env.NEXT_PUBLIC_AGENT_API_URL || 'https://nifty-agents-api.onrender.com';
 
+/**
+ * Safely render a value that might be an object from LLM responses.
+ * Prevents React error #31 (objects are not valid as React child).
+ */
+function safeStr(val: unknown, fallback: string = 'N/A'): string | number {
+    if (val === null || val === undefined) return fallback;
+    if (typeof val === 'string' || typeof val === 'number') return val;
+    if (typeof val === 'object') {
+        // LLM sometimes returns {current: "...", score: N, ...} instead of a plain string
+        const obj = val as Record<string, unknown>;
+        if ('current' in obj && (typeof obj.current === 'string' || typeof obj.current === 'number')) return obj.current;
+        if ('value' in obj && (typeof obj.value === 'string' || typeof obj.value === 'number')) return obj.value;
+        if ('label' in obj && (typeof obj.label === 'string' || typeof obj.label === 'number')) return obj.label;
+        return JSON.stringify(val);
+    }
+    return String(val);
+}
+
 // Types for different analysis types
 interface WeeklyAnalysis {
     analysis_type: 'weekly';
@@ -265,11 +283,12 @@ function Gauge({ value, max = 10, label, colorOverride }: { value: number; max?:
 
 function StatCard({ label, value, subValue, trend, icon: Icon }: {
     label: string;
-    value: string | number;
+    value: unknown;
     subValue?: string;
     trend?: 'up' | 'down' | 'neutral';
     icon?: React.ElementType;
 }) {
+    const displayValue = safeStr(value);
     return (
         <div className="bg-gray-50 dark:bg-gray-800/40 p-3 rounded-xl border border-gray-100 dark:border-gray-700/50">
             <div className="flex items-center justify-between mb-1">
@@ -277,7 +296,7 @@ function StatCard({ label, value, subValue, trend, icon: Icon }: {
                 {Icon && <Icon className="w-3 h-3 text-gray-400" />}
             </div>
             <div className="flex items-baseline gap-2">
-                <span className="text-base font-bold text-gray-900 dark:text-gray-100">{value}</span>
+                <span className="text-base font-bold text-gray-900 dark:text-gray-100">{displayValue}</span>
                 {trend && (
                     <span className={`text-xs ${trend === 'up' ? 'text-green-500' : trend === 'down' ? 'text-red-500' : 'text-gray-500'}`}>
                         {trend === 'up' ? '▲' : trend === 'down' ? '▼' : '▶'}
@@ -539,7 +558,7 @@ function WeeklyAnalysisView({ data }: { data: WeeklyAnalysis }) {
                             />
                             <StatCard
                                 label="Risk Regime"
-                                value={agents.risk_regime?.risk_regime || 'N/A'}
+                                value={agents.risk_regime?.risk_regime?.current || 'N/A'}
                                 subValue={`VIX: ${agents.risk_regime?.vix_analysis?.current_level || 'N/A'}`}
                                 icon={Shield}
                             />
@@ -697,9 +716,9 @@ function WeeklyAnalysisView({ data }: { data: WeeklyAnalysis }) {
                                 <div className="text-center">
                                     <div className="text-[10px] font-bold text-orange-600 uppercase tracking-widest mb-1">Current Risk Regime</div>
                                     <div className="text-2xl font-bold text-orange-900 dark:text-orange-100 mb-4 uppercase">
-                                        {agents.risk_regime?.risk_regime || 'Moderate'}
+                                        {safeStr(agents.risk_regime?.risk_regime?.current ?? agents.risk_regime?.risk_regime, 'Moderate')}
                                     </div>
-                                    <Gauge value={agents.risk_regime?.risk_regime_score || 5} label="Risk Intensity" />
+                                    <Gauge value={agents.risk_regime?.risk_regime?.score || 5} label="Risk Intensity" />
                                 </div>
                             </div>
 

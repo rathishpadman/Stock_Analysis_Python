@@ -16,6 +16,7 @@ from datetime import datetime, timedelta
 import os
 import logging
 import pandas as pd
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 # Try to import yfinance for index data fallback
 try:
@@ -32,6 +33,11 @@ except ImportError:
     SUPABASE_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
+
+
+class _YFRateLimitError(Exception):
+    """Raised when yfinance request is rate-limited, to trigger tenacity retry."""
+    pass
 
 
 def _get_supabase_client() -> Optional[Any]:
@@ -595,20 +601,32 @@ INDEX_SYMBOLS = {
 }
 
 
+@retry(
+    stop=stop_after_attempt(4),
+    wait=wait_exponential(multiplier=2, min=3, max=30),
+    retry=retry_if_exception_type(_YFRateLimitError),
+    reraise=True,
+    before_sleep=lambda rs: logger.warning(
+        f"Rate limited on index data, retrying in {rs.next_action.sleep:.0f}s "
+        f"(attempt {rs.attempt_number}/4)"
+    ),
+)
 def get_index_weekly_data(
     index_name: str,
     weeks: int = 4
 ) -> Dict[str, Any]:
     """
     Fetch index data directly from yfinance when not available in Supabase.
-    
+
+    Retries automatically on rate-limit (429) errors with exponential backoff.
+
     This is a fallback for indices like NIFTY50 that may not be in the
     weekly_analysis table.
-    
+
     Args:
         index_name: Index name (e.g., "NIFTY50", "BANKNIFTY")
         weeks: Number of weeks of data to fetch
-        
+
     Returns:
         Dict with index weekly data including OHLCV and basic technicals
     """
@@ -708,6 +726,10 @@ def get_index_weekly_data(
         }
         
     except Exception as e:
+        err_str = str(e).lower()
+        if "too many requests" in err_str or "rate limit" in err_str or "429" in err_str:
+            logger.warning(f"Rate limited fetching index data for {index_name}, will retry...")
+            raise _YFRateLimitError(f"Rate limited for {index_name}: {e}") from e
         logger.error(f"Error fetching index data for {index_name}: {e}")
         return {"error": str(e), "index": index_name}
 

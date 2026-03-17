@@ -12,6 +12,7 @@ import yfinance as yf
 from typing import Dict, List, Any, Optional
 from datetime import datetime, timedelta
 import logging
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 # Try to import nsetools, provide fallback
 try:
@@ -22,6 +23,30 @@ except ImportError:
     logging.warning("nsetools not installed. Live quotes will use yfinance fallback.")
 
 logger = logging.getLogger(__name__)
+
+
+class RateLimitError(Exception):
+    """Raised when a Yahoo Finance request is rate-limited."""
+    pass
+
+
+def _yf_retry_decorator(func):
+    """Apply tenacity retry with exponential backoff for rate-limited yfinance calls."""
+    @retry(
+        stop=stop_after_attempt(4),
+        wait=wait_exponential(multiplier=2, min=3, max=30),
+        retry=retry_if_exception_type(RateLimitError),
+        reraise=True,
+        before_sleep=lambda rs: logger.warning(
+            f"Rate limited, retrying in {rs.next_action.sleep:.0f}s "
+            f"(attempt {rs.attempt_number}/{4})"
+        ),
+    )
+    def wrapper(*args, **kwargs):
+        return func(*args, **kwargs)
+    wrapper.__name__ = func.__name__
+    wrapper.__doc__ = func.__doc__
+    return wrapper
 
 
 def _normalize_ticker(ticker: str) -> tuple[str, str]:
@@ -47,15 +72,17 @@ def _normalize_ticker(ticker: str) -> tuple[str, str]:
     return yf_ticker, nse_ticker
 
 
+@_yf_retry_decorator
 def get_stock_fundamentals(ticker: str) -> Dict[str, Any]:
     """
     Get fundamental financial data for a NIFTY stock.
-    
+
     Uses yfinance to fetch company info, financials, and key ratios.
-    
+    Retries automatically on rate-limit (429) errors with exponential backoff.
+
     Args:
         ticker: NSE stock symbol (e.g., 'RELIANCE' or 'RELIANCE.NS')
-    
+
     Returns:
         Dict containing:
         - ticker: Normalized ticker symbol
@@ -69,14 +96,14 @@ def get_stock_fundamentals(ticker: str) -> Dict[str, Any]:
         - margins: Gross, operating, profit margins
         - 52w_high, 52w_low: Year range
         - current_price: Latest price
-        
+
     Example:
         >>> result = get_stock_fundamentals("RELIANCE")
         >>> print(result["pe_ratio"])
         25.5
     """
     yf_ticker, nse_ticker = _normalize_ticker(ticker)
-    
+
     try:
         stock = yf.Ticker(yf_ticker)
         info = stock.info
@@ -150,6 +177,10 @@ def get_stock_fundamentals(ticker: str) -> Dict[str, Any]:
         return fundamentals
         
     except Exception as e:
+        err_str = str(e).lower()
+        if "too many requests" in err_str or "rate limit" in err_str or "429" in err_str:
+            logger.warning(f"Rate limited fetching fundamentals for {ticker}, will retry...")
+            raise RateLimitError(f"Rate limited for {ticker}: {e}") from e
         logger.error(f"Error fetching fundamentals for {ticker}: {e}")
         return {
             "error": f"Error fetching fundamentals: {str(e)}",
@@ -158,15 +189,17 @@ def get_stock_fundamentals(ticker: str) -> Dict[str, Any]:
         }
 
 
+@_yf_retry_decorator
 def get_stock_quote(ticker: str) -> Dict[str, Any]:
     """
     Get real-time/live quote for a NIFTY stock.
-    
+
     Uses nsetools for live NSE data, falls back to yfinance if unavailable.
-    
+    Retries automatically on rate-limit (429) errors with exponential backoff.
+
     Args:
         ticker: NSE stock symbol (e.g., 'RELIANCE' or 'RELIANCE.NS')
-    
+
     Returns:
         Dict containing:
         - last_price: Current/last traded price
@@ -176,7 +209,7 @@ def get_stock_quote(ticker: str) -> Dict[str, Any]:
         - volume: Trading volume
         - vwap: Volume weighted average price
         - bid, ask: Best bid/ask prices
-        
+
     Example:
         >>> quote = get_stock_quote("TCS")
         >>> print(f"TCS: ₹{quote['last_price']}")
@@ -233,6 +266,10 @@ def get_stock_quote(ticker: str) -> Dict[str, Any]:
         }
         
     except Exception as e:
+        err_str = str(e).lower()
+        if "too many requests" in err_str or "rate limit" in err_str or "429" in err_str:
+            logger.warning(f"Rate limited fetching quote for {ticker}, will retry...")
+            raise RateLimitError(f"Rate limited for {ticker}: {e}") from e
         logger.error(f"Error fetching quote for {ticker}: {e}")
         return {
             "error": f"Error fetching quote: {str(e)}",
@@ -241,6 +278,7 @@ def get_stock_quote(ticker: str) -> Dict[str, Any]:
         }
 
 
+@_yf_retry_decorator
 def get_price_history(
     ticker: str,
     days: int = 365,
@@ -248,19 +286,21 @@ def get_price_history(
 ) -> Dict[str, Any]:
     """
     Get historical price and volume data for a NIFTY stock.
-    
+
+    Retries automatically on rate-limit (429) errors with exponential backoff.
+
     Args:
         ticker: NSE stock symbol
         days: Number of days of history (default: 365)
         interval: Data interval - '1d', '1wk', '1mo' (default: '1d')
-    
+
     Returns:
         Dict containing:
         - ticker: Stock symbol
         - interval: Data frequency
         - data: List of OHLCV records with date
         - count: Number of data points
-        
+
     Example:
         >>> history = get_price_history("INFY", days=30)
         >>> for record in history["data"][-5:]:
@@ -309,6 +349,10 @@ def get_price_history(
         }
         
     except Exception as e:
+        err_str = str(e).lower()
+        if "too many requests" in err_str or "rate limit" in err_str or "429" in err_str:
+            logger.warning(f"Rate limited fetching price history for {ticker}, will retry...")
+            raise RateLimitError(f"Rate limited for {ticker}: {e}") from e
         logger.error(f"Error fetching price history for {ticker}: {e}")
         return {
             "error": f"Error fetching price history: {str(e)}",
