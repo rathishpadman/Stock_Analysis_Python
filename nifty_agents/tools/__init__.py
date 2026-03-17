@@ -2,7 +2,8 @@
 Tools module for NIFTY Agents.
 
 Contains data fetchers for Indian stock market data:
-- nifty_fetcher: Stock price and fundamental data via yfinance/nsetools
+- fundamentals_adapter: Multi-source adapter (Supabase/nsepython/yfinance/Finnhub)
+- nifty_fetcher: Stock price and fundamental data via adapter cascade
 - india_macro_fetcher: RBI rates, India VIX, FII/DII flows
 - india_news_fetcher: Economic Times RSS, corporate announcements
 - supabase_fetcher: Leverage existing scored data from Supabase

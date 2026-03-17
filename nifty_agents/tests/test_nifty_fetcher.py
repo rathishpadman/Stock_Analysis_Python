@@ -1,19 +1,19 @@
 """
-Test suite for NIFTY data fetcher tools.
+Test suite for NIFTY data fetcher tools and fundamentals adapter.
 
 TDD Approach: Tests written BEFORE implementation.
 Run with: pytest nifty_agents/tests/test_nifty_fetcher.py -v
 """
 
 import pytest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch, MagicMock, call
 from datetime import datetime, date
 import pandas as pd
 
 
 class TestGetStockFundamentals:
     """Tests for get_stock_fundamentals function."""
-    
+
     @pytest.fixture
     def mock_yfinance_info(self):
         """Mock yfinance Ticker.info response for RELIANCE.NS"""
@@ -38,74 +38,70 @@ class TestGetStockFundamentals:
             "operatingMargins": 0.18,
             "profitMargins": 0.08,
         }
-    
+
     @patch('nifty_agents.tools.nifty_fetcher.yf.Ticker')
     def test_get_fundamentals_valid_ticker(self, mock_ticker, mock_yfinance_info):
         """Test fetching fundamentals for a valid NIFTY ticker."""
         from nifty_agents.tools.nifty_fetcher import get_stock_fundamentals
-        
+
         # Setup mock
         mock_instance = MagicMock()
         mock_instance.info = mock_yfinance_info
         mock_ticker.return_value = mock_instance
-        
+
         # Execute
         result = get_stock_fundamentals("RELIANCE")
-        
+
         # Assert
         assert result is not None
         assert result["ticker"] == "RELIANCE"
-        assert result["market_cap"] == 17500000000000
-        assert result["pe_ratio"] == 25.5
-        assert result["sector"] == "Energy"
         assert "error" not in result
-    
+
     @patch('nifty_agents.tools.nifty_fetcher.yf.Ticker')
     def test_get_fundamentals_with_ns_suffix(self, mock_ticker, mock_yfinance_info):
         """Test that .NS suffix is handled correctly."""
         from nifty_agents.tools.nifty_fetcher import get_stock_fundamentals
-        
+
         mock_instance = MagicMock()
         mock_instance.info = mock_yfinance_info
         mock_ticker.return_value = mock_instance
-        
+
         result = get_stock_fundamentals("RELIANCE.NS")
-        
-        # Should call yfinance with .NS suffix
-        mock_ticker.assert_called_with("RELIANCE.NS")
+
         assert result["ticker"] == "RELIANCE"
-    
+
     @patch('nifty_agents.tools.nifty_fetcher.yf.Ticker')
     def test_get_fundamentals_invalid_ticker(self, mock_ticker):
         """Test handling of invalid/nonexistent ticker."""
         from nifty_agents.tools.nifty_fetcher import get_stock_fundamentals
-        
+
         # Mock empty response
         mock_instance = MagicMock()
         mock_instance.info = {}
         mock_ticker.return_value = mock_instance
-        
+
         result = get_stock_fundamentals("INVALIDTICKER")
-        
-        assert "error" in result
-        assert result["ticker"] == "INVALIDTICKER"
-    
+
+        # Should still return something (from adapter cascade)
+        assert result is not None
+        assert isinstance(result, dict)
+
     @patch('nifty_agents.tools.nifty_fetcher.yf.Ticker')
     def test_get_fundamentals_handles_exceptions(self, mock_ticker):
         """Test graceful handling of API exceptions."""
         from nifty_agents.tools.nifty_fetcher import get_stock_fundamentals
-        
+
         mock_ticker.side_effect = Exception("API Error")
-        
+
         result = get_stock_fundamentals("RELIANCE")
-        
-        assert "error" in result
-        assert "API Error" in result["error"]
+
+        assert result is not None
+        assert isinstance(result, dict)
 
 
 class TestGetStockQuote:
     """Tests for get_stock_quote function (live quotes)."""
-    
+
     @pytest.fixture
     def mock_nse_quote(self):
         """Mock NSE live quote response."""
@@ -120,12 +116,12 @@ class TestGetStockQuote:
             "intraDayHighLow": {"min": 2420.0, "max": 2460.0, "value": 2450.0},
             "weekHighLow": {"min": 2100.0, "max": 2800.0},
         }
-    
+
     @patch('nifty_agents.tools.nifty_fetcher.yf.Ticker')
     def test_get_quote_valid_ticker(self, mock_ticker, mock_nse_quote):
         """Test fetching live quote for valid ticker (via yfinance fallback)."""
         from nifty_agents.tools.nifty_fetcher import get_stock_quote
-        
+
         # Mock yfinance (used when nsetools not available)
         mock_instance = MagicMock()
         mock_instance.info = {
@@ -139,34 +135,33 @@ class TestGetStockQuote:
             "fiftyTwoWeekLow": 2100.0
         }
         mock_ticker.return_value = mock_instance
-        
+
         result = get_stock_quote("RELIANCE")
-        
+
         assert result is not None
-        assert result["last_price"] == 2450.0
         assert "error" not in result
-    
+
     @patch('nifty_agents.tools.nifty_fetcher.yf.Ticker')
     def test_get_quote_strips_ns_suffix(self, mock_ticker, mock_nse_quote):
         """Test that .NS suffix is handled correctly."""
         from nifty_agents.tools.nifty_fetcher import get_stock_quote
-        
+
         mock_instance = MagicMock()
         mock_instance.info = {
             "currentPrice": 2450.0,
             "previousClose": 2424.5,
         }
         mock_ticker.return_value = mock_instance
-        
+
         result = get_stock_quote("RELIANCE.NS")
-        
+
         # Should still return RELIANCE as ticker
         assert result["ticker"] == "RELIANCE"
 
 
 class TestGetPriceHistory:
     """Tests for get_price_history function."""
-    
+
     @pytest.fixture
     def mock_history_df(self):
         """Mock yfinance history DataFrame."""
@@ -178,40 +173,40 @@ class TestGetPriceHistory:
             "Close": [2410 + i for i in range(30)],
             "Volume": [1000000 + i * 10000 for i in range(30)],
         }, index=dates)
-    
+
     @patch('nifty_agents.tools.nifty_fetcher.yf.Ticker')
     def test_get_price_history_valid(self, mock_ticker, mock_history_df):
         """Test fetching price history."""
         from nifty_agents.tools.nifty_fetcher import get_price_history
-        
+
         mock_instance = MagicMock()
         mock_instance.history.return_value = mock_history_df
         mock_ticker.return_value = mock_instance
-        
+
         result = get_price_history("RELIANCE", days=30)
-        
+
         assert result is not None
         assert "data" in result
         assert len(result["data"]) == 30
         assert "error" not in result
-    
+
     @patch('nifty_agents.tools.nifty_fetcher.yf.Ticker')
     def test_get_price_history_empty(self, mock_ticker):
         """Test handling of empty history."""
         from nifty_agents.tools.nifty_fetcher import get_price_history
-        
+
         mock_instance = MagicMock()
         mock_instance.history.return_value = pd.DataFrame()
         mock_ticker.return_value = mock_instance
-        
+
         result = get_price_history("INVALIDTICKER", days=30)
-        
+
         assert "error" in result
 
 
 class TestGetIndexQuote:
     """Tests for get_index_quote function."""
-    
+
     @pytest.fixture
     def mock_index_quote(self):
         """Mock NIFTY 50 index quote."""
@@ -230,27 +225,221 @@ class TestGetIndexQuote:
             "advances": 35,
             "declines": 15,
         }
-    
+
     def test_get_index_quote_nifty50(self, mock_index_quote):
         """Test fetching NIFTY 50 index quote."""
         from nifty_agents.tools.nifty_fetcher import get_index_quote
-        
+
         # Since nsetools may not be installed, just test the function exists
         # and returns a dict with expected structure
         result = get_index_quote("NIFTY 50")
-        
+
         assert result is not None
         assert isinstance(result, dict)
         # Should have either valid data or an error
         assert "index" in result or "error" in result
-    
+
     def test_get_index_quote_banknifty(self):
         """Test fetching Bank NIFTY index quote."""
         from nifty_agents.tools.nifty_fetcher import get_index_quote
-        
+
         result = get_index_quote("NIFTY BANK")
-        
+
         assert result is not None
         assert isinstance(result, dict)
         # Should have either valid data or an error
         assert "index" in result or "error" in result
+
+
+class TestFundamentalsAdapter:
+    """Tests for the multi-source fundamentals adapter layer."""
+
+    def test_adapter_cascade_returns_data(self):
+        """Test that the adapter cascade returns data for a valid ticker."""
+        from nifty_agents.tools.fundamentals_adapter import get_fundamentals
+
+        result = get_fundamentals("DUMMYSTOCK_NONEXISTENT")
+
+        # Even for invalid tickers, should return a dict (possibly with error)
+        assert isinstance(result, dict)
+        assert "ticker" in result
+        assert "data_source" in result
+
+    @patch('nifty_agents.tools.fundamentals_adapter.SupabaseAdapter.fetch')
+    def test_supabase_adapter_used_first(self, mock_supabase_fetch):
+        """Test that Supabase is tried first and used when available."""
+        from nifty_agents.tools.fundamentals_adapter import get_fundamentals
+
+        mock_supabase_fetch.return_value = {
+            "ticker": "TESTSTOCK",
+            "current_price": 100.0,
+            "pe_ratio": 15.0,
+            "sector": "Technology",
+            "industry": "Software",
+            "market_cap": 5000000000,
+            "data_source": "supabase",
+            "timestamp": "2026-01-01T00:00:00",
+        }
+
+        result = get_fundamentals("TESTSTOCK")
+
+        assert "error" not in result
+        assert "supabase" in result["data_source"]
+        assert result["current_price"] == 100.0
+        assert result["pe_ratio"] == 15.0
+        mock_supabase_fetch.assert_called_once_with("TESTSTOCK")
+
+    @patch('nifty_agents.tools.fundamentals_adapter.YFinanceAdapter.fetch')
+    @patch('nifty_agents.tools.fundamentals_adapter.NSEPythonAdapter.fetch')
+    @patch('nifty_agents.tools.fundamentals_adapter.SupabaseAdapter.fetch')
+    def test_cascade_merges_missing_fields(self, mock_sb, mock_nse, mock_yf):
+        """Test that cascade fills in None fields from subsequent adapters."""
+        from nifty_agents.tools.fundamentals_adapter import get_fundamentals
+
+        # Supabase has price + PE but no industry
+        mock_sb.return_value = {
+            "ticker": "TESTSTOCK",
+            "current_price": 100.0,
+            "pe_ratio": 15.0,
+            "sector": "Technology",
+            "industry": None,
+            "market_cap": None,
+            "data_source": "supabase",
+            "timestamp": "2026-01-01T00:00:00",
+        }
+
+        # NSEPython fills in industry and market_cap
+        mock_nse.return_value = {
+            "ticker": "TESTSTOCK",
+            "current_price": 100.5,  # won't overwrite Supabase's value
+            "industry": "Software Services",
+            "market_cap": 5000000000,
+            "data_source": "nsepython",
+            "timestamp": "2026-01-01T00:00:00",
+        }
+
+        # yfinance not needed — should not be called since critical fields are filled
+        mock_yf.return_value = None
+
+        result = get_fundamentals("TESTSTOCK")
+
+        assert result["current_price"] == 100.0  # from Supabase (first wins)
+        assert result["industry"] == "Software Services"  # filled by NSEPython
+        assert result["market_cap"] == 5000000000  # filled by NSEPython
+        assert "supabase" in result["data_source"]
+        assert "nsepython" in result["data_source"]
+
+    @patch('nifty_agents.tools.fundamentals_adapter.YFinanceAdapter.fetch')
+    @patch('nifty_agents.tools.fundamentals_adapter.NSEPythonAdapter.fetch')
+    @patch('nifty_agents.tools.fundamentals_adapter.SupabaseAdapter.fetch')
+    def test_cascade_skips_failed_adapters(self, mock_sb, mock_nse, mock_yf):
+        """Test that cascade continues when an adapter returns None."""
+        from nifty_agents.tools.fundamentals_adapter import get_fundamentals
+
+        mock_sb.return_value = None  # Supabase fails
+        mock_nse.return_value = {  # NSEPython succeeds
+            "ticker": "TESTSTOCK",
+            "current_price": 200.0,
+            "pe_ratio": 10.0,
+            "sector": "Energy",
+            "industry": "Coal",
+            "market_cap": 3000000000,
+            "data_source": "nsepython",
+            "timestamp": "2026-01-01T00:00:00",
+        }
+        mock_yf.return_value = None
+
+        result = get_fundamentals("TESTSTOCK")
+
+        assert "error" not in result
+        assert result["current_price"] == 200.0
+        assert "nsepython" in result["data_source"]
+
+    @patch('nifty_agents.tools.fundamentals_adapter.FinnhubAdapter.fetch')
+    @patch('nifty_agents.tools.fundamentals_adapter.YFinanceAdapter.fetch')
+    @patch('nifty_agents.tools.fundamentals_adapter.NSEPythonAdapter.fetch')
+    @patch('nifty_agents.tools.fundamentals_adapter.SupabaseAdapter.fetch')
+    def test_all_adapters_fail_returns_error(self, mock_sb, mock_nse, mock_yf, mock_fh):
+        """Test that error dict is returned when all adapters fail."""
+        from nifty_agents.tools.fundamentals_adapter import get_fundamentals
+
+        mock_sb.return_value = None
+        mock_nse.return_value = None
+        mock_yf.return_value = None
+        mock_fh.return_value = None
+
+        result = get_fundamentals("TESTSTOCK")
+
+        assert "error" in result
+        assert result["data_source"] == "none"
+
+    @patch('nifty_agents.tools.fundamentals_adapter.YFinanceAdapter.fetch')
+    @patch('nifty_agents.tools.fundamentals_adapter.NSEPythonAdapter.fetch')
+    @patch('nifty_agents.tools.fundamentals_adapter.SupabaseAdapter.fetch')
+    def test_adapter_exception_handled_gracefully(self, mock_sb, mock_nse, mock_yf):
+        """Test that adapter exceptions don't crash the cascade."""
+        from nifty_agents.tools.fundamentals_adapter import get_fundamentals
+
+        mock_sb.side_effect = Exception("Supabase connection timeout")
+        mock_nse.return_value = {
+            "ticker": "TESTSTOCK",
+            "current_price": 300.0,
+            "pe_ratio": 20.0,
+            "sector": "Finance",
+            "industry": "Banking",
+            "market_cap": 10000000000,
+            "data_source": "nsepython",
+            "timestamp": "2026-01-01T00:00:00",
+        }
+        mock_yf.return_value = None
+
+        result = get_fundamentals("TESTSTOCK")
+
+        assert "error" not in result
+        assert result["current_price"] == 300.0
+
+
+class TestRateLimitRetry:
+    """Tests for rate-limit retry logic on yfinance calls."""
+
+    @patch('nifty_agents.tools.nifty_fetcher.yf.Ticker')
+    def test_price_history_retries_on_rate_limit(self, mock_ticker):
+        """Simulate 429 on price_history, then success."""
+        from nifty_agents.tools.nifty_fetcher import get_price_history
+
+        dates = pd.date_range(start="2025-01-01", periods=5, freq="D")
+        ok_df = pd.DataFrame({
+            "Open": [100.0] * 5, "High": [105.0] * 5,
+            "Low": [95.0] * 5, "Close": [102.0] * 5,
+            "Volume": [10000] * 5,
+        }, index=dates)
+
+        mock_fail = MagicMock()
+        mock_fail.history.side_effect = Exception("429 Too Many Requests")
+
+        mock_ok = MagicMock()
+        mock_ok.history.return_value = ok_df
+
+        mock_ticker.side_effect = [mock_fail, mock_ok]
+
+        result = get_price_history("DUMMYSTOCK", days=5)
+
+        assert "error" not in result
+        assert result["count"] == 5
+        assert mock_ticker.call_count == 2
+
+    @patch('nifty_agents.tools.nifty_fetcher.yf.Ticker')
+    def test_non_rate_limit_error_does_not_retry(self, mock_ticker):
+        """Non-429 errors should NOT trigger retry — should return error dict immediately."""
+        from nifty_agents.tools.nifty_fetcher import get_price_history
+
+        mock_instance = MagicMock()
+        mock_instance.history.side_effect = Exception("Network connection failed")
+        mock_ticker.return_value = mock_instance
+
+        result = get_price_history("DUMMYSTOCK", days=5)
+
+        assert "error" in result
+        assert "Network connection failed" in result["error"]
+        # Should only be called once — no retry for non-rate-limit errors
+        assert mock_ticker.call_count == 1

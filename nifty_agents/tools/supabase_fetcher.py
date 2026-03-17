@@ -602,13 +602,13 @@ INDEX_SYMBOLS = {
 
 
 @retry(
-    stop=stop_after_attempt(4),
-    wait=wait_exponential(multiplier=2, min=3, max=30),
+    stop=stop_after_attempt(5),
+    wait=wait_exponential(multiplier=2, min=5, max=60),
     retry=retry_if_exception_type(_YFRateLimitError),
     reraise=True,
     before_sleep=lambda rs: logger.warning(
         f"Rate limited on index data, retrying in {rs.next_action.sleep:.0f}s "
-        f"(attempt {rs.attempt_number}/4)"
+        f"(attempt {rs.attempt_number}/5)"
     ),
 )
 def get_index_weekly_data(
