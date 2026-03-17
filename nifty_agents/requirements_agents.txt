@@ -30,6 +30,12 @@ pytest>=7.4.0
 pytest-asyncio>=0.21.0
 httpx>=0.25.0  # For FastAPI testing
 
+# Finnhub (optional fallback for fundamentals adapter)
+finnhub-python>=2.4.0
+
+# Retry logic for rate-limited APIs
+tenacity>=8.2.0
+
 # Utilities
 python-dotenv>=1.0.0
 requests>=2.31.0

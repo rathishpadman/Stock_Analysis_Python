@@ -318,7 +318,7 @@ class TestFundamentalsAdapter:
             "timestamp": "2026-01-01T00:00:00",
         }
 
-        # yfinance not needed — should not be called since critical fields are filled
+        # yfinance returns None in this test
         mock_yf.return_value = None
 
         result = get_fundamentals("TESTSTOCK")
@@ -328,6 +328,87 @@ class TestFundamentalsAdapter:
         assert result["market_cap"] == 5000000000  # filled by NSEPython
         assert "supabase" in result["data_source"]
         assert "nsepython" in result["data_source"]
+
+    @patch('nifty_agents.tools.fundamentals_adapter.FinnhubAdapter.fetch')
+    @patch('nifty_agents.tools.fundamentals_adapter.YFinanceAdapter.fetch')
+    @patch('nifty_agents.tools.fundamentals_adapter.NSEPythonAdapter.fetch')
+    @patch('nifty_agents.tools.fundamentals_adapter.SupabaseAdapter.fetch')
+    def test_cascade_does_not_stop_early_when_basic_fields_filled(self, mock_sb, mock_nse, mock_yf, mock_fh):
+        """CRITICAL: Cascade must NOT stop early when basic fields are filled.
+        yfinance/Finnhub must still run to contribute deep fundamentals
+        (margins, debt_to_equity, ROE, dividends, beta).
+        This test prevents regression of the early-stop bug."""
+        from nifty_agents.tools.fundamentals_adapter import get_fundamentals
+
+        # Supabase fills all basic fields (price, PE, sector, industry, market_cap)
+        mock_sb.return_value = {
+            "ticker": "COALINDIA",
+            "current_price": 400.0,
+            "pe_ratio": 8.5,
+            "sector": "Energy",
+            "industry": "Coal",
+            "market_cap": 250000000000,
+            "roe": 0.45,
+            "profit_margin": None,
+            "operating_margin": None,
+            "debt_to_equity": None,
+            "dividend_yield": None,
+            "beta": None,
+            "data_source": "supabase",
+            "timestamp": "2026-01-01T00:00:00",
+        }
+
+        # NSEPython also fills basic fields (all already filled, so minimal merge)
+        mock_nse.return_value = {
+            "ticker": "COALINDIA",
+            "current_price": 401.0,
+            "sector": "Energy",
+            "industry": "Coal",
+            "market_cap": 250000000000,
+            "data_source": "nsepython",
+            "timestamp": "2026-01-01T00:00:00",
+        }
+
+        # yfinance provides deep fundamentals — MUST be reached
+        mock_yf.return_value = {
+            "ticker": "COALINDIA",
+            "profit_margin": 0.22,
+            "operating_margin": 0.30,
+            "gross_margin": 0.55,
+            "debt_to_equity": 12.5,
+            "dividend_yield": 0.06,
+            "beta": 0.8,
+            "current_ratio": 2.1,
+            "roa": 0.18,
+            "data_source": "yfinance",
+            "timestamp": "2026-01-01T00:00:00",
+        }
+
+        mock_fh.return_value = None  # Finnhub not needed in this test
+
+        result = get_fundamentals("COALINDIA")
+
+        # Basic fields from Supabase (first source wins)
+        assert result["current_price"] == 400.0
+        assert result["pe_ratio"] == 8.5
+        assert result["roe"] == 0.45
+
+        # Deep fundamentals from yfinance — MUST be present (the whole point of this fix)
+        assert result["profit_margin"] == 0.22, "profit_margin should come from yfinance"
+        assert result["operating_margin"] == 0.30, "operating_margin should come from yfinance"
+        assert result["debt_to_equity"] == 12.5, "debt_to_equity should come from yfinance"
+        assert result["dividend_yield"] == 0.06, "dividend_yield should come from yfinance"
+        assert result["beta"] == 0.8, "beta should come from yfinance"
+        assert result["current_ratio"] == 2.1, "current_ratio should come from yfinance"
+
+        # All three adapters should have been called
+        mock_sb.assert_called_once()
+        mock_nse.assert_called_once()
+        mock_yf.assert_called_once()
+
+        # All contributing sources should appear in data_source
+        assert "supabase" in result["data_source"]
+        assert "yfinance" in result["data_source"]
 
     @patch('nifty_agents.tools.fundamentals_adapter.YFinanceAdapter.fetch')
     @patch('nifty_agents.tools.fundamentals_adapter.NSEPythonAdapter.fetch')

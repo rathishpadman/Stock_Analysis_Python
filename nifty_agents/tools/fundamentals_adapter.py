@@ -449,10 +449,10 @@ def get_fundamentals(ticker: str) -> Dict[str, Any]:
             if merged:
                 sources_used.append(adapter.name)
 
-        # If we have all critical fields, stop early
-        critical = ("current_price", "pe_ratio", "sector", "industry", "market_cap")
-        if base_result and all(base_result.get(k) is not None for k in critical):
-            break
+        # NOTE: We intentionally do NOT stop early. Even if basic fields
+        # (price, PE, sector) are filled by Supabase/nsepython, we continue
+        # the cascade so yfinance/Finnhub can contribute deep fundamentals
+        # like margins, debt_to_equity, ROE, ROCE, dividends, beta, etc.
 
     if base_result:
         base_result["data_source"] = ",".join(sources_used)

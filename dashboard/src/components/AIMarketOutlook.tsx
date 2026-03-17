@@ -32,12 +32,23 @@ function safeStr(val: unknown, fallback: string = 'N/A'): string | number {
     if (val === null || val === undefined) return fallback;
     if (typeof val === 'string' || typeof val === 'number') return val;
     if (typeof val === 'object') {
+        if (Array.isArray(val)) return val.map(v => safeStr(v, '')).join(', ') || fallback;
         // LLM sometimes returns {current: "...", score: N, ...} instead of a plain string
         const obj = val as Record<string, unknown>;
-        if ('current' in obj && (typeof obj.current === 'string' || typeof obj.current === 'number')) return obj.current;
-        if ('value' in obj && (typeof obj.value === 'string' || typeof obj.value === 'number')) return obj.value;
-        if ('label' in obj && (typeof obj.label === 'string' || typeof obj.label === 'number')) return obj.label;
-        return JSON.stringify(val);
+        // Try common summary keys in priority order
+        const summaryKeys = ['current', 'value', 'label', 'verdict', 'assessment',
+            'outlook', 'signal', 'summary', 'stance', 'phase', 'status'];
+        for (const key of summaryKeys) {
+            if (key in obj && (typeof obj[key] === 'string' || typeof obj[key] === 'number')) {
+                return obj[key] as string | number;
+            }
+        }
+        // If object has only one string/number value, use it
+        const vals = Object.values(obj).filter(v => typeof v === 'string' || typeof v === 'number');
+        if (vals.length === 1) return vals[0] as string | number;
+        // Last resort: stringify (truncated for display)
+        const s = JSON.stringify(val);
+        return s.length > 60 ? s.slice(0, 57) + '...' : s;
     }
     return String(val);
 }
@@ -856,13 +867,14 @@ function MonthlyAnalysisView({ data }: { data: MonthlyAnalysis }) {
                             />
                             <StatCard
                                 label="Valuation"
-                                value={agents.valuations?.market_valuation || 'N/A'}
-                                subValue={agents.valuations?.pe_percentile ? `PE Perc: ${agents.valuations.pe_percentile}` : undefined}
+                                value={agents.valuations?.valuation_advice || agents.valuations?.market_valuation || 'N/A'}
+                                subValue={agents.valuations?.pe_percentile ? `PE Perc: ${safeStr(agents.valuations.pe_percentile)}` : undefined}
                                 icon={BarChart2}
                             />
                             <StatCard
                                 label="FII Flow"
-                                value={agents.fund_flows?.fii_stance || 'N/A'}
+                                value={agents.fund_flows?.fii_stance || agents.fund_flows?.flow_outlook || 'N/A'}
+                                subValue={agents.fund_flows?.institutional_consensus ? `Consensus: ${safeStr(agents.fund_flows.institutional_consensus)}` : undefined}
                                 icon={DollarSign}
                             />
                             <StatCard
