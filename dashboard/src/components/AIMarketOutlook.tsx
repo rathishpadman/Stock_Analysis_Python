@@ -1556,19 +1556,16 @@ export default function AIMarketOutlook({ type, ticker, sector }: AIMarketOutloo
 
             {/* Loading state */}
             {loading && !data && (
-                <div className="p-8 flex flex-col items-center justify-center text-gray-500">
-                    <Loader2 className="w-8 h-8 animate-spin mb-2" />
-                    <p className="text-sm">Running AI analysis...</p>
-                    <p className="text-xs text-gray-400 mt-1">This may take 30-60 seconds</p>
+                <div className="px-4 py-3 flex items-center justify-center gap-2 text-gray-500 border-t border-gray-200 dark:border-gray-800">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span className="text-sm">Running AI analysis... (30-60s)</span>
                 </div>
             )}
 
-            {/* Empty state */}
+            {/* Empty state — compact inline hint */}
             {!loading && !data && !error && (
-                <div className="p-8 text-center text-gray-500">
-                    <Cpu className="w-8 h-8 mx-auto mb-2 text-gray-400" />
-                    <p className="text-sm">Click &quot;Generate&quot; to run AI analysis</p>
-                    <p className="text-xs text-gray-400 mt-1">Multiple specialized agents will analyze the market</p>
+                <div className="px-4 py-2 text-center text-xs text-gray-500 border-t border-gray-200 dark:border-gray-800">
+                    Click &quot;Generate&quot; to run AI analysis
                 </div>
             )}
         </div>
