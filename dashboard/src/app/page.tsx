@@ -363,7 +363,7 @@ export default function DashboardPage() {
   }, [sidebarData.length]);
 
   const handleExportExcel = async () => {
-    const XLSX = (await import('xlsx')).default;
+    const XLSX = await import('xlsx');
     const wb = XLSX.utils.book_new();
 
     // Daily sheet — all fields
