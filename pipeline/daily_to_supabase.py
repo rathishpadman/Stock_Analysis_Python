@@ -401,7 +401,40 @@ def run_daily_pipeline(limit: int = None, dry_run: bool = False):
         except Exception as e:
             logger.warning(f"Could not compute sector metrics: {e}")
 
-        # 1d. Compute derived valuation ratios
+        # 1d. Fill ROE/ROA from metadata if missing (yfinance stores as 0-1 decimals)
+        try:
+            roe_col = merged_final.get("ROE TTM %")
+            roe_meta = merged_final.get("returnOnEquity", merged_final.get("returnOnEquity_meta"))
+            if roe_col is not None and roe_meta is not None:
+                roe_existing = pd.to_numeric(roe_col, errors="coerce")
+                roe_from_meta = pd.to_numeric(roe_meta, errors="coerce") * 100  # 0-1 -> %
+                merged_final["ROE TTM %"] = roe_existing.combine_first(roe_from_meta)
+
+            roa_col = merged_final.get("ROA %")
+            roa_meta = merged_final.get("returnOnAssets", merged_final.get("returnOnAssets_meta"))
+            if roa_col is not None and roa_meta is not None:
+                roa_existing = pd.to_numeric(roa_col, errors="coerce")
+                roa_from_meta = pd.to_numeric(roa_meta, errors="coerce") * 100
+                merged_final["ROA %"] = roa_existing.combine_first(roa_from_meta)
+
+            # Compute ROE from Net Income / (Market Cap / P/B) if still missing
+            roe_series = pd.to_numeric(merged_final.get("ROE TTM %"), errors="coerce")
+            ni = pd.to_numeric(merged_final.get("Net Income TTM (INR Cr)"), errors="coerce")
+            mcap = pd.to_numeric(merged_final.get("Market Cap (INR Cr)"), errors="coerce")
+            pb = pd.to_numeric(merged_final.get("P/B"), errors="coerce")
+            book_val = mcap / pb.replace(0, np.nan)
+            derived_roe = (ni / book_val * 100).where(book_val > 0)
+            if roe_series is not None:
+                merged_final["ROE TTM %"] = roe_series.combine_first(derived_roe)
+            else:
+                merged_final["ROE TTM %"] = derived_roe
+
+            filled_roe = pd.to_numeric(merged_final["ROE TTM %"], errors="coerce").notna().sum()
+            logger.info(f"ROE/ROA enriched: {filled_roe}/{len(merged_final)} stocks have ROE")
+        except Exception as e:
+            logger.warning(f"Could not enrich ROE/ROA: {e}")
+
+        # 1e. Compute derived valuation ratios
         try:
             pe = pd.to_numeric(merged_final.get("P/E (TTM)"), errors="coerce")
             eps_g = pd.to_numeric(merged_final.get("EPS Growth YoY %"), errors="coerce")
@@ -435,7 +468,7 @@ def run_daily_pipeline(limit: int = None, dry_run: bool = False):
         except Exception as e:
             logger.warning(f"Could not compute derived ratios: {e}")
 
-        # 1e. Piotroski F-Score (9-point scoring)
+        # 1f. Piotroski F-Score (9-point scoring)
         try:
             def _piotroski_row(r):
                 score = 0
@@ -473,7 +506,7 @@ def run_daily_pipeline(limit: int = None, dry_run: bool = False):
         except Exception as e:
             logger.warning(f"Could not compute Piotroski F-Score: {e}")
 
-        # 1f. Altman Z-Score (manufacturing variant, adapted for Indian equities)
+        # 1g. Altman Z-Score (manufacturing variant, adapted for Indian equities)
         try:
             def _altman_row(r):
                 mcap_v = pd.to_numeric(r.get("Market Cap (INR Cr)"), errors="coerce") if isinstance(r.get("Market Cap (INR Cr)"), (int, float, str)) else np.nan
@@ -514,7 +547,7 @@ def run_daily_pipeline(limit: int = None, dry_run: bool = False):
         except Exception as e:
             logger.warning(f"Could not compute Altman Z-Score: {e}")
 
-        # 1g. Economic Moat Score (composite: high margins + low D/E + high ROE + consistency)
+        # 1h. Economic Moat Score (composite: high margins + low D/E + high ROE + consistency)
         try:
             def _moat_row(r):
                 scores = []
@@ -549,7 +582,7 @@ def run_daily_pipeline(limit: int = None, dry_run: bool = False):
         except Exception as e:
             logger.warning(f"Could not compute Economic Moat Score: {e}")
 
-        # 1h. Quality Score (post-merge — uses metadata margins/ROE)
+        # 1i. Quality Score (post-merge — uses metadata margins/ROE)
         try:
             def _quality_row(r):
                 def _n(val, lo, hi, higher=True):

@@ -358,7 +358,7 @@ def calculate_additional_metrics(df: pd.DataFrame) -> pd.DataFrame:
     work["Free Float %"] = (float_shares / shares_out.replace(0, np.nan)) * 100
     work["Shares Outstanding"] = shares_out
     work["EPS TTM"] = trailing_eps
-    work["Dividend Yield %"] = _num("dividendYield") * 100
+    work["Dividend Yield %"] = _num("dividendYield")  # yfinance returns as % already (e.g. 1.3 = 1.3%)
     work["Currency"] = work.get("currency", "INR").fillna("INR")
     work["Exchange"] = work.get("exchange", "NSI").fillna("NSI")
     work["ISIN"] = work.get("isin", "").fillna("")
