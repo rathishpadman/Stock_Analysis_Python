@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { ArrowUpDown, ArrowUp, ArrowDown, Filter, X, Trophy, Search } from 'lucide-react';
+import { calculatePerformanceRank } from '@/lib/ranking';
 
 interface MonthlyData {
     ticker: string;
@@ -32,59 +33,14 @@ interface MonthlyData {
 interface MonthlyReportTableProps {
     data: MonthlyData[];
     onSelectStock: (ticker: string) => void;
+    consistentTickers?: Set<string>;
 }
 
 type SortField = 'ticker' | 'monthly_close' | 'monthly_return_pct' | 'return_3m' | 'return_6m' | 'return_12m' | 'ytd_return_pct' | 'performance_rank';
 type SortDirection = 'asc' | 'desc';
 type TrendFilter = 'ALL' | 'UP' | 'DOWN' | 'SIDEWAYS';
 
-// Calculate performance rank using industry-standard metrics
-// Risk-adjusted return approach similar to Sharpe-like scoring
-function calculatePerformanceRank(data: MonthlyData[]): MonthlyData[] {
-    const scored = data.map(stock => {
-        // Performance scoring factors
-        const return3m = stock.return_3m || 0;
-        const return6m = stock.return_6m || 0;
-        const return12m = stock.return_12m || 0;
-        const ytdReturn = stock.ytd_return_pct || 0;
-        const positiveMonths = stock.positive_months_12m || 6;
-        const avgMonthlyReturn = stock.avg_monthly_return_12m || 0;
-        const bestMonth = stock.best_month_return_12m || 0;
-        const worstMonth = stock.worst_month_return_12m || 0;
-
-        // Consistency Score (positive months ratio) - 25% weight
-        const consistencyScore = (positiveMonths / 12) * 100 * 0.25;
-
-        // Medium-term momentum (6M return) - 25% weight
-        const mediumTermScore = return6m * 0.25;
-
-        // Long-term momentum (12M return) - 25% weight
-        const longTermScore = return12m * 0.25;
-
-        // Risk-adjusted score (drawdown consideration) - 25% weight
-        // Lower drawdown (worst month) is better
-        const drawdownPenalty = Math.abs(worstMonth || 0);
-        const riskScore = (avgMonthlyReturn - (drawdownPenalty * 0.5)) * 0.25;
-
-        const totalScore = consistencyScore + mediumTermScore + longTermScore + riskScore;
-
-        return {
-            ...stock,
-            _performanceScore: totalScore
-        };
-    });
-
-    // Sort by performance score and assign ranks
-    const sorted = [...scored].sort((a, b) => (b._performanceScore || 0) - (a._performanceScore || 0));
-    
-    return sorted.map((stock, index) => ({
-        ...stock,
-        performance_rank: index + 1,
-        _performanceScore: undefined
-    }));
-}
-
-export default function MonthlyReportTableV2({ data, onSelectStock }: MonthlyReportTableProps) {
+export default function MonthlyReportTableV2({ data, onSelectStock, consistentTickers }: MonthlyReportTableProps) {
     const [sortField, setSortField] = useState<SortField>('performance_rank');
     const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
     const [trendFilter, setTrendFilter] = useState<TrendFilter>('ALL');
@@ -405,7 +361,12 @@ export default function MonthlyReportTableV2({ data, onSelectStock }: MonthlyRep
                                         #{row.performance_rank}
                                     </span>
                                 </td>
-                                <td className="p-3 font-medium text-white">{row.ticker}</td>
+                                <td className="p-3 font-medium text-white">
+                                    <span className="inline-flex items-center gap-1">
+                                        {consistentTickers?.has(row.ticker) && <span className="text-orange-400" title="Consistent Top 10">&#x1F525;</span>}
+                                        {row.ticker}
+                                    </span>
+                                </td>
                                 <td className="p-3">
                                     <span className={`px-2 py-0.5 rounded text-xs ${
                                         row.monthly_trend === 'UP' ? 'bg-green-500/20 text-green-400' :

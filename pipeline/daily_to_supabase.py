@@ -678,6 +678,31 @@ def run_daily_pipeline(limit: int = None, dry_run: bool = False):
             logger.info("--- Dry run complete, skipping upload ---")
         else:
             upload_to_supabase(payload)
+
+            # 5. Append to score_history for consistency tracking
+            try:
+                supabase = get_supabase_client()
+                history_rows = []
+                for p in payload:
+                    if p.get("overall_score") is not None:
+                        history_rows.append({
+                            "ticker": p["ticker"],
+                            "period_type": "daily",
+                            "period_date": p["date"],
+                            "overall_score": p.get("overall_score"),
+                            "score_fundamental": p.get("score_fundamental"),
+                            "score_technical": p.get("score_technical"),
+                            "score_risk": p.get("score_risk"),
+                            "close_price": p.get("price_last"),
+                            "sector": p.get("sector"),
+                        })
+                if history_rows:
+                    supabase.table("score_history").upsert(
+                        history_rows, on_conflict="ticker,period_type,period_date"
+                    ).execute()
+                    logger.info(f"Appended {len(history_rows)} rows to score_history")
+            except Exception as e:
+                logger.warning(f"Could not append to score_history: {e}")
     else:
         logger.error("No stocks processed successfully!")
 

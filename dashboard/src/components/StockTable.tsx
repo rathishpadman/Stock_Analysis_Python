@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { ALL_FIELDS } from '@/lib/constants';
-import { ChevronUp, ChevronDown } from 'lucide-react';
+import { ChevronUp, ChevronDown, Flame } from 'lucide-react';
 import AnalyzeButton from './AnalyzeButton';
 
 interface Stock {
@@ -13,11 +13,12 @@ interface StockTableProps {
     stocks: Stock[];
     visibleColumns: string[];
     onSelectStock?: (ticker: string) => void;
-    onRequestAnalysis?: (ticker: string) => void;  // New: AI Analysis callback
+    onRequestAnalysis?: (ticker: string) => void;
     timeframe?: '1d' | '1w' | '1m';
+    consistentTickers?: Set<string>;
 }
 
-export default function StockTable({ stocks, visibleColumns, onSelectStock, onRequestAnalysis, timeframe = '1d' }: StockTableProps) {
+export default function StockTable({ stocks, visibleColumns, onSelectStock, onRequestAnalysis, timeframe = '1d', consistentTickers }: StockTableProps) {
     const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
     const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
 
@@ -97,7 +98,7 @@ export default function StockTable({ stocks, visibleColumns, onSelectStock, onRe
                             >
                                 {columns.map(col => (
                                     <td key={col.id} className="whitespace-nowrap px-6 py-4 text-sm font-medium">
-                                        {renderCell(stock, col.id, timeframe)}
+                                        {renderCell(stock, col.id, timeframe, consistentTickers)}
                                     </td>
                                 ))}
                                 {/* AI Analysis Button */}
@@ -170,7 +171,7 @@ export default function StockTable({ stocks, visibleColumns, onSelectStock, onRe
     );
 }
 
-function renderCell(stock: any, colId: string, timeframe: '1d' | '1w' | '1m' = '1d') {
+function renderCell(stock: any, colId: string, timeframe: '1d' | '1w' | '1m' = '1d', consistentTickers?: Set<string>) {
     // Dynamic override for Return column
     let lookupId = colId;
     if (colId === 'return_1d') {
@@ -179,7 +180,12 @@ function renderCell(stock: any, colId: string, timeframe: '1d' | '1w' | '1m' = '
     }
     const value = stock[lookupId];
 
-    if (colId === 'ticker') return <span className="font-bold text-white tracking-tight group-hover:text-blue-400 transition-colors">{value}</span>;
+    if (colId === 'ticker') return (
+        <span className="font-bold text-white tracking-tight group-hover:text-blue-400 transition-colors inline-flex items-center gap-1">
+            {consistentTickers?.has(value) && <span title="Consistent Top 10"><Flame className="w-3.5 h-3.5 text-orange-400 shrink-0" /></span>}
+            {value}
+        </span>
+    );
     if (colId === 'company_name') return <span className="text-slate-300 group-hover:text-white transition-colors">{value}</span>;
 
     if (colId === 'overall_score') {

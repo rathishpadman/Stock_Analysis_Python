@@ -17,6 +17,7 @@ import { supabase } from '@/lib/supabase';
 import StockTable from '@/components/StockTable';
 import AIAnalysisModal from '@/components/AIAnalysisModal';
 import AIMarketOutlook from '@/components/AIMarketOutlook';
+import ConsistencyTracker from '@/components/ConsistencyTracker';
 import DateRangeSelector, { rangeToDays } from '@/components/DateRangeSelector';
 
 type ReportView = 'daily' | 'weekly' | 'monthly' | 'seasonality';
@@ -61,6 +62,11 @@ export default function DashboardPage() {
   const [showMarketMovers, setShowMarketMovers] = useState(false);
   const [showTechnicalSignals, setShowTechnicalSignals] = useState(false);
   const [showMissingStocks, setShowMissingStocks] = useState(false);
+
+  // Consistency tracker state
+  const [dailyConsistentTickers, setDailyConsistentTickers] = useState<Set<string>>(new Set());
+  const [weeklyConsistentTickers, setWeeklyConsistentTickers] = useState<Set<string>>(new Set());
+  const [monthlyConsistentTickers, setMonthlyConsistentTickers] = useState<Set<string>>(new Set());
 
   // Chart date range state (for detail view)
   const [chartRange, setChartRange] = useState('3m');
@@ -693,6 +699,11 @@ export default function DashboardPage() {
 
               {reportView === 'daily' ? (
                 <div className="space-y-6">
+                  <ConsistencyTracker
+                    type="daily"
+                    onSelectStock={(t) => handleStockSelect(t, 'daily')}
+                    onConsistentTickers={setDailyConsistentTickers}
+                  />
                   {/* Main Stock Table - Landing Focus */}
                   <StockTable
                     stocks={getFilteredData}
@@ -703,6 +714,7 @@ export default function DashboardPage() {
                       setShowAiModal(true);
                     }}
                     timeframe={timeframe}
+                    consistentTickers={dailyConsistentTickers}
                   />
 
                   {/* Collapsible: Market Movers */}
@@ -753,18 +765,30 @@ export default function DashboardPage() {
                 </div>
               ) : reportView === 'weekly' ? (
                 <div className="space-y-6">
+                  <ConsistencyTracker
+                    type="weekly"
+                    onSelectStock={(t) => handleStockSelect(t, 'weekly')}
+                    onConsistentTickers={setWeeklyConsistentTickers}
+                  />
                   <AIMarketOutlook type="weekly" />
                   <WeeklyReportTableV2
                     data={getFilteredData}
                     onSelectStock={(t) => handleStockSelect(t, 'weekly')}
+                    consistentTickers={weeklyConsistentTickers}
                   />
                 </div>
               ) : reportView === 'monthly' ? (
                 <div className="space-y-6">
+                  <ConsistencyTracker
+                    type="monthly"
+                    onSelectStock={(t) => handleStockSelect(t, 'monthly')}
+                    onConsistentTickers={setMonthlyConsistentTickers}
+                  />
                   <AIMarketOutlook type="monthly" />
                   <MonthlyReportTableV2
                     data={getFilteredData}
                     onSelectStock={(t) => handleStockSelect(t, 'monthly')}
+                    consistentTickers={monthlyConsistentTickers}
                   />
                 </div>
               ) : (

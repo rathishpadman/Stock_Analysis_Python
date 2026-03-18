@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { ArrowUpDown, ArrowUp, ArrowDown, Filter, X, Trophy, Search } from 'lucide-react';
+import { calculateMomentumRank } from '@/lib/ranking';
 
 interface WeeklyData {
     ticker: string;
@@ -29,67 +30,14 @@ interface WeeklyData {
 interface WeeklyReportTableProps {
     data: WeeklyData[];
     onSelectStock: (ticker: string) => void;
+    consistentTickers?: Set<string>;
 }
 
 type SortField = 'ticker' | 'weekly_close' | 'weekly_return_pct' | 'return_4w' | 'return_13w' | 'weekly_rsi14' | 'momentum_rank';
 type SortDirection = 'asc' | 'desc';
 type TrendFilter = 'ALL' | 'UP' | 'DOWN' | 'SIDEWAYS';
 
-// Calculate momentum rank based on market-accepted business logic
-// Momentum Score = (Weight * 4W Return) + (Weight * 13W Return) + RSI adjustment
-function calculateMomentumRank(data: WeeklyData[]): WeeklyData[] {
-    const scored = data.map(stock => {
-        // Momentum scoring factors (industry standard weights)
-        const return4w = stock.return_4w || 0;
-        const return13w = stock.return_13w || 0;
-        const rsi = stock.weekly_rsi14 || 50;
-        const volumeRatio = stock.weekly_volume_ratio || 1;
-
-        // Momentum Score Components:
-        // 1. Short-term momentum (4W return) - 30% weight
-        // 2. Medium-term momentum (13W return) - 40% weight  
-        // 3. RSI Zone bonus/penalty - 20% weight (optimal 40-60 zone)
-        // 4. Volume confirmation - 10% weight
-
-        const shortTermScore = return4w * 0.30;
-        const mediumTermScore = return13w * 0.40;
-        
-        // RSI adjustment: penalize overbought (>70) and oversold (<30)
-        let rsiScore = 0;
-        if (rsi >= 40 && rsi <= 60) {
-            rsiScore = 10; // Optimal zone bonus
-        } else if (rsi > 60 && rsi <= 70) {
-            rsiScore = 5; // Slightly overbought
-        } else if (rsi >= 30 && rsi < 40) {
-            rsiScore = 5; // Slightly oversold - potential bounce
-        } else if (rsi > 70) {
-            rsiScore = -5; // Overbought penalty
-        } else {
-            rsiScore = 0; // Deeply oversold - risky
-        }
-        
-        // Volume confirmation bonus
-        const volumeScore = volumeRatio > 1.2 ? 5 : volumeRatio > 1 ? 2 : 0;
-
-        const totalScore = shortTermScore + mediumTermScore + (rsiScore * 0.20) + (volumeScore * 0.10);
-
-        return {
-            ...stock,
-            _momentumScore: totalScore
-        };
-    });
-
-    // Sort by momentum score and assign ranks
-    const sorted = [...scored].sort((a, b) => (b._momentumScore || 0) - (a._momentumScore || 0));
-    
-    return sorted.map((stock, index) => ({
-        ...stock,
-        momentum_rank: index + 1,
-        _momentumScore: undefined // Remove internal score
-    }));
-}
-
-export default function WeeklyReportTable({ data, onSelectStock }: WeeklyReportTableProps) {
+export default function WeeklyReportTable({ data, onSelectStock, consistentTickers }: WeeklyReportTableProps) {
     const [sortField, setSortField] = useState<SortField>('momentum_rank');
     const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
     const [trendFilter, setTrendFilter] = useState<TrendFilter>('ALL');
@@ -421,7 +369,12 @@ export default function WeeklyReportTable({ data, onSelectStock }: WeeklyReportT
                                         #{row.momentum_rank}
                                     </span>
                                 </td>
-                                <td className="p-3 font-medium text-white">{row.ticker}</td>
+                                <td className="p-3 font-medium text-white">
+                                    <span className="inline-flex items-center gap-1">
+                                        {consistentTickers?.has(row.ticker) && <span className="text-orange-400" title="Consistent Top 10">&#x1F525;</span>}
+                                        {row.ticker}
+                                    </span>
+                                </td>
                                 <td className="p-3">
                                     <span className={`px-2 py-0.5 rounded text-xs ${
                                         row.weekly_trend === 'UP' ? 'bg-green-500/20 text-green-400' :
