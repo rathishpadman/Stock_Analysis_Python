@@ -98,7 +98,9 @@ def prepare_output_df(df: pd.DataFrame) -> pd.DataFrame:
         "EPS TTM", "ROE TTM %", "ROA %", "Debt/Equity", "Interest Coverage",
         "EPS Growth YoY %", "Revenue Growth YoY %", "Gross Profit Margin %",
         "Operating Profit Margin %", "Net Profit Margin %", "FCF Yield %", "PEG Ratio",
-        "Beta 1Y"
+        "Beta 1Y", "Beta 3Y",
+        # Risk metrics (from risk_stats)
+        "Volatility 30D %", "Volatility 90D %", "Max Drawdown 1Y %", "Sharpe 1Y", "Sortino 1Y",
     ]:
         out[col] = _pick_series(df, [col, f"{col}_meta"], default=np.nan)
 
@@ -146,17 +148,27 @@ def prepare_output_df(df: pd.DataFrame) -> pd.DataFrame:
     ]:
         out[col] = _pick_series(df, [col, f"{col}_meta"], default=np.nan)
 
+    # Computed metrics (from enrich_stock or daily_to_supabase enrichment)
+    for col in [
+        "Alpha 1Y %", "Sector P/E (Median)", "Sector Relative Strength 6M %",
+        "Quality Score", "Momentum Score", "Altman Z-Score", "Piotroski F-Score",
+        "Economic Moat Score",
+    ]:
+        out[col] = _pick_series(df, [col, f"{col}_meta"], default=np.nan)
+
     # Qualitative placeholders (still blank until filled by other modules)
     for col in [
         "Consensus Rating (1-5)", "Target Price", "Upside %", "# Analysts",
         "Recommendation", "Moat Notes", "Risk Notes", "Catalysts", "ESG Score",
         "Sector Leader Ticker", "Leader Gap on Metric", "Sector Tailwinds/Headwinds",
-        "Sector P/E (Median)", "Economic Moat Score", "Altman Z-Score", "Piotroski F-Score",
-        "Alpha 1Y %", "Sortino 1Y", "Sector Relative Strength 6M %", "Quality Score",
-        "Momentum Score", "News Sentiment Score", "Social Media Sentiment"
+        "News Sentiment Score", "Social Media Sentiment"
     ]:
         if col not in out.columns:
             out[col] = _pick_series(df, [col, f"{col}_meta"], default=np.nan)
+
+    # Support & Resistance pivot points (computed in daily_to_supabase from ATR)
+    for col in ["Pivot Point", "Support 1", "Support 2", "Resistance 1", "Resistance 2"]:
+        out[col] = _pick_series(df, [col], default=np.nan)
 
     # Shareholding (populated by daily_to_supabase from NSE API)
     out["Promoter Holding %"] = _pick_series(df, ["Promoter Holding %", "promoter_holding_pct"], default=np.nan)
@@ -595,6 +607,11 @@ def run_pipeline(template_path: str, out_path: str) -> None:
             "Alpha 1Y %": ["Alpha 1Y %", "alpha_1y"],
             "Sortino 1Y": ["Sortino 1Y", "sortino_1y"],
             "Sector Relative Strength 6M %": ["Sector Relative Strength 6M %","sector_rel_strength_6m"],
+            "Pivot Point": ["Pivot Point", "pivot_point"],
+            "Support 1": ["Support 1", "support_1"],
+            "Support 2": ["Support 2", "support_2"],
+            "Resistance 1": ["Resistance 1", "resistance_1"],
+            "Resistance 2": ["Resistance 2", "resistance_2"],
             "Quality Score": ["Quality Score", "quality_score"],
             "Momentum Score": ["Momentum Score", "momentum_score"],
             "News Sentiment Score": ["News Sentiment Score", "news_sentiment_score"],

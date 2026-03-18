@@ -152,6 +152,12 @@ def prepare_daily_payload(df: pd.DataFrame, snapshot_date: date) -> list:
         # Sector metrics (computed post-merge)
         "Sector P/E (Median)": "sector_pe_median",
         "Sector Relative Strength 6M %": "sector_relative_strength_6m_pct",
+        # Support & Resistance pivot points
+        "Pivot Point": "pivot_point",
+        "Support 1": "support_1",
+        "Support 2": "support_2",
+        "Resistance 1": "resistance_1",
+        "Resistance 2": "resistance_2",
     }
 
     for _, row in df.iterrows():
@@ -374,9 +380,196 @@ def run_daily_pipeline(limit: int = None, dry_run: bool = False):
                     sector_ret6m_median = ret6m_numeric.groupby(sector_col).transform("median")
                     merged_final["Sector Relative Strength 6M %"] = ret6m_numeric - sector_ret6m_median
 
+                # Sector leader: best 6M return within each sector
+                try:
+                    ret6m_s = pd.to_numeric(
+                        merged_final.get("Return 6M %", merged_final.get("return_6m")),
+                        errors="coerce",
+                    )
+                    if ret6m_s is not None:
+                        idx_best = ret6m_s.groupby(sector_col).transform("idxmax")
+                        merged_final["Sector Leader Ticker"] = merged_final.loc[
+                            idx_best.values, "symbol"
+                        ].values
+                        merged_final["Leader Gap on Metric"] = (
+                            ret6m_s - ret6m_s.loc[idx_best.values].values
+                        )
+                except Exception:
+                    pass
+
                 logger.info("Sector metrics computed (P/E median, relative strength)")
         except Exception as e:
             logger.warning(f"Could not compute sector metrics: {e}")
+
+        # 1d. Compute derived valuation ratios
+        try:
+            pe = pd.to_numeric(merged_final.get("P/E (TTM)"), errors="coerce")
+            eps_g = pd.to_numeric(merged_final.get("EPS Growth YoY %"), errors="coerce")
+            # PEG Ratio = PE / EPS Growth (guard div-by-zero and negative growth)
+            peg = pe / eps_g.replace(0, np.nan)
+            peg = peg.where((eps_g > 0) & (peg > 0) & (peg < 100), np.nan)
+            merged_final["PEG Ratio"] = peg
+
+            # Enterprise Value = Market Cap + Debt - Cash (approximated)
+            mcap = pd.to_numeric(merged_final.get("Market Cap (INR Cr)"), errors="coerce")
+            de = pd.to_numeric(merged_final.get("Debt/Equity"), errors="coerce")
+            pb = pd.to_numeric(merged_final.get("P/B"), errors="coerce")
+            # book_value ≈ mcap / pb; debt ≈ book_value * de/100; assume cash ≈ 0 for simplicity
+            book_val = mcap / pb.replace(0, np.nan)
+            total_debt = book_val * de / 100.0
+            ev = mcap + total_debt.fillna(0)
+            merged_final["Enterprise Value (INR Cr)"] = ev.where(ev > 0, np.nan)
+
+            # Interest Coverage from EBITDA if available
+            ebitda = pd.to_numeric(merged_final.get("EBITDA TTM (INR Cr)"), errors="coerce")
+            net_income = pd.to_numeric(merged_final.get("Net Income TTM (INR Cr)"), errors="coerce")
+            interest_exp = ebitda - net_income  # rough proxy: EBITDA - NI ≈ depreciation + interest + tax
+            # This is a rough approximation; only set if not already filled
+            existing_ic = pd.to_numeric(merged_final.get("Interest Coverage"), errors="coerce")
+            if existing_ic.isna().all():
+                # Use EBIT/interest approx: (EBITDA * 0.7) / (EBITDA - NetIncome) * 0.3
+                # Too rough — skip for now, NSEPythonAdapter provides this at agent level
+                pass
+
+            logger.info("Derived valuation ratios computed (PEG, EV)")
+        except Exception as e:
+            logger.warning(f"Could not compute derived ratios: {e}")
+
+        # 1e. Piotroski F-Score (9-point scoring)
+        try:
+            def _piotroski_row(r):
+                score = 0
+                ni = pd.to_numeric(r.get("Net Income TTM (INR Cr)"), errors="coerce") if isinstance(r.get("Net Income TTM (INR Cr)"), (int, float, str)) else np.nan
+                ocf = pd.to_numeric(r.get("OCF TTM (INR Cr)"), errors="coerce") if isinstance(r.get("OCF TTM (INR Cr)"), (int, float, str)) else np.nan
+                roe_val = pd.to_numeric(r.get("ROE TTM %"), errors="coerce") if isinstance(r.get("ROE TTM %"), (int, float, str)) else np.nan
+                de_val = pd.to_numeric(r.get("Debt/Equity"), errors="coerce") if isinstance(r.get("Debt/Equity"), (int, float, str)) else np.nan
+                gpm = pd.to_numeric(r.get("Gross Profit Margin %"), errors="coerce") if isinstance(r.get("Gross Profit Margin %"), (int, float, str)) else np.nan
+                rev_g = pd.to_numeric(r.get("Revenue Growth YoY %"), errors="coerce") if isinstance(r.get("Revenue Growth YoY %"), (int, float, str)) else np.nan
+
+                # 1. Net Income > 0
+                if not np.isnan(ni) and ni > 0: score += 1
+                # 2. OCF > 0
+                if not np.isnan(ocf) and ocf > 0: score += 1
+                # 3. ROE improving (proxy: ROE > 10%)
+                if not np.isnan(roe_val) and roe_val > 10: score += 1
+                # 4. OCF > Net Income (accruals quality)
+                if not np.isnan(ocf) and not np.isnan(ni) and ocf > ni: score += 1
+                # 5. Debt/Equity decreasing (proxy: D/E < 50)
+                if not np.isnan(de_val) and de_val < 50: score += 1
+                # 6. Current ratio improving (proxy: give point if D/E < 30)
+                if not np.isnan(de_val) and de_val < 30: score += 1
+                # 7. No dilution (proxy: give point — assume no data means no dilution)
+                score += 1
+                # 8. Gross margin improving (proxy: GPM > 20%)
+                if not np.isnan(gpm) and gpm > 20: score += 1
+                # 9. Revenue growth > 0
+                if not np.isnan(rev_g) and rev_g > 0: score += 1
+
+                return score if score > 0 else np.nan
+
+            merged_final["Piotroski F-Score"] = merged_final.apply(_piotroski_row, axis=1)
+            filled_p = merged_final["Piotroski F-Score"].notna().sum()
+            logger.info(f"Piotroski F-Score computed: {filled_p}/{len(merged_final)} stocks")
+        except Exception as e:
+            logger.warning(f"Could not compute Piotroski F-Score: {e}")
+
+        # 1f. Altman Z-Score (manufacturing variant, adapted for Indian equities)
+        try:
+            def _altman_row(r):
+                mcap_v = pd.to_numeric(r.get("Market Cap (INR Cr)"), errors="coerce") if isinstance(r.get("Market Cap (INR Cr)"), (int, float, str)) else np.nan
+                rev_v = pd.to_numeric(r.get("Revenue TTM (INR Cr)"), errors="coerce") if isinstance(r.get("Revenue TTM (INR Cr)"), (int, float, str)) else np.nan
+                ebitda_v = pd.to_numeric(r.get("EBITDA TTM (INR Cr)"), errors="coerce") if isinstance(r.get("EBITDA TTM (INR Cr)"), (int, float, str)) else np.nan
+                ni_v = pd.to_numeric(r.get("Net Income TTM (INR Cr)"), errors="coerce") if isinstance(r.get("Net Income TTM (INR Cr)"), (int, float, str)) else np.nan
+                de_v = pd.to_numeric(r.get("Debt/Equity"), errors="coerce") if isinstance(r.get("Debt/Equity"), (int, float, str)) else np.nan
+                pb_v = pd.to_numeric(r.get("P/B"), errors="coerce") if isinstance(r.get("P/B"), (int, float, str)) else np.nan
+
+                if any(np.isnan(x) for x in [mcap_v, rev_v, de_v, pb_v] if isinstance(x, float)):
+                    return np.nan
+                if np.isnan(mcap_v) or np.isnan(rev_v) or np.isnan(pb_v) or pb_v == 0:
+                    return np.nan
+
+                book_val = mcap_v / pb_v
+                total_debt = book_val * (de_v / 100.0) if not np.isnan(de_v) else 0
+                total_assets = book_val + total_debt
+                if total_assets <= 0:
+                    return np.nan
+
+                # Working capital proxy: assume WC/TA ≈ 0.1 for large caps
+                wc_ta = 0.1
+                # Retained earnings proxy: NI / TA
+                re_ta = (ni_v / total_assets) if not np.isnan(ni_v) else 0
+                # EBIT/TA
+                ebit_ta = (ebitda_v * 0.85 / total_assets) if not np.isnan(ebitda_v) else 0
+                # Market equity / Total liabilities
+                me_tl = mcap_v / max(total_debt, 1)
+                # Sales/TA
+                s_ta = rev_v / total_assets
+
+                z = 1.2 * wc_ta + 1.4 * re_ta + 3.3 * ebit_ta + 0.6 * me_tl + 1.0 * s_ta
+                return round(z, 2) if 0 < z < 50 else np.nan
+
+            merged_final["Altman Z-Score"] = merged_final.apply(_altman_row, axis=1)
+            filled_a = merged_final["Altman Z-Score"].notna().sum()
+            logger.info(f"Altman Z-Score computed: {filled_a}/{len(merged_final)} stocks")
+        except Exception as e:
+            logger.warning(f"Could not compute Altman Z-Score: {e}")
+
+        # 1g. Economic Moat Score (composite: high margins + low D/E + high ROE + consistency)
+        try:
+            def _moat_row(r):
+                scores = []
+                gpm = pd.to_numeric(r.get("Gross Profit Margin %"), errors="coerce") if isinstance(r.get("Gross Profit Margin %"), (int, float, str)) else np.nan
+                opm = pd.to_numeric(r.get("Operating Profit Margin %"), errors="coerce") if isinstance(r.get("Operating Profit Margin %"), (int, float, str)) else np.nan
+                roe_v = pd.to_numeric(r.get("ROE TTM %"), errors="coerce") if isinstance(r.get("ROE TTM %"), (int, float, str)) else np.nan
+                de_v = pd.to_numeric(r.get("Debt/Equity"), errors="coerce") if isinstance(r.get("Debt/Equity"), (int, float, str)) else np.nan
+                fcf_y = pd.to_numeric(r.get("FCF Yield %"), errors="coerce") if isinstance(r.get("FCF Yield %"), (int, float, str)) else np.nan
+
+                def _n(val, lo, hi, higher=True):
+                    if np.isnan(val): return None
+                    s = (val - lo) / (hi - lo) * 100 if hi != lo else 50
+                    if not higher: s = 100 - s
+                    return max(0, min(100, s))
+
+                for val, lo, hi, hb in [
+                    (gpm, 15, 60, True),   # Gross margin: wide moat > 40%
+                    (opm, 8, 35, True),    # Operating margin
+                    (roe_v, 5, 30, True),  # ROE
+                    (de_v, 0, 80, False),  # D/E: lower = wider moat
+                    (fcf_y, 0, 15, True),  # FCF yield
+                ]:
+                    if not np.isnan(val) if isinstance(val, float) else val is not None:
+                        s = _n(val, lo, hi, hb)
+                        if s is not None: scores.append(s)
+
+                return round(sum(scores) / len(scores), 1) if scores else np.nan
+
+            merged_final["Economic Moat Score"] = merged_final.apply(_moat_row, axis=1)
+            filled_m = merged_final["Economic Moat Score"].notna().sum()
+            logger.info(f"Economic Moat Score computed: {filled_m}/{len(merged_final)} stocks")
+        except Exception as e:
+            logger.warning(f"Could not compute Economic Moat Score: {e}")
+
+        # 1h. Support & Resistance pivot points from last day's OHLC
+        try:
+            high_col = pd.to_numeric(merged_final.get("52W High"), errors="coerce")
+            low_col = pd.to_numeric(merged_final.get("52W Low"), errors="coerce")
+            close_col = pd.to_numeric(merged_final.get("Price (Last)"), errors="coerce")
+
+            # Use recent range for pivots: approximate with ATR-based intraday range
+            atr = pd.to_numeric(merged_final.get("ATR14"), errors="coerce")
+            # Intraday high ≈ close + ATR/2, low ≈ close - ATR/2
+            intra_high = close_col + atr / 2
+            intra_low = close_col - atr / 2
+            pp = (intra_high + intra_low + close_col) / 3
+
+            merged_final["Pivot Point"] = pp.round(2)
+            merged_final["Resistance 1"] = (2 * pp - intra_low).round(2)
+            merged_final["Resistance 2"] = (pp + (intra_high - intra_low)).round(2)
+            merged_final["Support 1"] = (2 * pp - intra_high).round(2)
+            merged_final["Support 2"] = (pp - (intra_high - intra_low)).round(2)
+            logger.info("Pivot points (S&R) computed from ATR-based range")
+        except Exception as e:
+            logger.warning(f"Could not compute pivot points: {e}")
 
         # 2. Compute scores
         try:

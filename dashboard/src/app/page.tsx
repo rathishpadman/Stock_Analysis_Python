@@ -11,7 +11,7 @@ import { MonthlyPriceChart, MonthlyReturnsChart, RollingReturnsChart, MonthlyVol
 import { SeasonalityBarChart, SeasonalityRadarChart, QuarterlyBreakdown, SeasonalityStats } from '@/components/SeasonalityCharts';
 import { ScoreBarChart, PriceChart, RSIChart, MACDChart, VolumeChart, StochasticChart } from '@/components/Charts';
 import { ALL_FIELDS, DEFAULT_COLUMNS, WEEKLY_FIELDS, DEFAULT_WEEKLY_COLUMNS, MONTHLY_FIELDS, DEFAULT_MONTHLY_COLUMNS, SEASONALITY_FIELDS, DEFAULT_SEASONALITY_COLUMNS } from '@/lib/constants';
-import { Settings2, Search, Filter, LogOut, Loader2, BarChart3, TrendingUp, ShieldCheck, Info, Calendar, Flame, AlertTriangle, Activity, ChevronLeft, ChevronDown, ChevronUp, HelpCircle } from 'lucide-react';
+import { Settings2, Search, Filter, LogOut, Loader2, BarChart3, TrendingUp, ShieldCheck, Info, Calendar, Flame, AlertTriangle, Activity, ChevronLeft, ChevronDown, ChevronUp, HelpCircle, Download } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import StockTable from '@/components/StockTable';
@@ -362,6 +362,35 @@ export default function DashboardPage() {
     return Math.max(0, expectedUniverseSize - sidebarData.length);
   }, [sidebarData.length]);
 
+  const handleExportExcel = async () => {
+    const XLSX = (await import('xlsx')).default;
+    const wb = XLSX.utils.book_new();
+
+    // Daily sheet — all fields
+    if (stocks.length > 0) {
+      const ws = XLSX.utils.json_to_sheet(stocks);
+      XLSX.utils.book_append_sheet(wb, ws, 'Daily');
+    }
+    // Weekly sheet
+    if (weeklyData.length > 0) {
+      const ws = XLSX.utils.json_to_sheet(weeklyData);
+      XLSX.utils.book_append_sheet(wb, ws, 'Weekly');
+    }
+    // Monthly sheet
+    if (monthlyData.length > 0) {
+      const ws = XLSX.utils.json_to_sheet(monthlyData);
+      XLSX.utils.book_append_sheet(wb, ws, 'Monthly');
+    }
+    // Seasonality sheet
+    if (seasonalityData.length > 0) {
+      const ws = XLSX.utils.json_to_sheet(seasonalityData);
+      XLSX.utils.book_append_sheet(wb, ws, 'Seasonality');
+    }
+
+    const date = new Date().toISOString().split('T')[0];
+    XLSX.writeFile(wb, `Stock_Analysis_${date}.xlsx`);
+  };
+
   const handleStockSelect = (ticker: string, source: DetailSource = 'daily') => {
     setSelectedStock(ticker);
     setDetailSource(source);
@@ -471,6 +500,14 @@ export default function DashboardPage() {
             className={`p-2 rounded border border-white/5 transition-all ${showColumnPicker ? 'bg-blue-600/20 border-blue-500 text-blue-400' : 'bg-slate-900 text-slate-500 hover:text-slate-300'}`}
           >
             <Settings2 className="h-4 w-4" />
+          </button>
+
+          <button
+            onClick={handleExportExcel}
+            className="p-2 bg-slate-900 hover:bg-emerald-900/40 border border-white/5 hover:border-emerald-500/30 rounded text-slate-500 hover:text-emerald-400 transition-all"
+            title="Export to Excel (Daily/Weekly/Monthly/Seasonality)"
+          >
+            <Download className="h-4 w-4" />
           </button>
 
           <a
