@@ -47,6 +47,13 @@ STANDARD_FIELDS = {
     "avg_volume", "avg_volume_10d",
     # Other
     "beta", "shares_outstanding", "float_shares", "face_value",
+    # Shareholding
+    "promoter_holding_pct", "public_holding_pct",
+    # Market-level FII/DII flows (from nse_fiidii)
+    "fii_net_value_cr", "dii_net_value_cr",
+    # Support & Resistance (pivot points)
+    "pivot_point", "support_1", "support_2", "support_3",
+    "resistance_1", "resistance_2", "resistance_3",
     # Scores (bonus, from pre-computed pipelines)
     "fundamental_score", "technical_score", "quality_score", "overall_score",
     # Metadata
@@ -128,7 +135,13 @@ class SupabaseAdapter(FundamentalsAdapter):
                 "interest_coverage": d.get("interest_coverage"),
 
                 # Dividends
-                "dividend_yield": d.get("dividend_yield_pct"),
+                # Dividend yield: Supabase stores in basis points (478 = 4.78%)
+                # Normalize to percentage if > 20 (no stock has 20%+ div yield)
+                "dividend_yield": (
+                    d.get("dividend_yield_pct") / 100
+                    if d.get("dividend_yield_pct") and d.get("dividend_yield_pct") > 20
+                    else d.get("dividend_yield_pct")
+                ),
 
                 # Growth
                 "eps_growth_yoy": d.get("eps_growth_yoy_pct"),
@@ -236,6 +249,12 @@ class NSEPythonAdapter(FundamentalsAdapter):
             # Enrich with financial results (margins, debt, revenue growth)
             self._enrich_from_results(ticker, result)
 
+            # Enrich with shareholding pattern (promoter/public %)
+            self._enrich_shareholding(ticker, result)
+
+            # Enrich with pivot points (support & resistance)
+            self._enrich_pivot_points(data, result)
+
             if result.get("current_price"):
                 logger.info(f"[{self.name}] Fetched fundamentals for {ticker}")
                 return result
@@ -264,15 +283,27 @@ class NSEPythonAdapter(FundamentalsAdapter):
             net_profit = self._to_float(latest.get("re_net_profit"))
             pbt = self._to_float(latest.get("re_pro_loss_bef_tax"))
 
-            # Profit margin
-            if revenue and revenue > 0 and net_profit is not None:
-                result.setdefault("profit_margin", round(net_profit / revenue, 4))
+            # Sanity check: skip margin calcs if data looks inconsistent
+            # (e.g., net profit >> revenue due to unit mismatch or other income)
+            data_sane = (
+                revenue and revenue > 0
+                and net_profit is not None
+                and abs(net_profit) <= revenue * 5  # net profit shouldn't exceed 5x revenue
+            )
+
+            # Profit margin (only if data is sane)
+            if data_sane:
+                margin = round(net_profit / revenue, 4)
+                if -1.0 <= margin <= 1.0:  # margin should be between -100% and 100%
+                    result.setdefault("profit_margin", margin)
 
             # Operating margin estimate (PBT + other income adjustments)
             other_income = self._to_float(latest.get("re_oth_inc_new")) or 0
-            if revenue and revenue > 0 and pbt is not None:
+            if data_sane and pbt is not None:
                 operating_profit = pbt - other_income
-                result.setdefault("operating_margin", round(operating_profit / revenue, 4))
+                op_margin = round(operating_profit / revenue, 4)
+                if -1.0 <= op_margin <= 1.0:
+                    result.setdefault("operating_margin", op_margin)
 
             # Debt to equity (directly available)
             de_ratio = self._to_float(latest.get("re_debt_eqt_rat"))
@@ -286,10 +317,108 @@ class NSEPythonAdapter(FundamentalsAdapter):
                     growth = round((revenue - prev_revenue) / prev_revenue * 100, 2)
                     result.setdefault("revenue_growth_yoy", growth)
 
+            # Interest coverage = EBIT / Interest expense
+            interest_exp = self._to_float(latest.get("re_int_expd")) or 0
+            if interest_exp and interest_exp > 0 and pbt is not None:
+                ebit = pbt + interest_exp
+                ic = round(ebit / interest_exp, 2)
+                if 0 < ic < 1000:  # sanity: IC shouldn't be astronomical
+                    result.setdefault("interest_coverage", ic)
+
+            # ROE = Net Profit / Shareholder Equity (if equity data available)
+            equity = self._to_float(latest.get("re_net_worth"))
+            if equity and equity > 0 and net_profit is not None:
+                roe_val = round(net_profit / equity, 4)
+                if -2.0 <= roe_val <= 2.0:  # ROE between -200% and 200%
+                    result.setdefault("roe", roe_val)
+
+            # ROCE = EBIT / Capital Employed (Equity + Debt)
+            total_debt = self._to_float(latest.get("re_borrow")) or 0
+            if equity and equity > 0 and pbt is not None:
+                ebit = pbt + (interest_exp or 0)
+                capital_employed = equity + total_debt
+                if capital_employed > 0:
+                    roce_val = round(ebit / capital_employed, 4)
+                    if -2.0 <= roce_val <= 2.0:
+                        result.setdefault("roce", roce_val)
+
         except ImportError:
             pass
         except Exception as e:
             logger.debug(f"[{self.name}] nse_past_results failed for {ticker}: {e}")
+
+    def _enrich_pivot_points(self, nse_data: dict, result: Dict[str, Any]) -> None:
+        """Compute standard pivot points from NSE intraday high/low/close."""
+        try:
+            price_info = nse_data.get("priceInfo", {})
+            intraday = price_info.get("intraDayHighLow", {})
+
+            high = intraday.get("max")
+            low = intraday.get("min")
+            close = price_info.get("lastPrice") or price_info.get("previousClose")
+
+            if not all([high, low, close]):
+                return
+
+            high, low, close = float(high), float(low), float(close)
+            pp = round((high + low + close) / 3, 2)
+
+            result.setdefault("pivot_point", pp)
+            result.setdefault("resistance_1", round(2 * pp - low, 2))
+            result.setdefault("resistance_2", round(pp + (high - low), 2))
+            result.setdefault("resistance_3", round(high + 2 * (pp - low), 2))
+            result.setdefault("support_1", round(2 * pp - high, 2))
+            result.setdefault("support_2", round(pp - (high - low), 2))
+            result.setdefault("support_3", round(low - 2 * (high - pp), 2))
+
+            logger.debug(
+                f"[{self.name}] Pivots: PP={pp}, "
+                f"S1/S2/S3={result.get('support_1')}/{result.get('support_2')}/{result.get('support_3')}, "
+                f"R1/R2/R3={result.get('resistance_1')}/{result.get('resistance_2')}/{result.get('resistance_3')}"
+            )
+        except Exception as e:
+            logger.debug(f"[{self.name}] Pivot point calc failed: {e}")
+
+    def _enrich_shareholding(self, ticker: str, result: Dict[str, Any]) -> None:
+        """Enrich with promoter/public holding % and market-level FII/DII flows."""
+        try:
+            from nsepython import nsefetch
+
+            # Stock-specific: promoter & public holding %
+            master = nsefetch(
+                "https://www.nseindia.com/api/corporate-share-holdings-master?index=equities"
+            )
+            if isinstance(master, list):
+                entry = next((x for x in master if x.get("symbol") == ticker), None)
+                if entry:
+                    promoter = self._to_float(entry.get("pr_and_prgrp"))
+                    public = self._to_float(entry.get("public_val"))
+                    if promoter is not None:
+                        result.setdefault("promoter_holding_pct", promoter)
+                    if public is not None:
+                        result.setdefault("public_holding_pct", public)
+                    logger.debug(
+                        f"[{self.name}] Shareholding for {ticker}: "
+                        f"promoter={promoter}%, public={public}%"
+                    )
+        except Exception as e:
+            logger.debug(f"[{self.name}] Shareholding fetch failed for {ticker}: {e}")
+
+        # Market-level: FII/DII daily net flow (via nse_fiidii)
+        try:
+            from nsepython import nse_fiidii
+
+            fiidii = nse_fiidii("list")
+            if isinstance(fiidii, list):
+                for item in fiidii:
+                    cat = (item.get("category") or "").upper()
+                    net = self._to_float(item.get("netValue"))
+                    if "FII" in cat or "FPI" in cat:
+                        result.setdefault("fii_net_value_cr", net)
+                    elif "DII" in cat:
+                        result.setdefault("dii_net_value_cr", net)
+        except Exception as e:
+            logger.debug(f"[{self.name}] FII/DII fetch failed: {e}")
 
     @staticmethod
     def _to_float(val) -> Optional[float]:

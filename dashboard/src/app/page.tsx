@@ -9,7 +9,7 @@ import TechnicalSignals from '@/components/TechnicalSignals';
 import { WeeklyPriceChart, WeeklyRSIChart, WeeklyReturnsChart, WeeklyVolumeChart, WeeklyStats } from '@/components/WeeklyCharts';
 import { MonthlyPriceChart, MonthlyReturnsChart, RollingReturnsChart, MonthlyVolumeChart, MonthlyStats } from '@/components/MonthlyCharts';
 import { SeasonalityBarChart, SeasonalityRadarChart, QuarterlyBreakdown, SeasonalityStats } from '@/components/SeasonalityCharts';
-import { ScoreBarChart, PriceChart, RSIChart, MACDChart } from '@/components/Charts';
+import { ScoreBarChart, PriceChart, RSIChart, MACDChart, VolumeChart, StochasticChart } from '@/components/Charts';
 import { ALL_FIELDS, DEFAULT_COLUMNS, WEEKLY_FIELDS, DEFAULT_WEEKLY_COLUMNS, MONTHLY_FIELDS, DEFAULT_MONTHLY_COLUMNS, SEASONALITY_FIELDS, DEFAULT_SEASONALITY_COLUMNS } from '@/lib/constants';
 import { Settings2, Search, Filter, LogOut, Loader2, BarChart3, TrendingUp, ShieldCheck, Info, Calendar, Flame, AlertTriangle, Activity, ChevronLeft, ChevronDown, ChevronUp, HelpCircle } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
@@ -1022,19 +1022,33 @@ export default function DashboardPage() {
                     </span>
                   </div>
 
-                  {/* Charts Section */}
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Charts Section — Price full-width, RSI + MACD side-by-side below */}
+                  <div className="space-y-6">
                     <div className="relative">
                       {chartsLoading && (
                         <div className="absolute inset-0 bg-slate-950/50 backdrop-blur-[2px] z-10 flex items-center justify-center rounded-lg">
                           <Loader2 className="h-8 w-8 text-blue-500 animate-spin" />
                         </div>
                       )}
-                      <PriceChart ticker={selectedStockData.ticker} data={historicalData} />
+                      <PriceChart
+                        ticker={selectedStockData.ticker}
+                        data={historicalData}
+                        pivots={selectedStockData.pivot_point ? {
+                          pp: selectedStockData.pivot_point,
+                          s1: selectedStockData.support_1,
+                          s2: selectedStockData.support_2,
+                          r1: selectedStockData.resistance_1,
+                          r2: selectedStockData.resistance_2,
+                        } : undefined}
+                      />
                     </div>
-                    <div className="space-y-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                       <RSIChart ticker={selectedStockData.ticker} data={historicalData} />
                       <MACDChart ticker={selectedStockData.ticker} data={historicalData} />
+                    </div>
+                    <VolumeChart ticker={selectedStockData.ticker} data={historicalData} />
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      <StochasticChart ticker={selectedStockData.ticker} data={historicalData} />
                     </div>
                   </div>
 
@@ -1073,6 +1087,68 @@ export default function DashboardPage() {
                         </div>
                       ))}
                     </div>
+
+                    {/* Peer Comparison vs Sector */}
+                    {(() => {
+                      const sector = selectedStockData.sector;
+                      const sectorPeers = stocks.filter(s => s.sector === sector && s.ticker !== selectedStockData.ticker);
+                      if (!sector || sectorPeers.length === 0) return null;
+
+                      const median = (arr: number[]) => {
+                        const sorted = arr.filter(v => v != null && !isNaN(v)).sort((a, b) => a - b);
+                        if (sorted.length === 0) return null;
+                        const mid = Math.floor(sorted.length / 2);
+                        return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+                      };
+
+                      const metrics = [
+                        { key: 'pe_ttm', label: 'P/E (TTM)', lower: true },
+                        { key: 'pb', label: 'P/B', lower: true },
+                        { key: 'roe_ttm', label: 'ROE %', lower: false },
+                        { key: 'operating_profit_margin_pct', label: 'Op. Margin %', lower: false },
+                        { key: 'net_profit_margin_pct', label: 'Net Margin %', lower: false },
+                        { key: 'debt_equity', label: 'Debt/Equity', lower: true },
+                        { key: 'return_1y', label: '1Y Return %', lower: false },
+                        { key: 'overall_score', label: 'Overall Score', lower: false },
+                      ];
+
+                      return (
+                        <div className="bg-[#0a101f] border border-white/5 rounded-xl p-5">
+                          <h4 className="text-[10px] font-black text-cyan-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                            <BarChart3 className="h-3 w-3" />
+                            PEER COMPARISON — {sector} ({sectorPeers.length} peers)
+                          </h4>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            {metrics.map(m => {
+                              const stockVal = selectedStockData[m.key];
+                              const sectorMedian = median(sectorPeers.map(s => s[m.key]));
+                              const hasData = stockVal != null && sectorMedian != null;
+                              const isBetter = hasData && (m.lower ? stockVal < sectorMedian : stockVal > sectorMedian);
+                              return (
+                                <div key={m.key} className="bg-slate-900/50 rounded-lg p-3">
+                                  <div className="text-[9px] text-slate-500 uppercase mb-2">{m.label}</div>
+                                  <div className="flex items-baseline justify-between">
+                                    <div>
+                                      <div className="text-xs font-mono text-white">{stockVal != null ? (typeof stockVal === 'number' ? stockVal.toFixed(2) : stockVal) : '-'}</div>
+                                      <div className="text-[9px] text-slate-500">Stock</div>
+                                    </div>
+                                    <div className="text-right">
+                                      <div className="text-xs font-mono text-slate-400">{sectorMedian != null ? sectorMedian.toFixed(2) : '-'}</div>
+                                      <div className="text-[9px] text-slate-500">Sector Median</div>
+                                    </div>
+                                  </div>
+                                  {hasData && (
+                                    <div className={`text-[9px] mt-1 font-bold ${isBetter ? 'text-emerald-500' : 'text-amber-500'}`}>
+                                      {isBetter ? '▲ Better than sector' : '▼ Below sector'}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })()}
 
                     {/* Qualitative Notes Card */}
                     <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">

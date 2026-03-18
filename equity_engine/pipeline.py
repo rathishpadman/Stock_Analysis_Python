@@ -158,6 +158,10 @@ def prepare_output_df(df: pd.DataFrame) -> pd.DataFrame:
         if col not in out.columns:
             out[col] = _pick_series(df, [col, f"{col}_meta"], default=np.nan)
 
+    # Shareholding (populated by daily_to_supabase from NSE API)
+    out["Promoter Holding %"] = _pick_series(df, ["Promoter Holding %", "promoter_holding_pct"], default=np.nan)
+    out["Public Holding %"] = _pick_series(df, ["Public Holding %", "public_holding_pct"], default=np.nan)
+
     out["As Of Datetime"] = _pick_series(df, ["As Of Datetime"], default="")
     out["Sources"] = _pick_series(df, ["Sources"], default="")
     out["Data Quality Score"] = _pick_series(df, ["Data Quality Score"], default=np.nan)
@@ -236,6 +240,65 @@ def enrich_stock(symbol: str, settings: Settings) -> Dict[str, float]:
     row["CAGR 3Y %"] = float(cagr3*100) if cagr3==cagr3 else np.nan
     row["CAGR 5Y %"] = float(cagr5*100) if cagr5==cagr5 else np.nan
     row.update(risk)
+
+    # Momentum Score (0-100): weighted average of multi-timeframe returns rank
+    # Uses normalized returns across 1m/3m/6m/12m windows
+    try:
+        mom_returns = [
+            row.get("Return 21d %"),   # 1 month
+            row.get("Return 63d %"),   # 3 month
+            row.get("Return 126d %"),  # 6 month
+            row.get("Return 252d %"),  # 12 month
+        ]
+        valid_rets = [r for r in mom_returns if r is not None and r == r]
+        if valid_rets:
+            # Simple average of returns, then map to 0-100 using sigmoid-like scaling
+            avg_ret = sum(valid_rets) / len(valid_rets)
+            # Map: -30% -> ~10, 0% -> 50, +30% -> ~90
+            momentum = max(0.0, min(100.0, 50.0 + avg_ret * 1.5))
+            row["Momentum Score"] = round(momentum, 2)
+    except Exception:
+        pass
+
+    # Quality Score: composite of profitability and financial health metrics
+    # Each metric normalized to 0-100 using calibrated ranges for Indian equities
+    try:
+        def _norm(val, low, high, higher_better=True):
+            """Normalize val to 0-100 given typical range [low, high]."""
+            if high == low:
+                return 50.0
+            score = (val - low) / (high - low) * 100.0
+            if not higher_better:
+                score = 100.0 - score
+            return max(0.0, min(100.0, score))
+
+        q_scores = []
+        # ROE: typical range 5%-30% for Indian large caps
+        roe = row.get("ROE TTM %")
+        if roe is not None and roe == roe:
+            q_scores.append(_norm(roe, 5.0, 30.0))
+        # Net Profit Margin: typical 3%-25%
+        npm = row.get("Net Profit Margin %")
+        if npm is not None and npm == npm:
+            q_scores.append(_norm(npm, 3.0, 25.0))
+        # Operating Margin: typical 8%-35%
+        opm = row.get("Operating Profit Margin %")
+        if opm is not None and opm == opm:
+            q_scores.append(_norm(opm, 8.0, 35.0))
+        # D/E: lower is better, typical 0-100 (as stored in pipeline)
+        de = row.get("Debt/Equity")
+        if de is not None and de == de:
+            q_scores.append(_norm(de, 0.0, 80.0, higher_better=False))
+        # Interest Coverage: higher better, typical 1-15x
+        ic = row.get("Interest Coverage")
+        if ic is not None and ic == ic:
+            q_scores.append(_norm(ic, 1.0, 15.0))
+
+        if q_scores:
+            row["Quality Score"] = round(sum(q_scores) / len(q_scores), 2)
+    except Exception:
+        pass
+
     # Compute canonical metrics that may not be present in vendor metadata
     try:
         from .normalizers import compute_beta, compute_cagr_for_ticker, compute_alpha, compute_adl

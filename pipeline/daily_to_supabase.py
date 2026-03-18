@@ -135,6 +135,23 @@ def prepare_daily_payload(df: pd.DataFrame, snapshot_date: date) -> list:
         "Momentum Score": "momentum_score",
         "News Sentiment Score": "news_sentiment_score",
         "Social Media Sentiment": "social_sentiment",
+        "Promoter Holding %": "promoter_holding_pct",
+        "Public Holding %": "public_holding_pct",
+        # Risk metrics (computed by risk_stats in pipeline but previously unmapped)
+        "Volatility 30D %": "volatility_30d",
+        "Volatility 90D %": "volatility_90d",
+        "Max Drawdown 1Y %": "max_drawdown_1y",
+        "Sharpe 1Y": "sharpe_1y",
+        # Beta (computed by normalizers in pipeline)
+        "Beta 1Y": "beta_1y",
+        "Beta 3Y": "beta_3y",
+        # Valuation (from metadata merge)
+        "Enterprise Value (INR Cr)": "enterprise_value_cr",
+        "Forward PE": "forward_pe",
+        "PEG Ratio": "peg_ratio",
+        # Sector metrics (computed post-merge)
+        "Sector P/E (Median)": "sector_pe_median",
+        "Sector Relative Strength 6M %": "sector_relative_strength_6m_pct",
     }
 
     for _, row in df.iterrows():
@@ -301,6 +318,65 @@ def run_daily_pipeline(limit: int = None, dry_run: bool = False):
         # 1. Merge with universe metadata to get Sector, Industry, ISIN etc.
         meta_subset = uni.drop_duplicates(subset=["symbol"]).copy()
         merged_final = stocks.merge(meta_subset, on="symbol", how="left", suffixes=("", "_meta"))
+
+        # 1b. Enrich with shareholding data from NSE (single API call for all stocks)
+        try:
+            from nsepython import nsefetch
+            logger.info("Fetching shareholding data from NSE...")
+            shp_master = nsefetch(
+                "https://www.nseindia.com/api/corporate-share-holdings-master?index=equities"
+            )
+            if isinstance(shp_master, list):
+                shp_lookup = {}
+                for entry in shp_master:
+                    sym = entry.get("symbol")
+                    if sym:
+                        shp_lookup[sym] = {
+                            "promoter_pct": entry.get("pr_and_prgrp"),
+                            "public_pct": entry.get("public_val"),
+                        }
+                # Map to merged_final using the symbol column
+                def _get_shp(sym, field):
+                    s = str(sym).replace(".NS", "").upper().strip()
+                    entry = shp_lookup.get(s)
+                    if entry:
+                        try:
+                            return float(entry[field])
+                        except (ValueError, TypeError):
+                            return np.nan
+                    return np.nan
+
+                merged_final["Promoter Holding %"] = merged_final["symbol"].apply(
+                    lambda s: _get_shp(s, "promoter_pct")
+                )
+                merged_final["Public Holding %"] = merged_final["symbol"].apply(
+                    lambda s: _get_shp(s, "public_pct")
+                )
+                filled = merged_final["Promoter Holding %"].notna().sum()
+                logger.info(f"Shareholding data enriched: {filled}/{len(merged_final)} stocks")
+        except Exception as e:
+            logger.warning(f"Could not fetch shareholding data: {e}")
+
+        # 1c. Compute sector-level metrics
+        try:
+            # Sector P/E Median
+            sector_col = merged_final.get("Sector", merged_final.get("sector"))
+            pe_col = merged_final.get("P/E (TTM)", merged_final.get("pe_ttm"))
+            if sector_col is not None and pe_col is not None:
+                pe_numeric = pd.to_numeric(pe_col, errors="coerce")
+                sector_pe_median = pe_numeric.groupby(sector_col).transform("median")
+                merged_final["Sector P/E (Median)"] = sector_pe_median
+
+                # Sector Relative Strength 6M: stock 6M return vs sector median 6M return
+                ret6m_col = merged_final.get("Return 6M %", merged_final.get("return_6m"))
+                if ret6m_col is not None:
+                    ret6m_numeric = pd.to_numeric(ret6m_col, errors="coerce")
+                    sector_ret6m_median = ret6m_numeric.groupby(sector_col).transform("median")
+                    merged_final["Sector Relative Strength 6M %"] = ret6m_numeric - sector_ret6m_median
+
+                logger.info("Sector metrics computed (P/E median, relative strength)")
+        except Exception as e:
+            logger.warning(f"Could not compute sector metrics: {e}")
 
         # 2. Compute scores
         try:

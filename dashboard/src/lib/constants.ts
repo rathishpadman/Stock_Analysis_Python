@@ -26,6 +26,8 @@ export const ALL_FIELDS = [
     { id: 'enterprise_value_cr', label: 'EV (Cr)', group: 'Fundamental' },
     { id: 'shares_outstanding', label: 'Shares Out.', group: 'Fundamental' },
     { id: 'free_float_pct', label: 'Free Float %', group: 'Fundamental' },
+    { id: 'promoter_holding_pct', label: 'Promoter %', group: 'Fundamental' },
+    { id: 'public_holding_pct', label: 'Public %', group: 'Fundamental' },
     { id: 'pe_ttm', label: 'P/E (TTM)', group: 'Fundamental' },
     { id: 'pb', label: 'P/B', group: 'Fundamental' },
     { id: 'ps_ratio', label: 'P/S Ratio', group: 'Fundamental' },
@@ -71,6 +73,13 @@ export const ALL_FIELDS = [
     { id: 'stoch_k', label: 'Stoch %K', group: 'Technical' },
     { id: 'stoch_d', label: 'Stoch %D', group: 'Technical' },
     { id: 'obv', label: 'OBV', group: 'Technical' },
+
+    // Support & Resistance (Pivot Points)
+    { id: 'pivot_point', label: 'Pivot Point', group: 'Technical' },
+    { id: 'support_1', label: 'Support 1', group: 'Technical' },
+    { id: 'support_2', label: 'Support 2', group: 'Technical' },
+    { id: 'resistance_1', label: 'Resistance 1', group: 'Technical' },
+    { id: 'resistance_2', label: 'Resistance 2', group: 'Technical' },
 
     // Volume & Liquidity
     { id: 'avg_volume_1w', label: 'Avg Vol (1W)', group: 'Technical' },

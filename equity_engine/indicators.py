@@ -121,4 +121,8 @@ def risk_stats(close: pd.Series, rf_annual_pct: float, lookback: int = 252) -> D
     px = close.tail(252)
     dd = (px/px.cummax() - 1).min()*100.0
     sharpe = float((tail.mean()*252 - rf_annual_pct/100) / (tail.std()*np.sqrt(252))) if tail.std()>0 else float("nan")
-    return {"Volatility 30D %": vol_30, "Volatility 90D %": vol_90, "Max Drawdown 1Y %": float(dd), "Sharpe 1Y": sharpe}
+    # Sortino: uses downside deviation instead of total std
+    downside = tail[tail < 0]
+    downside_std = float(downside.std() * np.sqrt(252)) if len(downside) > 1 else float("nan")
+    sortino = float((tail.mean()*252 - rf_annual_pct/100) / downside_std) if downside_std > 0 else float("nan")
+    return {"Volatility 30D %": vol_30, "Volatility 90D %": vol_90, "Max Drawdown 1Y %": float(dd), "Sharpe 1Y": sharpe, "Sortino 1Y": sortino}
