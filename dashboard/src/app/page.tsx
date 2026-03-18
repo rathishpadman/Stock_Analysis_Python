@@ -366,29 +366,28 @@ export default function DashboardPage() {
     const XLSX = await import('xlsx');
     const wb = XLSX.utils.book_new();
 
-    // Daily sheet — all fields
-    if (stocks.length > 0) {
-      const ws = XLSX.utils.json_to_sheet(stocks);
-      XLSX.utils.book_append_sheet(wb, ws, 'Daily');
-    }
-    // Weekly sheet
-    if (weeklyData.length > 0) {
-      const ws = XLSX.utils.json_to_sheet(weeklyData);
-      XLSX.utils.book_append_sheet(wb, ws, 'Weekly');
-    }
-    // Monthly sheet
-    if (monthlyData.length > 0) {
-      const ws = XLSX.utils.json_to_sheet(monthlyData);
-      XLSX.utils.book_append_sheet(wb, ws, 'Monthly');
-    }
-    // Seasonality sheet
-    if (seasonalityData.length > 0) {
-      const ws = XLSX.utils.json_to_sheet(seasonalityData);
-      XLSX.utils.book_append_sheet(wb, ws, 'Seasonality');
+    const sheets: [string, any[]][] = [
+      ['Daily', stocks],
+      ['Weekly', weeklyData],
+      ['Monthly', monthlyData],
+      ['Seasonality', seasonalityData],
+    ];
+
+    let added = 0;
+    for (const [name, data] of sheets) {
+      if (data.length > 0) {
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data), name);
+        added++;
+      }
     }
 
-    const date = new Date().toISOString().split('T')[0];
-    XLSX.writeFile(wb, `Stock_Analysis_${date}.xlsx`);
+    if (added === 0) {
+      alert('No data loaded yet. Please wait for data to load before exporting.');
+      return;
+    }
+
+    const d = new Date().toISOString().split('T')[0];
+    XLSX.writeFile(wb, `Stock_Analysis_${d}.xlsx`);
   };
 
   const handleStockSelect = (ticker: string, source: DetailSource = 'daily') => {
