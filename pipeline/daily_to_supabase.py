@@ -549,7 +549,50 @@ def run_daily_pipeline(limit: int = None, dry_run: bool = False):
         except Exception as e:
             logger.warning(f"Could not compute Economic Moat Score: {e}")
 
-        # 1h. Support & Resistance pivot points from last day's OHLC
+        # 1h. Quality Score (post-merge — uses metadata margins/ROE)
+        try:
+            def _quality_row(r):
+                def _n(val, lo, hi, higher=True):
+                    if np.isnan(val): return None
+                    s = (val - lo) / (hi - lo) * 100 if hi != lo else 50
+                    if not higher: s = 100 - s
+                    return max(0, min(100, s))
+
+                scores = []
+                # Try multiple candidate column names for each metric
+                for candidates, lo, hi, hb in [
+                    (["ROE TTM %", "returnOnEquity"], 5, 30, True),
+                    (["Net Profit Margin %", "profitMargins"], 3, 25, True),
+                    (["Operating Profit Margin %", "operatingMargins"], 8, 35, True),
+                    (["Debt/Equity", "debtToEquity"], 0, 80, False),
+                    (["FCF Yield %"], 0, 15, True),
+                ]:
+                    val = np.nan
+                    for c in candidates:
+                        v = r.get(c)
+                        if v is not None and v != "":
+                            try:
+                                fv = float(v)
+                                # profitMargins/operatingMargins from yfinance are 0-1 scale
+                                if c in ("profitMargins", "operatingMargins", "returnOnEquity") and abs(fv) < 1:
+                                    fv = fv * 100
+                                val = fv
+                                break
+                            except (ValueError, TypeError):
+                                continue
+                    if not np.isnan(val):
+                        s = _n(val, lo, hi, hb)
+                        if s is not None:
+                            scores.append(s)
+                return round(sum(scores) / len(scores), 2) if scores else np.nan
+
+            merged_final["Quality Score"] = merged_final.apply(_quality_row, axis=1)
+            filled_q = merged_final["Quality Score"].notna().sum()
+            logger.info(f"Quality Score computed: {filled_q}/{len(merged_final)} stocks")
+        except Exception as e:
+            logger.warning(f"Could not compute Quality Score: {e}")
+
+        # 1i. Support & Resistance pivot points from last day's OHLC
         try:
             high_col = pd.to_numeric(merged_final.get("52W High"), errors="coerce")
             low_col = pd.to_numeric(merged_final.get("52W Low"), errors="coerce")
