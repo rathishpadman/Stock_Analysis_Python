@@ -59,7 +59,7 @@ from ..tools.nse_live_fetcher import (
     get_upcoming_events,
     NSEPYTHON_AVAILABLE
 )
-from ..observability import AgentObservability, get_observability, get_model_from_env
+from ..observability import AgentObservability, get_observability, get_model_from_env, get_model_for_agent, get_model_pool
 
 
 def get_market_breadth():
@@ -71,7 +71,7 @@ def get_market_breadth():
             return result
     except Exception:
         pass
-    
+
     try:
         # Fallback to NSE
         return get_market_breadth_nse()
@@ -117,9 +117,10 @@ def get_fii_dii_data():
     }
 
 
-# Try to import Google GenAI
+# Try to import Google GenAI (new SDK: google-genai)
 try:
-    import google.generativeai as genai
+    from google import genai
+    from google.genai import types as genai_types
     GENAI_AVAILABLE = True
 except ImportError:
     GENAI_AVAILABLE = False
@@ -1210,21 +1211,22 @@ class BaseTemporalCrew:
         self.model_name = model_name or get_model_from_env()
         self.timeout = timeout
         self.observability = get_observability()
-        
-        # Initialize Gemini
+
+        # Initialize Gemini (new google-genai SDK)
         if GENAI_AVAILABLE and self.api_key:
-            genai.configure(api_key=self.api_key)
-            self.model = genai.GenerativeModel(self.model_name)
-            logger.info(f"Temporal crew initialized with model: {self.model_name}")
+            self.client = genai.Client(api_key=self.api_key)
+            self.model_pool = get_model_pool()
+            logger.info(f"Temporal crew initialized with model pool: {self.model_pool}")
         else:
-            self.model = None
+            self.client = None
+            self.model_pool = []
             logger.warning("Google GenAI not available for temporal crew")
     
     @retry(
         stop=stop_after_attempt(5),
         wait=wait_combine(
-            wait_exponential(multiplier=1, min=4, max=60),
-            wait_random(min=0, max=3),
+            wait_exponential(multiplier=2, min=8, max=60),
+            wait_random(min=0, max=5),
         ),
         retry=retry_if_exception_type(Exception),
         reraise=True,
@@ -1241,16 +1243,19 @@ class BaseTemporalCrew:
         trace_id: str
     ) -> Dict[str, Any]:
         """Call a single agent with data and return parsed response."""
-        if not self.model:
+        if not self.client:
             return {"error": "Model not initialized", "agent": agent_name}
-        
+
+        # Multi-model rotation for temporal crew agents
+        model_name = get_model_for_agent(agent_name)
+
         span_id = self.observability.log_agent_start(trace_id, "MARKET", agent_name, data)
         start_time = time.time()
-        
+
         try:
             # Format prompt with data
             formatted_prompt = prompt.format(data=json.dumps(data, indent=2, default=str))
-            
+
             # Log LLM request
             self.observability.log_llm_request(
                 trace_id=trace_id,
@@ -1260,14 +1265,15 @@ class BaseTemporalCrew:
                 system_prompt="You are a financial analyst. Respond ONLY with valid JSON.",
                 user_prompt=formatted_prompt
             )
-            
-            # Call Gemini
+
+            # Call Gemini via new google-genai SDK
             response = await asyncio.to_thread(
-                self.model.generate_content,
-                formatted_prompt,
-                generation_config=genai.types.GenerationConfig(
+                self.client.models.generate_content,
+                model=model_name,
+                contents=formatted_prompt,
+                config=genai_types.GenerateContentConfig(
                     temperature=0.3,
-                    max_output_tokens=4000
+                    max_output_tokens=4000,
                 )
             )
             
@@ -1321,8 +1327,8 @@ class BaseTemporalCrew:
     @retry(
         stop=stop_after_attempt(5),
         wait=wait_combine(
-            wait_exponential(multiplier=1, min=4, max=60),
-            wait_random(min=0, max=3),
+            wait_exponential(multiplier=2, min=8, max=60),
+            wait_random(min=0, max=5),
         ),
         retry=retry_if_exception_type(Exception),
         reraise=True,
@@ -1339,22 +1345,26 @@ class BaseTemporalCrew:
         synthesizer_name: str = "synthesizer"
     ) -> Dict[str, Any]:
         """Call synthesizer agent to combine results."""
-        if not self.model:
+        if not self.client:
             return {"error": "Model not initialized"}
-        
+
+        # Synthesizer uses primary model
+        model_name = get_model_for_agent("predictor_agent")
+
         span_id = self.observability.log_agent_start(trace_id, "MARKET", synthesizer_name)
         start_time = time.time()
-        
+
         try:
             # Format prompt with agent results
             formatted_prompt = synthesizer_prompt.format(**agent_results)
-            
+
             response = await asyncio.to_thread(
-                self.model.generate_content,
-                formatted_prompt,
-                generation_config=genai.types.GenerationConfig(
+                self.client.models.generate_content,
+                model=model_name,
+                contents=formatted_prompt,
+                config=genai_types.GenerateContentConfig(
                     temperature=0.3,
-                    max_output_tokens=4000
+                    max_output_tokens=4000,
                 )
             )
             

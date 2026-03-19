@@ -87,11 +87,12 @@ from ..config.nifty_prompts import (
 )
 
 # Import observability
-from ..observability import AgentObservability, get_observability, agent_logger, get_model_from_env
+from ..observability import AgentObservability, get_observability, agent_logger, get_model_from_env, get_model_for_agent, get_model_pool
 
-# Try to import Google GenAI
+# Try to import Google GenAI (new SDK: google-genai)
 try:
-    import google.generativeai as genai
+    from google import genai
+    from google.genai import types as genai_types
     GENAI_AVAILABLE = True
 except ImportError:
     GENAI_AVAILABLE = False
@@ -181,17 +182,18 @@ class NiftyAgentOrchestrator:
         self.enable_caching = enable_caching
         self.timeout = timeout
         self.cache: Dict[str, Any] = {}
-        
+
         # Initialize observability
         self.observability = get_observability()
-        
-        # Initialize Gemini
+
+        # Initialize Gemini (new google-genai SDK)
         if GENAI_AVAILABLE and self.api_key:
-            genai.configure(api_key=self.api_key)
-            self.model = genai.GenerativeModel(self.model_name)
-            logger.info(f"Initialized with model: {self.model_name}")
+            self.client = genai.Client(api_key=self.api_key)
+            self.model_pool = get_model_pool()
+            logger.info(f"Initialized with model pool: {self.model_pool}")
         else:
-            self.model = None
+            self.client = None
+            self.model_pool = []
             logger.warning("Google GenAI not available. Set GOOGLE_API_KEY.")
     
     def _store_analysis_to_supabase(self, ticker: str, report: Dict[str, Any]) -> None:
@@ -535,12 +537,12 @@ class NiftyAgentOrchestrator:
         return cleaned
     
     @retry(
-        stop=stop_after_attempt(5),
-        # Exponential backoff (4-60s) + random jitter (0-3s) to prevent
+        stop=stop_after_attempt(4),
+        # Exponential backoff (8-60s) + wider jitter (0-5s) to prevent
         # multiple agents retrying simultaneously after a Gemini 429 burst
         wait=wait_combine(
-            wait_exponential(multiplier=1, min=4, max=60),
-            wait_random(min=0, max=3),
+            wait_exponential(multiplier=2, min=8, max=60),
+            wait_random(min=0, max=5),
         ),
         retry=retry_if_exception_type(Exception),
         reraise=True,
@@ -567,18 +569,26 @@ class NiftyAgentOrchestrator:
                 input_data=base_data
             )
         
-        if not self.model:
+        if not self.client:
             return {"error": "GenAI not configured", "agent": agent_name}
-        
+
         config = AGENT_CONFIG.get(agent_name, {})
         system_prompt = config.get("system_prompt", "")
         output_format = config.get("output_format", {})
         temperature = config.get("temperature", 0.3)
         max_tokens = config.get("max_tokens", 2000)
-        
+
+        # Multi-model rotation: pick model based on agent type
+        model_name = get_model_for_agent(agent_name)
+
+        # Thinking models (gemini-2.5-flash) use tokens for internal reasoning,
+        # so we need a higher max_output_tokens to ensure enough room for actual output
+        if "2.5-flash" in model_name and "lite" not in model_name:
+            max_tokens = max(max_tokens * 4, 8000)
+
         # Get agent-specific data (token optimization)
         agent_data = self._get_agent_specific_data(agent_name, base_data)
-        
+
         # Build the prompt with filtered data
         user_prompt = f"""
 Analyze the following stock data and provide your expert analysis.
@@ -597,7 +607,6 @@ IMPORTANT: Include a "reasoning" field explaining your analysis logic.
 Respond ONLY with valid JSON. No explanatory text outside the JSON.
 """
 
-        
         # Log LLM request
         llm_start_time = time.time()
         if trace_id and span_id:
@@ -611,23 +620,26 @@ Respond ONLY with valid JSON. No explanatory text outside the JSON.
                 temperature=temperature,
                 max_tokens=max_tokens
             )
-        
+
         try:
-            # Call Gemini
-            response = self.model.generate_content(
-                [system_prompt, user_prompt],
-                generation_config=genai.GenerationConfig(
+            # Call Gemini via new google-genai SDK with model rotation
+            response = self.client.models.generate_content(
+                model=model_name,
+                contents=[system_prompt, user_prompt],
+                config=genai_types.GenerateContentConfig(
                     temperature=temperature,
-                    max_output_tokens=max_tokens
+                    max_output_tokens=max_tokens,
                 )
             )
             
             llm_latency_ms = (time.time() - llm_start_time) * 1000
             
-            # Parse response
-            raw_response = response.text.strip()  # Keep original for logging
+            # Parse response (guard against None from thinking models)
+            if response.text is None:
+                raise Exception(f"Empty response from {model_name} (likely max_output_tokens too low for thinking model)")
+            raw_response = response.text.strip()
             response_text = _clean_json_response(raw_response)
-            
+
             # Get token counts from response if available
             input_tokens = None
             output_tokens = None
@@ -756,18 +768,21 @@ Respond ONLY with valid JSON. No explanatory text outside the JSON.
                 input_data={"analyses_summary": list(agent_analyses.keys())}
             )
         
-        if not self.model:
+        if not self.client:
             return {"error": "GenAI not configured"}
-        
+
         config = AGENT_CONFIG.get("predictor_agent", {})
         system_prompt = config.get("system_prompt", "")
         output_format = config.get("output_format", {})
         temperature = config.get("temperature", 0.4)
         max_tokens = config.get("max_tokens", 2500)
-        
+
+        # Predictor uses primary model (most capable)
+        model_name = get_model_for_agent("predictor_agent")
+
         # Clean agent analyses to reduce token usage
         cleaned_analyses = self._clean_for_predictor(agent_analyses)
-        
+
         user_prompt = f"""
 You have received analyses from 5 specialized agents for {ticker}.
 Synthesize these into a final investment recommendation.
@@ -782,7 +797,6 @@ IMPORTANT: Include a "reasoning" field explaining how you weighted each agent's 
 Respond ONLY with valid JSON.
 """
 
-        
         # Log LLM request
         llm_start_time = time.time()
         if trace_id and span_id:
@@ -796,20 +810,23 @@ Respond ONLY with valid JSON.
                 temperature=temperature,
                 max_tokens=max_tokens
             )
-        
+
         try:
-            response = self.model.generate_content(
-                [system_prompt, user_prompt],
-                generation_config=genai.GenerationConfig(
+            response = self.client.models.generate_content(
+                model=model_name,
+                contents=[system_prompt, user_prompt],
+                config=genai_types.GenerateContentConfig(
                     temperature=temperature,
-                    max_output_tokens=max_tokens
+                    max_output_tokens=max_tokens,
                 )
             )
             
             llm_latency_ms = (time.time() - llm_start_time) * 1000
+            if response.text is None:
+                raise Exception(f"Empty response from {model_name} (likely max_output_tokens too low for thinking model)")
             raw_response = response.text.strip()
             response_text = _clean_json_response(raw_response)
-            
+
             # Get token counts
             input_tokens = None
             output_tokens = None

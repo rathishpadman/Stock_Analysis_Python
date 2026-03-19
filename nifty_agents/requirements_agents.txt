@@ -15,8 +15,8 @@ feedparser>=6.0.10
 # Optional: jugaad-data for RBI rates (may have issues on Windows)
 # jugaad-data>=0.25
 
-# Google GenAI for LLM
-google-generativeai>=0.3.0
+# Google GenAI for LLM (new SDK - replaces deprecated google-generativeai)
+google-genai>=1.0.0
 
 # Supabase client
 supabase>=2.0.0

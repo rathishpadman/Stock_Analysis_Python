@@ -90,6 +90,27 @@ GEMINI_PRICING = {
         "context_window": 1048576,
         "description": "DEPRECATED - Use gemini-2.0-flash instead"
     },
+    # Gemini 2.0 Flash Lite - Cheapest, high RPM (4K)
+    "gemini-2.0-flash-lite": {
+        "input_per_1k_tokens": 0.0,              # Free tier
+        "output_per_1k_tokens": 0.0,
+        "context_window": 1048576,
+        "description": "Lightweight flash model, 4K RPM, great for simple agents"
+    },
+    # Gemini 2.5 Flash Lite - Next-gen lightweight (4K RPM)
+    "gemini-2.5-flash-lite": {
+        "input_per_1k_tokens": 0.0,              # Free tier
+        "output_per_1k_tokens": 0.0,
+        "context_window": 1048576,
+        "description": "Next-gen lightweight model, 4K RPM"
+    },
+    # Gemini 2.5 Flash - Capable, capped at ~5K RPD
+    "gemini-2.5-flash": {
+        "input_per_1k_tokens": 0.000015,         # $0.015 per 1M tokens
+        "output_per_1k_tokens": 0.00006,         # $0.06 per 1M tokens
+        "context_window": 1048576,
+        "description": "Next-gen flash, best quality/cost ratio, ~5K RPD cap"
+    },
     # Gemini 2.0 Flash Thinking - Enhanced reasoning
     "gemini-2.0-flash-thinking-exp": {
         "input_per_1k_tokens": 0.0,          # Free during experimental
@@ -155,8 +176,48 @@ TOTAL_TOKENS_PER_ANALYSIS = {
 
 
 def get_model_from_env() -> str:
-    """Get model name from environment variable."""
+    """Get primary model name from environment variable."""
     return os.environ.get("GEMINI_MODEL", "gemini-2.0-flash")
+
+
+def get_model_pool() -> list:
+    """
+    Get the multi-model pool from environment variable.
+
+    Returns list of model names. Falls back to [primary_model] if pool not set.
+    """
+    pool_str = os.environ.get("GEMINI_MODEL_POOL", "")
+    if pool_str:
+        return [m.strip() for m in pool_str.split(",") if m.strip()]
+    return [get_model_from_env()]
+
+
+# Agent-to-model assignment: spread agents across rate-limit buckets
+# Pool: [0] gemini-2.0-flash (2K RPM)
+#        [1] gemini-2.5-flash-lite (4K RPM)
+#        [2] gemini-2.5-flash (capped ~5K RPD, use sparingly)
+AGENT_MODEL_MAP = {
+    "fundamental_agent": 2,   # gemini-2.5-flash (best quality for financials)
+    "technical_agent": 0,     # gemini-2.0-flash
+    "predictor_agent": 0,     # gemini-2.0-flash
+    "sentiment_agent": 1,     # gemini-2.5-flash-lite
+    "macro_agent": 1,         # gemini-2.5-flash-lite
+    "regulatory_agent": 1,    # gemini-2.5-flash-lite
+}
+
+
+def get_model_for_agent(agent_name: str) -> str:
+    """
+    Get the appropriate model for a given agent.
+
+    Uses AGENT_MODEL_MAP to spread agents across model pool buckets.
+    Falls back to primary model if pool is too small or agent unknown.
+    """
+    pool = get_model_pool()
+    idx = AGENT_MODEL_MAP.get(agent_name, 0)
+    if idx < len(pool):
+        return pool[idx]
+    return pool[0]
 
 
 def estimate_analysis_cost(model: str = None) -> Dict[str, Any]:
