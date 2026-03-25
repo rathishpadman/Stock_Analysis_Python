@@ -197,13 +197,33 @@ def get_model_pool() -> list:
 #        [1] gemini-2.5-flash-lite (4K RPM)
 #        [2] gemini-2.5-flash (capped ~5K RPD, use sparingly)
 AGENT_MODEL_MAP = {
+    # --- Daily Analysis Agents (Orchestrator) ---
     "fundamental_agent": 2,   # gemini-2.5-flash (best quality for financials)
     "technical_agent": 0,     # gemini-2.0-flash
     "predictor_agent": 0,     # gemini-2.0-flash
     "sentiment_agent": 1,     # gemini-2.5-flash-lite
     "macro_agent": 1,         # gemini-2.5-flash-lite
     "regulatory_agent": 1,    # gemini-2.5-flash-lite
+
+    # --- Weekly Temporal Crew Agents ---
+    "trend_agent": 0,             # gemini-2.0-flash
+    "sector_rotation_agent": 1,   # gemini-2.5-flash-lite
+    "risk_regime_agent": 1,       # gemini-2.5-flash-lite
+    "weekly_synthesizer": 2,      # gemini-2.5-flash (final synthesis = best quality)
+
+    # --- Monthly Temporal Crew Agents ---
+    "macro_fundamentals_agent": 1,  # gemini-2.5-flash-lite
+    "technical_momentum_agent": 0,  # gemini-2.0-flash
+    "monthly_risk_agent": 1,        # gemini-2.5-flash-lite
+    "monthly_synthesizer": 2,       # gemini-2.5-flash (final synthesis)
+
+    # --- Seasonality Temporal Crew Agents ---
+    "seasonal_pattern_agent": 0,    # gemini-2.0-flash
+    "correlation_agent": 1,         # gemini-2.5-flash-lite
+    "event_catalyst_agent": 1,      # gemini-2.5-flash-lite
+    "seasonality_synthesizer": 2,   # gemini-2.5-flash (final synthesis)
 }
+
 
 
 def get_model_for_agent(agent_name: str) -> str:
