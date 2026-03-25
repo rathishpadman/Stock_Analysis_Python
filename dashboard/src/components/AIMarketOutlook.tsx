@@ -557,7 +557,7 @@ function WeeklyAnalysisView({ data }: { data: WeeklyAnalysis }) {
                             <StatCard
                                 label="Primary Trend"
                                 value={agents.trend?.primary_trend || 'N/A'}
-                                subValue={agents.trend?.trend_strength ? `Strength: ${agents.trend.trend_strength}` : undefined}
+                                subValue={agents.trend?.trend_strength ? `Strength: ${safeStr(agents.trend.trend_strength)}` : undefined}
                                 icon={TrendingUp}
                             />
                             <StatCard
@@ -681,7 +681,7 @@ function WeeklyAnalysisView({ data }: { data: WeeklyAnalysis }) {
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
-                                            {syn.sector_allocation?.map((sec: any, i: number) => (
+                                            {Array.isArray(syn.sector_allocation) && syn.sector_allocation.map((sec: any, i: number) => (
                                                 <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                                                     <td className="px-4 py-3 font-bold text-gray-900 dark:text-gray-100">{sec.sector}</td>
                                                     <td className={`px-4 py-3 font-bold ${sec.return_1w_pct >= 0 ? 'text-green-500' : 'text-red-500'}`}>
@@ -697,6 +697,9 @@ function WeeklyAnalysisView({ data }: { data: WeeklyAnalysis }) {
                                                     </td>
                                                 </tr>
                                             ))}
+                                            {!Array.isArray(syn.sector_allocation) && (
+                                                <tr><td colSpan={4} className="px-4 py-6 text-center text-xs text-gray-400">Sector data not available for this analysis</td></tr>
+                                            )}
                                         </tbody>
                                     </table>
                                 </div>
@@ -710,9 +713,11 @@ function WeeklyAnalysisView({ data }: { data: WeeklyAnalysis }) {
                                         {syn.sector_rotation?.direction || 'Neutral'}
                                     </div>
                                     <p className="text-[11px] text-purple-700 dark:text-purple-300 leading-relaxed mb-4">
-                                        Moving from {syn.sector_rotation?.from_sectors?.join(', ')} to {syn.sector_rotation?.to_sectors?.join(', ')}.
+                                        {syn.sector_rotation?.from_sectors?.length > 0 && syn.sector_rotation?.to_sectors?.length > 0
+                                            ? `Moving from ${syn.sector_rotation.from_sectors.join(', ')} to ${syn.sector_rotation.to_sectors.join(', ')}.`
+                                            : 'Sector rotation signals are being monitored.'}
                                     </p>
-                                    <Gauge value={syn.sector_rotation?.rotation_strength * 2 || 5} label="Rotation Strength" />
+                                    <Gauge value={(Number(syn.sector_rotation?.rotation_strength) || 5) * 2} label="Rotation Strength" />
                                 </div>
                             </div>
                         </div>
@@ -1385,22 +1390,66 @@ export default function AIMarketOutlook({ type, ticker, sector }: AIMarketOutloo
     const [error, setError] = useState<string | null>(null);
     const [isExpanded, setIsExpanded] = useState(false);
     const [lastFetchType, setLastFetchType] = useState<string | null>(null);
+    const [cacheHit, setCacheHit] = useState(false);
+    const [cachedAt, setCachedAt] = useState<Date | null>(null);
+    const [autoFetching, setAutoFetching] = useState(false);
+
+    // Format how long ago the cache was populated
+    const formatAge = (date: Date): string => {
+        const diffMs = Date.now() - date.getTime();
+        const diffMin = Math.floor(diffMs / 60000);
+        if (diffMin < 1) return 'just now';
+        if (diffMin < 60) return `${diffMin}m ago`;
+        const diffH = Math.floor(diffMin / 60);
+        if (diffH < 24) return `${diffH}h ago`;
+        return `${Math.floor(diffH / 24)}d ago`;
+    };
+
+    // On mount: try to load cached results silently
+    useEffect(() => {
+        let cancelled = false;
+        const loadCached = async () => {
+            setAutoFetching(true);
+            try {
+                const params = new URLSearchParams({ type });
+                const res = await fetch(`${API_BASE}/api/agent/temporal/cached?${params}`, {
+                    headers: { 'Accept': 'application/json' }
+                });
+                if (res.ok && !cancelled) {
+                    const result = await res.json();
+                    setData(result);
+                    setLastFetchType(type);
+                    setCacheHit(true);
+                    setCachedAt(new Date()); // approximate — server TTL checked
+                    setIsExpanded(true);
+                }
+            } catch {
+                // Silent fail — user can still click Generate
+            } finally {
+                if (!cancelled) setAutoFetching(false);
+            }
+        };
+        loadCached();
+        return () => { cancelled = true; };
+    }, [type, ticker, sector]);
 
     // Reset data when type/context changes
     useEffect(() => {
-        if (type !== lastFetchType || !data) {
+        if (type !== lastFetchType) {
             setData(null);
             setIsExpanded(false);
-            setLastFetchType(null); // Reset until next fetch
+            setLastFetchType(null);
+            setCacheHit(false);
+            setCachedAt(null);
         }
     }, [type, ticker, sector]);
 
-    const fetchAnalysis = useCallback(async () => {
+    const fetchAnalysis = useCallback(async (forceRefresh = true) => {
         setLoading(true);
         setError(null);
 
         try {
-            // Map type to Render API endpoint (same pattern as AIAnalysisModal)
+            // Map type to Render API endpoint
             let endpoint: string;
             switch (type) {
                 case 'weekly':
@@ -1416,14 +1465,14 @@ export default function AIMarketOutlook({ type, ticker, sector }: AIMarketOutloo
                     throw new Error(`Unknown analysis type: ${type}`);
             }
 
-            // Build URL with query params for seasonality
-            let url = `${API_BASE}${endpoint}`;
-            if (type === 'seasonality' && (ticker || sector)) {
-                const params = new URLSearchParams();
+            // Build URL with query params
+            const params = new URLSearchParams();
+            if (type === 'seasonality') {
                 if (ticker) params.set('ticker', ticker);
                 if (sector) params.set('sector', sector);
-                url += `?${params.toString()}`;
             }
+            if (forceRefresh) params.set('force_refresh', 'true');
+            const url = `${API_BASE}${endpoint}${params.size > 0 ? `?${params}` : ''}`;
 
             console.log(`[AIMarketOutlook] Fetching from: ${url}`);
 
@@ -1439,6 +1488,8 @@ export default function AIMarketOutlook({ type, ticker, sector }: AIMarketOutloo
             const result = await response.json();
             setData(result);
             setLastFetchType(type);
+            setCacheHit(result._cache_hit === true);
+            setCachedAt(new Date());
             setIsExpanded(true);
 
         } catch (err) {
@@ -1448,6 +1499,7 @@ export default function AIMarketOutlook({ type, ticker, sector }: AIMarketOutloo
             setLoading(false);
         }
     }, [type, ticker, sector]);
+
 
     const typeLabels: Record<string, { title: string; icon: React.ReactNode; color: string }> = {
         weekly: {
@@ -1488,18 +1540,31 @@ export default function AIMarketOutlook({ type, ticker, sector }: AIMarketOutloo
                         <h3 className="font-semibold text-gray-900 dark:text-gray-100">
                             {config.title}
                         </h3>
-                        {data?.observability?.duration_seconds && (
-                            <div className="flex items-center gap-2 text-xs text-gray-500">
-                                <Clock className="w-3 h-3" />
-                                {data.observability.duration_seconds.toFixed(1)}s
-                                {data.observability.total_cost_usd && (
-                                    <>
-                                        <DollarSign className="w-3 h-3 ml-2" />
-                                        ${data.observability.total_cost_usd.toFixed(4)}
-                                    </>
-                                )}
-                            </div>
-                        )}
+                        <div className="flex items-center gap-2 mt-0.5">
+                            {data?.observability?.duration_seconds && (
+                                <div className="flex items-center gap-1 text-xs text-gray-500">
+                                    <Clock className="w-3 h-3" />
+                                    {data.observability.duration_seconds.toFixed(1)}s
+                                    {data.observability.total_cost_usd && (
+                                        <>
+                                            <DollarSign className="w-3 h-3 ml-1" />
+                                            ${data.observability.total_cost_usd.toFixed(4)}
+                                        </>
+                                    )}
+                                </div>
+                            )}
+                            {cachedAt && (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-500">
+                                    <Clock className="w-2.5 h-2.5" />
+                                    {cacheHit ? 'Cached · ' : ''}{formatAge(cachedAt)}
+                                </span>
+                            )}
+                            {autoFetching && (
+                                <span className="inline-flex items-center gap-1 text-[10px] text-gray-400">
+                                    <Loader2 className="w-2.5 h-2.5 animate-spin" /> loading...
+                                </span>
+                            )}
+                        </div>
                     </div>
                 </div>
 
@@ -1507,8 +1572,8 @@ export default function AIMarketOutlook({ type, ticker, sector }: AIMarketOutloo
                     {stance && <StanceBadge stance={stance} />}
 
                     <button
-                        onClick={fetchAnalysis}
-                        disabled={loading}
+                        onClick={() => fetchAnalysis(true)}
+                        disabled={loading || autoFetching}
                         className={`flex items-center gap-2 px-4 py-2 rounded-lg bg-${config.color}-600 hover:bg-${config.color}-700 text-white font-medium transition-colors disabled:opacity-50`}
                     >
                         {loading ? (
@@ -1519,7 +1584,7 @@ export default function AIMarketOutlook({ type, ticker, sector }: AIMarketOutloo
                         ) : (
                             <>
                                 <Sparkles className="w-4 h-4" />
-                                {data ? 'Refresh' : 'Generate'}
+                                {data ? 'Refresh Analysis' : 'Generate'}
                             </>
                         )}
                     </button>

@@ -48,6 +48,9 @@ A comprehensive equity analysis platform built with Next.js frontend and Python 
 - ✅ **REST API + SSE Streaming**: Real-time progress updates
 - ✅ **FinOps Dashboard**: Token usage, cost tracking, model comparison
 - ✅ **GitHub Actions**: Automated daily/weekly/monthly pipelines
+- ✅ **Top 10 Consistency Tracker**: Historical ranking persistence with configurable lookback
+- ✅ **Excel Export**: Download all tab data to .xlsx workbook
+- ✅ **Advanced Scoring**: Piotroski F-Score, Altman Z-Score, Economic Moat, Quality Score
 
 ---
 
@@ -648,7 +651,19 @@ Primary table containing daily stock analysis data with **110+ fields**.
 | pe_ttm | DECIMAL | Price/Earnings TTM |
 | pb | DECIMAL | Price/Book ratio |
 | market_cap_cr | DECIMAL | Market cap (INR Cr) |
-| ... | ... | 80+ additional fields |
+| pivot_point | DECIMAL | Pivot point (PP = (H+L+C)/3) |
+| support_1 | DECIMAL | Support level 1 |
+| support_2 | DECIMAL | Support level 2 |
+| resistance_1 | DECIMAL | Resistance level 1 |
+| resistance_2 | DECIMAL | Resistance level 2 |
+| forward_pe | DECIMAL | Forward P/E from yfinance |
+| piotroski_f_score | DECIMAL | Piotroski F-Score (0-9) |
+| altman_z_score | DECIMAL | Altman Z-Score |
+| economic_moat_score | DECIMAL | Economic Moat (0-100) |
+| quality_score | DECIMAL | Quality Score (0-100) |
+| peg_ratio | DECIMAL | P/E ÷ EPS Growth |
+| enterprise_value_cr | DECIMAL | Enterprise Value (INR Cr) |
+| ... | ... | 60+ additional fields |
 
 ### 2. weekly_analysis
 
@@ -699,7 +714,29 @@ Aggregated monthly data for each ticker.
 | monthly_sma12 | DECIMAL | 12-month SMA |
 | monthly_trend | VARCHAR(10) | UP/DOWN/SIDEWAYS |
 
-### 4. seasonality
+### 4. score_history (NEW — March 2026)
+
+Historical score snapshots for the Top 10 Consistency Tracker. Unlike daily_stocks (upsert), this table appends one row per ticker per period to preserve history.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | BIGSERIAL PRIMARY KEY | Auto-increment ID |
+| ticker | TEXT NOT NULL | Stock symbol |
+| period_type | TEXT NOT NULL | 'daily', 'weekly', or 'monthly' |
+| period_date | DATE NOT NULL | Date of the score snapshot |
+| overall_score | DOUBLE PRECISION | Composite score for ranking |
+| score_fundamental | DOUBLE PRECISION | Fundamental sub-score |
+| score_technical | DOUBLE PRECISION | Technical sub-score |
+| score_risk | DOUBLE PRECISION | Risk sub-score |
+| close_price | DOUBLE PRECISION | Closing price on that date |
+| sector | TEXT | Sector classification |
+| created_at | TIMESTAMPTZ | Row creation timestamp |
+
+**Unique constraint**: `UNIQUE(ticker, period_type, period_date)`
+**Indexes**: `(period_type, period_date DESC)`, `(ticker, period_type, period_date DESC)`
+**Seeded data**: 47 daily periods, 60 weekly periods, 25 monthly periods (~26K rows)
+
+### 5. seasonality
 
 Historical monthly return patterns by ticker.
 
@@ -732,6 +769,8 @@ The main dashboard (`dashboard/src/app/page.tsx`) provides:
 | `WeeklyReportTableV2.tsx` | Weekly with momentum ranking, trend/RSI filtering |
 | `MonthlyReportTableV2.tsx` | Monthly with return-based filtering |
 | `SeasonalityHeatmapV2.tsx` | Color-coded monthly returns heatmap |
+| `ConsistencyTracker.tsx` | Top 10 consistency panel with heatmap grid |
+| `AIMarketOutlook.tsx` | Weekly/Monthly/Seasonality AI analysis panels |
 
 ### Chart Components
 
@@ -767,6 +806,8 @@ The main dashboard (`dashboard/src/app/page.tsx`) provides:
 | `/api/monthly/[ticker]` | GET | Fetch ticker monthly history |
 | `/api/seasonality` | GET | Fetch seasonality data |
 | `/api/seasonality/[ticker]` | GET | Fetch ticker seasonality |
+| `/api/consistency` | GET | Top 10 Consistency Tracker (params: type, days) |
+| `/api/analysis-history/[ticker]` | GET | Historical analysis for a ticker |
 
 ### Agent API Endpoints (FastAPI)
 
@@ -1008,6 +1049,10 @@ Optional dependency - system falls back to yfinance if unavailable.
 | Jan 2026 | 3.3 | **🆕 ObservabilityDashboard** component |
 | Jan 2026 | 3.4 | **🆕 A2A Patterns, Critical Issues & Optimizations** from log analysis |
 | Jan 2026 | 3.5 | **✅ Token Optimization Implemented** - `_get_agent_specific_data()` & `_clean_for_predictor()` |
+| Mar 2026 | 4.0 | **🆕 20+ Blank Fields Fixed** — Piotroski, Altman Z, Moat, S&R, PEG, EV, ROE enrichment |
+| Mar 2026 | 4.1 | **🆕 Top 10 Consistency Tracker** — score_history table, /api/consistency, heatmap panel |
+| Mar 2026 | 4.2 | **🆕 Excel Export** — Download all tab data to .xlsx + AI Outlook compact mode |
+| Mar 2026 | 4.3 | **✅ Bug Fixes** — Dividend yield 100x, xlsx import, empty workbook, S&R blank, Quality Score null |
 
 ---
 
@@ -1023,6 +1068,6 @@ Optional dependency - system falls back to yfinance if unavailable.
 
 ---
 
-*Last Updated: January 20, 2026*
-*Version: 3.5.0*
+*Last Updated: March 18, 2026*
+*Version: 4.3.0*
 

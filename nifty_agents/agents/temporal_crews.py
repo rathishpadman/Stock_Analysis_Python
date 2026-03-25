@@ -1253,8 +1253,15 @@ class BaseTemporalCrew:
         start_time = time.time()
 
         try:
-            # Format prompt with data
-            formatted_prompt = prompt.format(data=json.dumps(data, indent=2, default=str))
+            # Inject current IST date to prevent LLM hallucinating dates
+            from datetime import timezone, timedelta
+            ist = timezone(timedelta(hours=5, minutes=30))
+            current_date_str = datetime.now(ist).strftime("%A, %d %B %Y")
+            date_context = f"Today's date (Indian Standard Time) is {current_date_str}.\n\n"
+
+            # Format prompt with data and prepend date context
+            formatted_prompt = date_context + prompt.format(data=json.dumps(data, indent=2, default=str))
+            system_prompt_with_date = f"You are a financial analyst. Today is {current_date_str} (IST). Respond ONLY with valid JSON."
 
             # Log LLM request
             self.observability.log_llm_request(
@@ -1262,7 +1269,7 @@ class BaseTemporalCrew:
                 span_id=span_id,
                 ticker="MARKET",
                 agent_name=agent_name,
-                system_prompt="You are a financial analyst. Respond ONLY with valid JSON.",
+                system_prompt=system_prompt_with_date,
                 user_prompt=formatted_prompt
             )
 

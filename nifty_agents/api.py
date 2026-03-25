@@ -1142,6 +1142,25 @@ async def clear_logs():
 # Temporal Analysis Endpoints (Weekly, Monthly, Seasonality)
 # ============================================================================
 
+
+def _make_serializable(obj: Any) -> Any:
+    """Recursively convert objects to JSON-serializable types."""
+    if isinstance(obj, dict):
+        return {k: _make_serializable(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [_make_serializable(v) for v in obj]
+    elif hasattr(obj, 'isoformat'):
+        return obj.isoformat()
+    elif hasattr(obj, '__dict__'):
+        return _make_serializable(obj.__dict__)
+    else:
+        try:
+            json.dumps(obj)
+            return obj
+        except (TypeError, ValueError):
+            return str(obj)
+
+
 # Import temporal crews
 try:
     from .agents.temporal_crews import (
@@ -1157,56 +1176,75 @@ except ImportError as e:
     logger.warning(f"Temporal crews not available: {e}")
     TEMPORAL_CREWS_AVAILABLE = False
 
+# In-memory result cache for temporal analyses (prevents duplicate runs + serves fresh results)
+_temporal_cache: Dict[str, Any] = {}
+_temporal_locks: Dict[str, asyncio.Lock] = {
+    "weekly": asyncio.Lock(),
+    "monthly": asyncio.Lock(),
+    "seasonality": asyncio.Lock(),
+}
+# Cache TTLs in seconds
+_TEMPORAL_CACHE_TTL = {
+    "weekly": 23 * 3600,       # 23 hours (weekly analysis valid until next week)
+    "monthly": 6 * 24 * 3600,  # 6 days (monthly analysis valid until next month)
+    "seasonality": 6 * 24 * 3600,  # 6 days
+}
+
+
+def _get_temporal_cached(key: str) -> Optional[Dict[str, Any]]:
+    """Return cached temporal result if still fresh, else None."""
+    entry = _temporal_cache.get(key)
+    if not entry:
+        return None
+    age_seconds = (datetime.now() - entry["cached_at"]).total_seconds()
+    ttl = _TEMPORAL_CACHE_TTL.get(key.split(":")[0], 23 * 3600)
+    if age_seconds < ttl:
+        return entry["result"]
+    return None
+
+
+def _set_temporal_cached(key: str, result: Dict[str, Any]):
+    """Store temporal result in in-process cache."""
+    _temporal_cache[key] = {"result": result, "cached_at": datetime.now()}
+
 
 @app.get(
     "/api/agent/weekly-outlook",
     tags=["Temporal Analysis"],
     summary="Get Weekly Market Outlook"
 )
-async def weekly_outlook():
+async def weekly_outlook(force_refresh: bool = Query(False, description="Force a fresh LLM run, bypass cache")):
     """
     Get AI-generated weekly market outlook for Indian equities.
-    
-    Uses multiple specialized agents:
-    - Trend Agent: Technical analysis of weekly patterns
-    - Sector Rotation Agent: Money flow analysis
-    - Risk Regime Agent: Market risk assessment
-    - Weekly Synthesizer: Combines all insights
-    
-    Returns:
-        Complete weekly analysis with stance, insights, and recommendations
+
+    Caches results for 23 hours. Use force_refresh=true to re-run analysis.
     """
     if not TEMPORAL_CREWS_AVAILABLE:
-        raise HTTPException(
-            status_code=503, 
-            detail="Temporal analysis crews not available"
-        )
-    
-    try:
-        result = await get_weekly_outlook()
-        
-        # Make response JSON-serializable
-        def make_serializable(obj):
-            if isinstance(obj, dict):
-                return {k: make_serializable(v) for k, v in obj.items()}
-            elif isinstance(obj, list):
-                return [make_serializable(v) for v in obj]
-            elif hasattr(obj, 'isoformat'):
-                return obj.isoformat()
-            elif hasattr(obj, '__dict__'):
-                return make_serializable(obj.__dict__)
-            else:
-                try:
-                    json.dumps(obj)
-                    return obj
-                except (TypeError, ValueError):
-                    return str(obj)
-        
-        return JSONResponse(content=make_serializable(result))
-        
-    except Exception as e:
-        logger.error(f"Weekly outlook failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=503, detail="Temporal analysis crews not available")
+
+    if not force_refresh:
+        cached = _get_temporal_cached("weekly")
+        if cached is not None:
+            cached["_cache_hit"] = True
+            return JSONResponse(content=cached)
+
+    async with _temporal_locks["weekly"]:
+        # Re-check cache after acquiring lock (another request may have just completed)
+        if not force_refresh:
+            cached = _get_temporal_cached("weekly")
+            if cached is not None:
+                cached["_cache_hit"] = True
+                return JSONResponse(content=cached)
+
+        try:
+            result = await get_weekly_outlook()
+            serialized = _make_serializable(result)
+            _set_temporal_cached("weekly", serialized)
+            serialized["_cache_hit"] = False
+            return JSONResponse(content=serialized)
+        except Exception as e:
+            logger.error(f"Weekly outlook failed: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get(
@@ -1214,50 +1252,37 @@ async def weekly_outlook():
     tags=["Temporal Analysis"],
     summary="Get Monthly Investment Thesis"
 )
-async def monthly_thesis():
+async def monthly_thesis(force_refresh: bool = Query(False, description="Force a fresh LLM run, bypass cache")):
     """
     Get AI-generated monthly investment thesis for Indian markets.
-    
-    Uses multiple specialized agents:
-    - Macro Cycle Agent: Economic cycle analysis
-    - Fund Flow Agent: Institutional flow tracking
-    - Valuation Regime Agent: Market-wide valuations
-    - Monthly Strategist: Investment thesis synthesis
-    
-    Returns:
-        Complete monthly analysis with thesis, asset allocation, and themes
+
+    Caches results for 6 days. Use force_refresh=true to re-run analysis.
     """
     if not TEMPORAL_CREWS_AVAILABLE:
-        raise HTTPException(
-            status_code=503,
-            detail="Temporal analysis crews not available"
-        )
-    
-    try:
-        result = await get_monthly_thesis()
-        
-        # Make response JSON-serializable
-        def make_serializable(obj):
-            if isinstance(obj, dict):
-                return {k: make_serializable(v) for k, v in obj.items()}
-            elif isinstance(obj, list):
-                return [make_serializable(v) for v in obj]
-            elif hasattr(obj, 'isoformat'):
-                return obj.isoformat()
-            elif hasattr(obj, '__dict__'):
-                return make_serializable(obj.__dict__)
-            else:
-                try:
-                    json.dumps(obj)
-                    return obj
-                except (TypeError, ValueError):
-                    return str(obj)
-        
-        return JSONResponse(content=make_serializable(result))
-        
-    except Exception as e:
-        logger.error(f"Monthly thesis failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=503, detail="Temporal analysis crews not available")
+
+    if not force_refresh:
+        cached = _get_temporal_cached("monthly")
+        if cached is not None:
+            cached["_cache_hit"] = True
+            return JSONResponse(content=cached)
+
+    async with _temporal_locks["monthly"]:
+        if not force_refresh:
+            cached = _get_temporal_cached("monthly")
+            if cached is not None:
+                cached["_cache_hit"] = True
+                return JSONResponse(content=cached)
+
+        try:
+            result = await get_monthly_thesis()
+            serialized = _make_serializable(result)
+            _set_temporal_cached("monthly", serialized)
+            serialized["_cache_hit"] = False
+            return JSONResponse(content=serialized)
+        except Exception as e:
+            logger.error(f"Monthly thesis failed: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get(
@@ -1267,55 +1292,65 @@ async def monthly_thesis():
 )
 async def seasonality_insights(
     ticker: Optional[str] = Query(None, description="Optional ticker for stock-specific seasonality"),
-    sector: Optional[str] = Query(None, description="Optional sector to focus on")
+    sector: Optional[str] = Query(None, description="Optional sector to focus on"),
+    force_refresh: bool = Query(False, description="Force a fresh LLM run, bypass cache")
 ):
     """
     Get AI-generated seasonality insights for Indian markets.
-    
-    Uses multiple specialized agents:
-    - Historical Pattern Agent: Monthly return patterns analysis
-    - Event Calendar Agent: Recurring event impacts
-    - Sector Seasonality Agent: Sector-specific patterns
-    - Seasonality Synthesizer: Actionable insights
-    
-    Args:
-        ticker: Optional specific stock ticker for focused analysis
-        sector: Optional sector for sector-specific patterns
-    
-    Returns:
-        Seasonality analysis with probability, patterns, and recommendations
+
+    Caches results for 6 days. Use force_refresh=true to re-run analysis.
     """
     if not TEMPORAL_CREWS_AVAILABLE:
-        raise HTTPException(
-            status_code=503,
-            detail="Temporal analysis crews not available"
-        )
-    
-    try:
-        result = await get_seasonality_insights(ticker=ticker, sector=sector)
-        
-        # Make response JSON-serializable
-        def make_serializable(obj):
-            if isinstance(obj, dict):
-                return {k: make_serializable(v) for k, v in obj.items()}
-            elif isinstance(obj, list):
-                return [make_serializable(v) for v in obj]
-            elif hasattr(obj, 'isoformat'):
-                return obj.isoformat()
-            elif hasattr(obj, '__dict__'):
-                return make_serializable(obj.__dict__)
-            else:
-                try:
-                    json.dumps(obj)
-                    return obj
-                except (TypeError, ValueError):
-                    return str(obj)
-        
-        return JSONResponse(content=make_serializable(result))
-        
-    except Exception as e:
-        logger.error(f"Seasonality insights failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=503, detail="Temporal analysis crews not available")
+
+    cache_key = f"seasonality:{ticker or ''}:{sector or ''}"
+
+    if not force_refresh:
+        cached = _get_temporal_cached(cache_key)
+        if cached is not None:
+            cached["_cache_hit"] = True
+            return JSONResponse(content=cached)
+
+    async with _temporal_locks["seasonality"]:
+        if not force_refresh:
+            cached = _get_temporal_cached(cache_key)
+            if cached is not None:
+                cached["_cache_hit"] = True
+                return JSONResponse(content=cached)
+
+        try:
+            result = await get_seasonality_insights(ticker=ticker, sector=sector)
+            serialized = _make_serializable(result)
+            _set_temporal_cached(cache_key, serialized)
+            serialized["_cache_hit"] = False
+            return JSONResponse(content=serialized)
+        except Exception as e:
+            logger.error(f"Seasonality insights failed: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get(
+    "/api/agent/temporal/cached",
+    tags=["Temporal Analysis"],
+    summary="Get Cached Temporal Analysis"
+)
+async def get_cached_temporal(type: str = Query(..., description="Analysis type: weekly, monthly, or seasonality")):
+    """
+    Return the latest cached temporal analysis result without triggering a new LLM run.
+    Used by the dashboard on page load to show the most recent analysis instantly.
+
+    Returns 404 if no cached result exists yet.
+    """
+    valid_types = ["weekly", "monthly", "seasonality"]
+    if type not in valid_types:
+        raise HTTPException(status_code=400, detail=f"type must be one of: {valid_types}")
+
+    cached = _get_temporal_cached(type)
+    if cached is None:
+        raise HTTPException(status_code=404, detail=f"No cached {type} analysis available. Click Generate to run one.")
+
+    cached["_cache_hit"] = True
+    return JSONResponse(content=cached)
 
 
 @app.get(
