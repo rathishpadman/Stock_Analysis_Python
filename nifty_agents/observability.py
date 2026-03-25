@@ -209,19 +209,19 @@ AGENT_MODEL_MAP = {
     "trend_agent": 0,             # gemini-2.0-flash
     "sector_rotation_agent": 1,   # gemini-2.5-flash-lite
     "risk_regime_agent": 1,       # gemini-2.5-flash-lite
-    "weekly_synthesizer": 2,      # gemini-2.5-flash (final synthesis = best quality)
+    "weekly_synthesizer": 2,      # gemini-2.5-flash
 
     # --- Monthly Temporal Crew Agents ---
-    "macro_fundamentals_agent": 1,  # gemini-2.5-flash-lite
-    "technical_momentum_agent": 0,  # gemini-2.0-flash
-    "monthly_risk_agent": 1,        # gemini-2.5-flash-lite
-    "monthly_synthesizer": 2,       # gemini-2.5-flash (final synthesis)
+    "macro_cycle_agent": 1,       # gemini-2.5-flash-lite
+    "fund_flow_agent": 0,         # gemini-2.0-flash
+    "valuation_regime_agent": 1,  # gemini-2.5-flash-lite
+    "monthly_strategist": 2,      # gemini-2.5-flash
 
     # --- Seasonality Temporal Crew Agents ---
-    "seasonal_pattern_agent": 0,    # gemini-2.0-flash
-    "correlation_agent": 1,         # gemini-2.5-flash-lite
-    "event_catalyst_agent": 1,      # gemini-2.5-flash-lite
-    "seasonality_synthesizer": 2,   # gemini-2.5-flash (final synthesis)
+    "historical_pattern_agent": 0, # gemini-2.0-flash
+    "event_calendar_agent": 1,     # gemini-2.5-flash-lite
+    "sector_seasonality_agent": 1, # gemini-2.5-flash-lite
+    "seasonality_synthesizer": 2,  # gemini-2.5-flash
 }
 
 
